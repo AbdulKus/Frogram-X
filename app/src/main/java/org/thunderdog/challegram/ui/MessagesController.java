@@ -221,6 +221,7 @@ import org.thunderdog.challegram.ui.camera.CameraAccessImageView;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Test;
 import org.thunderdog.challegram.util.CancellableResultHandler;
+import org.thunderdog.challegram.util.ForumTopicIconModifier;
 import org.thunderdog.challegram.util.HapticMenuHelper;
 import org.thunderdog.challegram.util.OptionDelegate;
 import org.thunderdog.challegram.util.Permissions;
@@ -4489,7 +4490,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       int forumTopicId = getForumTopicId();
       if (forumTopicId != 0) {
         ids.append(R.id.btn_pinTopic);
-        strings.append(Settings.instance().getDefaultForumTopicId(tdlib.id(), chat.id) == forumTopicId ? R.string.Unpin : R.string.Pin);
+        strings.append(Settings.instance().getDefaultForumTopicId(tdlib.id(), chat.id) == forumTopicId ? R.string.UnpinTopic : R.string.PinTopic);
       }
     }
 
@@ -4644,19 +4645,24 @@ public class MessagesController extends ViewController<MessagesController.Argume
         UI.showError(error);
         return;
       }
-      if (forumTopics.topics.length == 0) {
+      boolean canCreateTopic = canCreateForumTopic();
+      if (forumTopics.topics.length == 0 && !canCreateTopic) {
         UI.showToast(Lang.getString(R.string.NoTopics), Toast.LENGTH_SHORT);
         return;
       }
 
       int activeForumTopicId = getForumTopicId();
       int defaultForumTopicId = Settings.instance().getDefaultForumTopicId(tdlib.id(), chatId);
-      List<ListItem> items = new ArrayList<>(forumTopics.topics.length);
+      List<ListItem> items = new ArrayList<>(forumTopics.topics.length + (canCreateTopic ? 1 : 0));
+      if (canCreateTopic) {
+        items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_createTopic, R.drawable.baseline_add_24, R.string.CreateTopic));
+      }
       for (TdApi.ForumTopic forumTopic : forumTopics.topics) {
         int forumTopicId = forumTopic.info.forumTopicId;
-        int icon = forumTopicId == defaultForumTopicId ? R.drawable.deproko_baseline_pin_24 : R.drawable.baseline_forum_24;
-        items.add(new ListItem(ListItem.TYPE_INFO_SETTING, R.id.btn_topic, icon, forumTopic.info.name, false)
+        ForumTopicIconModifier iconModifier = new ForumTopicIconModifier(tdlib, forumTopic.info.icon, forumTopicId == defaultForumTopicId);
+        items.add(new ListItem(ListItem.TYPE_INFO_SETTING, R.id.btn_topic, 0, forumTopic.info.name, false)
           .setIntValue(forumTopicId)
+          .setDrawModifier(iconModifier)
           .setData(forumTopic));
       }
 
@@ -4666,16 +4672,30 @@ public class MessagesController extends ViewController<MessagesController.Argume
         .setDisableFooter(true)
         .setNeedRootInsets(true)
         .setSettingProcessor((item, view, isUpdate) -> {
+          if (item.getId() != R.id.btn_topic) {
+            return;
+          }
           TdApi.ForumTopic forumTopic = (TdApi.ForumTopic) item.getData();
           view.setName(forumTopic.lastMessage != null ?
             Lang.getRelativeTimestamp(forumTopic.lastMessage.date, TimeUnit.SECONDS) : "");
           view.setData(forumTopic.info.name);
           view.setUnreadCounter(forumTopic.unreadCount, false, isUpdate);
           int currentDefaultForumTopicId = Settings.instance().getDefaultForumTopicId(tdlib.id(), chatId);
-          view.setIconColorId(item.getIntValue() == activeForumTopicId || item.getIntValue() == currentDefaultForumTopicId ?
-            ColorId.textNeutral : ColorId.icon);
+          ForumTopicIconModifier iconModifier = (ForumTopicIconModifier) item.getDrawModifier();
+          iconModifier.setPinned(item.getIntValue() == currentDefaultForumTopicId);
+          view.setCenterIcon(true);
+          view.setDrawModifier(iconModifier);
+          iconModifier.bind(view);
+          view.setTextColorId(item.getIntValue() == activeForumTopicId ? ColorId.textNeutral : ColorId.NONE);
         })
         .setOnSettingItemClick((view, settingsId, item, doneButton, settingsAdapter, window) -> {
+          if (item.getId() == R.id.btn_createTopic) {
+            promptCreateForumTopic(() -> {
+              window.hideWindow(true);
+              showForumTopics();
+            });
+            return;
+          }
           window.hideWindow(true);
           setForumTopic((TdApi.ForumTopic) item.getData());
         })
@@ -4697,15 +4717,22 @@ public class MessagesController extends ViewController<MessagesController.Argume
     int forumTopicId = forumTopic.info.forumTopicId;
     boolean isDefault = Settings.instance().getDefaultForumTopicId(tdlib.id(), chatId) == forumTopicId;
 
-    IntList ids = new IntList(3);
-    StringList strings = new StringList(3);
-    IntList colors = new IntList(3);
-    IntList icons = new IntList(3);
+    IntList ids = new IntList(4);
+    StringList strings = new StringList(4);
+    IntList colors = new IntList(4);
+    IntList icons = new IntList(4);
 
     ids.append(R.id.btn_pinTopic);
-    strings.append(isDefault ? R.string.Unpin : R.string.Pin);
+    strings.append(isDefault ? R.string.UnpinTopic : R.string.PinTopic);
     colors.append(OptionColor.NORMAL);
     icons.append(isDefault ? R.drawable.deproko_baseline_pin_undo_24 : R.drawable.deproko_baseline_pin_24);
+
+    if (canEditForumTopic(forumTopic)) {
+      ids.append(R.id.btn_editTopic);
+      strings.append(R.string.EditTopic);
+      colors.append(OptionColor.NORMAL);
+      icons.append(R.drawable.baseline_edit_24);
+    }
 
     if (forumTopic.unreadCount > 0 && forumTopic.lastMessage != null) {
       ids.append(R.id.btn_markChatAsRead);
@@ -4728,12 +4755,13 @@ public class MessagesController extends ViewController<MessagesController.Argume
         Settings.instance().setDefaultForumTopicId(tdlib.id(), chatId, newDefaultForumTopicId);
         for (ListItem item : topicsAdapter.getItems()) {
           if (item.getId() == R.id.btn_topic) {
-            item.setIconRes(item.getIntValue() == newDefaultForumTopicId ?
-              R.drawable.deproko_baseline_pin_24 : R.drawable.baseline_forum_24);
+            ((ForumTopicIconModifier) item.getDrawModifier()).setPinned(item.getIntValue() == newDefaultForumTopicId);
           }
         }
         topicsAdapter.notifyDataSetChanged();
         updateTopicBar(true);
+      } else if (id == R.id.btn_editTopic) {
+        promptEditForumTopic(forumTopic, topicsAdapter);
       } else if (id == R.id.btn_markChatAsRead && forumTopic.lastMessage != null) {
         tdlib.send(new TdApi.ViewMessages(
           chatId,
@@ -4751,6 +4779,119 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
       return true;
     });
+  }
+
+  private boolean canManageForumTopics () {
+    if (chat == null) {
+      return false;
+    }
+    TdApi.ChatMemberStatus status = tdlib.chatStatus(chat.id);
+    if (status == null) {
+      return false;
+    }
+    switch (status.getConstructor()) {
+      case TdApi.ChatMemberStatusCreator.CONSTRUCTOR:
+        return true;
+      case TdApi.ChatMemberStatusAdministrator.CONSTRUCTOR:
+        return ((TdApi.ChatMemberStatusAdministrator) status).rights.canManageTopics;
+      default:
+        return false;
+    }
+  }
+
+  private boolean canCreateForumTopic () {
+    if (chat == null) {
+      return false;
+    }
+    if (canManageForumTopics()) {
+      return true;
+    }
+    TdApi.ChatMemberStatus status = tdlib.chatStatus(chat.id);
+    if (status == null || !chat.permissions.canCreateTopics) {
+      return false;
+    }
+    switch (status.getConstructor()) {
+      case TdApi.ChatMemberStatusMember.CONSTRUCTOR:
+        return true;
+      case TdApi.ChatMemberStatusRestricted.CONSTRUCTOR:
+        return ((TdApi.ChatMemberStatusRestricted) status).permissions.canCreateTopics;
+      default:
+        return false;
+    }
+  }
+
+  private boolean canEditForumTopic (TdApi.ForumTopic forumTopic) {
+    return forumTopic != null && (canManageForumTopics() || forumTopic.info.isOutgoing);
+  }
+
+  private void promptCreateForumTopic (Runnable after) {
+    if (chat == null || !canCreateForumTopic()) {
+      return;
+    }
+    long chatId = chat.id;
+    openInputAlert(
+      Lang.getString(R.string.CreateTopic),
+      Lang.getString(R.string.TopicName),
+      R.string.CreateTopic,
+      R.string.Cancel,
+      null,
+      (inputView, result) -> {
+        String name = result.trim();
+        if (name.isEmpty() || name.codePointCount(0, name.length()) > 128) {
+          return false;
+        }
+        int[] colors = {0x6fb9f0, 0xffd67e, 0xcb86db, 0x8eee98, 0xff93b2, 0xfb6f5f};
+        int color = colors[(int) (SystemClock.uptimeMillis() % colors.length)];
+        tdlib.send(new TdApi.CreateForumTopic(chatId, name, false, new TdApi.ForumTopicIcon(color, 0)), (topicInfo, error) ->
+          runOnUiThreadOptional(() -> {
+            if (error != null) {
+              UI.showError(error);
+            } else if (chat != null && chat.id == chatId) {
+              after.run();
+            }
+          })
+        );
+        return true;
+      },
+      true
+    ).getEditText().setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+  }
+
+  private void promptEditForumTopic (TdApi.ForumTopic forumTopic, SettingsAdapter topicsAdapter) {
+    if (chat == null || !canEditForumTopic(forumTopic)) {
+      return;
+    }
+    long chatId = chat.id;
+    int forumTopicId = forumTopic.info.forumTopicId;
+    openInputAlert(
+      Lang.getString(R.string.EditTopic),
+      Lang.getString(R.string.TopicName),
+      R.string.Save,
+      R.string.Cancel,
+      forumTopic.info.name,
+      (inputView, result) -> {
+        String name = result.trim();
+        if (name.isEmpty() || name.codePointCount(0, name.length()) > 128) {
+          return false;
+        }
+        tdlib.send(new TdApi.EditForumTopic(chatId, forumTopicId, name, false, 0), (ok, error) ->
+          runOnUiThreadOptional(() -> {
+            if (error != null) {
+              UI.showError(error);
+            } else if (chat != null && chat.id == chatId) {
+              forumTopic.info.name = name;
+              if (getForumTopicId() == forumTopicId) {
+                activeForumTopic = forumTopic;
+                updateTopicBar(true);
+              }
+              topicsAdapter.notifyDataSetChanged();
+            }
+          })
+        );
+        return true;
+      },
+      true
+    ).getEditText().setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
   }
 
   // Clear history
