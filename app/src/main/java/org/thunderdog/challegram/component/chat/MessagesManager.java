@@ -122,6 +122,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     this.tdlib = controller.tdlib();
     this.searchMiddleware = new MessagesSearchManagerMiddleware(tdlib);
     this.loader = new MessagesLoader(this, searchMiddleware);
+    tdlib.settings().addPinnedMessageDismissListener(this);
     this.listener = new RecyclerView.OnScrollListener() {
       @Override
       public void onScrollStateChanged (RecyclerView recyclerView, int newState) {
@@ -546,11 +547,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     lastViewedMentionMessageId = 0;
     lastViewedReactionMessageId = 0;
     chatAdmins = null;
-    if (pinnedMessages != null) {
-      pinnedMessages.performDestroy();
-      pinnedMessages = null;
-    }
-    pinnedMessagesAvailable = false;
+    destroyPinnedMessages(false);
     hasVisibleProtectedContent = false;
     unsubscribeFromUpdates();
     mentionsHandler = null;
@@ -602,7 +599,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     loader.setSearchParameters(query, sender, filter);
     adapter.setChatType(chat.type);
     if (filter != null && Td.isPinnedFilter(filter)) {
-      initPinned(chat.id, 1, 1);
+      initPinned(chat.id, null, 1, 1);
     }
     if (highlightMessageId != null) {
       loadFromMessage(highlightMessageId, highlightMode, true);
@@ -664,6 +661,9 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   private final MessageListManager.MaxMessageIdListener pinnedMessageAvailabilityChangeListener = new MessageListManager.MaxMessageIdListener() {
     @Override
     public void onMaxMessageIdChanged (ListManager<TdApi.Message> list, long maxMessageId) {
+      if (list != pinnedMessages) {
+        return;
+      }
       if (maxMessageId != 0) {
         long chatId = loader.getChatId();
         setPinnedMessagesAvailable(!(tdlib.settings().isMessageDismissed(chatId, maxMessageId) || tdlib.chatRestricted(chatId)));
@@ -675,6 +675,9 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   private final MessageListManager.ChangeListener pinnedMessageListener = new MessageListManager.ChangeListener() {
     @Override
     public void onAvailabilityChanged (ListManager<TdApi.Message> list, boolean isAvailable) {
+      if (list != pinnedMessages) {
+        return;
+      }
       long chatId = loader.getChatId();
       if (!isAvailable || !(tdlib.settings().hasDismissedMessages(chatId) || tdlib.chatRestricted(chatId))) {
         // Either list became unavailable,
@@ -693,8 +696,20 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     }
   }
 
-  private void initPinned (long chatId, int initialLoadCount, int loadCount) {
-    this.pinnedMessages = new MessageListManager(tdlib, initialLoadCount, loadCount, pinnedMessageListener, chatId, 0, null, null, null, new TdApi.SearchMessagesFilterPinned());
+  private void destroyPinnedMessages (boolean updateController) {
+    awaitingForPinnedMessages = false;
+    if (pinnedMessages != null) {
+      pinnedMessages.performDestroy();
+      pinnedMessages = null;
+    }
+    pinnedMessagesAvailable = false;
+    if (updateController) {
+      controller.showHidePinnedMessages(false, null);
+    }
+  }
+
+  private void initPinned (long chatId, @Nullable TdApi.MessageTopic topicId, int initialLoadCount, int loadCount) {
+    this.pinnedMessages = new MessageListManager(tdlib, initialLoadCount, loadCount, pinnedMessageListener, chatId, 0, topicId, null, null, new TdApi.SearchMessagesFilterPinned());
     this.pinnedMessages.addMaxMessageIdListener(pinnedMessageAvailabilityChangeListener);
     this.pinnedMessages.addChangeListener(new MessageListManager.ChangeListener() {
       @Override
@@ -707,10 +722,10 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
         });
       }
     });
-    tdlib.settings().addPinnedMessageDismissListener(this);
   }
 
   public void openChat (TdApi.Chat chat, @Nullable ThreadInfo messageThread, @Nullable TdApi.MessageTopic topicId, TdApi.SearchMessagesFilter filter, MessagesController context, boolean areScheduled, boolean needPinnedMessages) {
+    destroyPinnedMessages(true);
     if (chat.id != 0) {
       if (Log.isEnabled(Log.TAG_MESSAGES_LOADER)) {
         Log.i(Log.TAG_MESSAGES_LOADER, "[CREATE] chatId:%d", chat.id);
@@ -719,9 +734,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       // readOneShot = true;
     }
     if (chat.id != 0 && messageThread == null && !areScheduled && needPinnedMessages) {
-      initPinned(chat.id, 10, 50);
-    } else {
-      this.pinnedMessages = null;
+      initPinned(chat.id, topicId, 10, 50);
     }
     if (!areScheduled && tdlib.chatRestricted(chat)) {
       loader.setChat(chat, messageThread, topicId, MessagesLoader.SPECIAL_MODE_RESTRICTED, null);
