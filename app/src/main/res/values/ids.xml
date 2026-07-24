@@ -1423,6 +1423,8 @@
   <item type="id" name="btn_pinTopic" />
   <item type="id" name="btn_createTopic" />
   <item type="id" name="btn_editTopic" />
+  <item type="id" name="btn_closeTopic" />
+  <item type="id" name="btn_deleteTopic" />
 
   <!-- BROADCAST BUTTONS -->
 
