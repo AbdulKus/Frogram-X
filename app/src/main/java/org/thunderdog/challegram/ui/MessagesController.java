@@ -4489,8 +4489,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       int forumTopicId = getForumTopicId();
       if (forumTopicId != 0) {
         ids.append(R.id.btn_pinTopic);
-        strings.append(Settings.instance().getDefaultForumTopicId(tdlib.id(), chat.id) == forumTopicId ?
-          R.string.StopOpeningTopicByDefault : R.string.OpenTopicByDefault);
+        strings.append(Settings.instance().getDefaultForumTopicId(tdlib.id(), chat.id) == forumTopicId ? R.string.Unpin : R.string.Pin);
       }
     }
 
@@ -4646,7 +4645,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         return;
       }
       if (forumTopics.topics.length == 0) {
-        UI.showToast(R.string.NoTopics, Toast.LENGTH_SHORT);
+        UI.showToast(Lang.getString(R.string.NoTopics), Toast.LENGTH_SHORT);
         return;
       }
 
@@ -4668,17 +4667,90 @@ public class MessagesController extends ViewController<MessagesController.Argume
         .setNeedRootInsets(true)
         .setSettingProcessor((item, view, isUpdate) -> {
           TdApi.ForumTopic forumTopic = (TdApi.ForumTopic) item.getData();
-          view.setData(forumTopic.lastMessage != null ?
+          view.setName(forumTopic.lastMessage != null ?
             Lang.getRelativeTimestamp(forumTopic.lastMessage.date, TimeUnit.SECONDS) : "");
+          view.setData(forumTopic.info.name);
           view.setUnreadCounter(forumTopic.unreadCount, false, isUpdate);
-          view.setIconColorId(item.getIntValue() == activeForumTopicId || item.getIntValue() == defaultForumTopicId ?
+          int currentDefaultForumTopicId = Settings.instance().getDefaultForumTopicId(tdlib.id(), chatId);
+          view.setIconColorId(item.getIntValue() == activeForumTopicId || item.getIntValue() == currentDefaultForumTopicId ?
             ColorId.textNeutral : ColorId.icon);
         })
         .setOnSettingItemClick((view, settingsId, item, doneButton, settingsAdapter, window) -> {
           window.hideWindow(true);
           setForumTopic((TdApi.ForumTopic) item.getData());
+        })
+        .setOnSettingItemLongClick((view, item, settingsAdapter) -> {
+          if (item.getId() != R.id.btn_topic) {
+            return false;
+          }
+          showForumTopicOptions((TdApi.ForumTopic) item.getData(), settingsAdapter);
+          return true;
         }));
     }));
+  }
+
+  private void showForumTopicOptions (TdApi.ForumTopic forumTopic, SettingsAdapter topicsAdapter) {
+    if (chat == null || forumTopic == null) {
+      return;
+    }
+    long chatId = chat.id;
+    int forumTopicId = forumTopic.info.forumTopicId;
+    boolean isDefault = Settings.instance().getDefaultForumTopicId(tdlib.id(), chatId) == forumTopicId;
+
+    IntList ids = new IntList(3);
+    StringList strings = new StringList(3);
+    IntList colors = new IntList(3);
+    IntList icons = new IntList(3);
+
+    ids.append(R.id.btn_pinTopic);
+    strings.append(isDefault ? R.string.Unpin : R.string.Pin);
+    colors.append(OptionColor.NORMAL);
+    icons.append(isDefault ? R.drawable.deproko_baseline_pin_undo_24 : R.drawable.deproko_baseline_pin_24);
+
+    if (forumTopic.unreadCount > 0 && forumTopic.lastMessage != null) {
+      ids.append(R.id.btn_markChatAsRead);
+      strings.append(R.string.MarkTopicAsRead);
+      colors.append(OptionColor.NORMAL);
+      icons.append(R.drawable.baseline_done_all_24);
+    }
+
+    ids.append(R.id.btn_cancel);
+    strings.append(R.string.Cancel);
+    colors.append(OptionColor.NORMAL);
+    icons.append(R.drawable.baseline_cancel_24);
+
+    showOptions(forumTopic.info.name, ids.get(), strings.get(), colors.get(), icons.get(), (itemView, id) -> {
+      if (chat == null || chat.id != chatId) {
+        return true;
+      }
+      if (id == R.id.btn_pinTopic) {
+        int newDefaultForumTopicId = isDefault ? 0 : forumTopicId;
+        Settings.instance().setDefaultForumTopicId(tdlib.id(), chatId, newDefaultForumTopicId);
+        for (ListItem item : topicsAdapter.getItems()) {
+          if (item.getId() == R.id.btn_topic) {
+            item.setIconRes(item.getIntValue() == newDefaultForumTopicId ?
+              R.drawable.deproko_baseline_pin_24 : R.drawable.baseline_forum_24);
+          }
+        }
+        topicsAdapter.notifyDataSetChanged();
+        updateTopicBar(true);
+      } else if (id == R.id.btn_markChatAsRead && forumTopic.lastMessage != null) {
+        tdlib.send(new TdApi.ViewMessages(
+          chatId,
+          new long[] {forumTopic.lastMessage.id},
+          new TdApi.MessageSourceForumTopicHistory(),
+          true
+        ), (ok, error) -> runOnUiThreadOptional(() -> {
+          if (error != null) {
+            UI.showError(error);
+            return;
+          }
+          forumTopic.unreadCount = 0;
+          topicsAdapter.notifyDataSetChanged();
+        }));
+      }
+      return true;
+    });
   }
 
   // Clear history
