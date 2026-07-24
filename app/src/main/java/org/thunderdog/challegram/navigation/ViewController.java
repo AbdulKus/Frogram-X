@@ -2118,6 +2118,12 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
         }
       }
     };
+    if (b.onSettingItemLongClick != null) {
+      settings.adapter.setOnLongClickListener(view -> {
+        Object tag = view.getTag();
+        return tag instanceof ListItem && b.onSettingItemLongClick.onLongClick(view, (ListItem) tag, settings.adapter);
+      });
+    }
     final int checkedIndex = settings.adapter.setItems(items, true);
 
     FrameLayoutFix footerView = null;
