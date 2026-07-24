@@ -71,7 +71,7 @@ if [ ! "$IGNORE_SDK" ]; then
   test -d "$ANDROID_SDK_ROOT" || echo -e "${STYLE_WARN}Android SDK is not installed.${STYLE_END}"
 fi
 
-FLAVORS=$(scripts/./read-property.sh version.properties version.flavors)
+FLAVORS=${TGX_BUILD_FLAVORS:-$(scripts/./read-property.sh version.properties version.flavors)}
 export FLAVORS
 
 # Export
