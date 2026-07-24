@@ -1265,6 +1265,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
         SettingView settingView = new SettingView(context, tdlib);
         settingView.setType(viewType == ListItem.TYPE_INFO_MULTILINE ? SettingView.TYPE_INFO_MULTILINE : SettingView.TYPE_INFO);
         settingView.setOnClickListener(onClickListener);
+        settingView.setOnLongClickListener(onLongClickListener);
         if (themeProvider != null) {
           themeProvider.addThemeInvalidateListener(settingView);
         }
