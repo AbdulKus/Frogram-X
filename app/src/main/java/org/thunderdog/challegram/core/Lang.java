@@ -252,7 +252,9 @@ public class Lang {
   }
 
   private static @Nullable String getFrogramFallbackString (@StringRes int resId) {
-    if (resId != R.string.Topics && resId != R.string.NoTopics && resId != R.string.MarkTopicAsRead) {
+    if (resId != R.string.Topics && resId != R.string.NoTopics && resId != R.string.MarkTopicAsRead &&
+        resId != R.string.PinTopic && resId != R.string.UnpinTopic && resId != R.string.CreateTopic &&
+        resId != R.string.EditTopic && resId != R.string.TopicName) {
       return null;
     }
     Context context = UI.getAppContext();
