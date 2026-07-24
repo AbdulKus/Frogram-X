@@ -13,6 +13,7 @@
 package org.thunderdog.challegram.util;
 
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.view.View;
 
@@ -45,19 +46,27 @@ public final class ForumTopicIconModifier implements DrawModifier, TdlibEmojiMan
   private final int color;
   private final Drawable forumIcon;
   private final Drawable pinIcon;
+  private final Drawable lockIcon;
+  private final boolean general;
 
   private TGStickerObj sticker;
   private WeakReference<View> boundView;
   private boolean postponedRequestSent;
   private boolean pinned;
+  private boolean closed;
+  private boolean centered;
+  private boolean selected;
 
-  public ForumTopicIconModifier (Tdlib tdlib, TdApi.ForumTopicIcon icon, boolean pinned) {
+  public ForumTopicIconModifier (Tdlib tdlib, TdApi.ForumTopicIcon icon, boolean pinned, boolean closed, boolean general) {
     this.tdlib = tdlib;
-    this.customEmojiId = icon != null ? icon.customEmojiId : 0;
+    this.customEmojiId = !general && icon != null ? icon.customEmojiId : 0;
     this.color = icon != null && icon.color != 0 ? 0xff000000 | icon.color : Theme.getColor(ColorId.icon);
     this.pinned = pinned;
+    this.closed = closed;
+    this.general = general;
     this.forumIcon = Drawables.get(R.drawable.baseline_forum_16);
     this.pinIcon = Drawables.get(R.drawable.deproko_baseline_pin_14);
+    this.lockIcon = Drawables.get(R.drawable.baseline_lock_14);
     if (customEmojiId != 0) {
       TdlibEmojiManager.Entry entry = tdlib.emoji().findOrPostponeRequest(customEmojiId, this);
       if (entry != null && !entry.isNotFound()) {
@@ -83,13 +92,36 @@ public final class ForumTopicIconModifier implements DrawModifier, TdlibEmojiMan
     view.invalidate();
   }
 
+  public ForumTopicIconModifier setCentered (boolean centered) {
+    this.centered = centered;
+    return this;
+  }
+
+  public void setSelected (boolean selected) {
+    if (this.selected != selected) {
+      this.selected = selected;
+      invalidateBoundView();
+    }
+  }
+
   public void setPinned (boolean pinned) {
     if (this.pinned != pinned) {
       this.pinned = pinned;
-      View view = boundView != null ? boundView.get() : null;
-      if (view != null) {
-        view.invalidate();
-      }
+      invalidateBoundView();
+    }
+  }
+
+  public void setClosed (boolean closed) {
+    if (this.closed != closed) {
+      this.closed = closed;
+      invalidateBoundView();
+    }
+  }
+
+  private void invalidateBoundView () {
+    View view = boundView != null ? boundView.get() : null;
+    if (view != null) {
+      view.invalidate();
     }
   }
 
@@ -126,13 +158,19 @@ public final class ForumTopicIconModifier implements DrawModifier, TdlibEmojiMan
   @Override
   public void afterDraw (View view, Canvas c) {
     int size = Screen.dp(30f);
-    int left = Screen.dp(15f);
+    int left = centered ? (view.getMeasuredWidth() - size) / 2 : Screen.dp(15f);
     if (org.thunderdog.challegram.core.Lang.rtl()) {
-      left = view.getMeasuredWidth() - left - size;
+      left = centered ? left : view.getMeasuredWidth() - left - size;
     }
     int top = (view.getMeasuredHeight() - size) / 2;
+    float centerX = left + size / 2f;
+    float centerY = top + size / 2f;
 
-    c.drawCircle(left + size / 2f, top + size / 2f, size / 2f, Paints.fillingPaint(color));
+    if (selected) {
+      c.drawCircle(centerX, centerY, size / 2f + Screen.dp(3f),
+        Paints.getProgressPaint(Theme.getColor(ColorId.iconActive), Screen.dp(2f)));
+    }
+    c.drawCircle(centerX, centerY, size / 2f, Paints.fillingPaint(color));
     if (sticker != null && view instanceof ComplexReceiverProvider) {
       ComplexReceiver receiver = ((ComplexReceiverProvider) view).getComplexReceiver();
       ImageReceiver imageReceiver = receiver.getImageReceiver(IMAGE_RECEIVER_KEY);
@@ -140,15 +178,26 @@ public final class ForumTopicIconModifier implements DrawModifier, TdlibEmojiMan
       float scale = sticker.getDisplayScale();
       DrawAlgorithms.drawReceiver(c, imageReceiver, gifReceiver, false, true,
         left, top, left + size, top + size, scale, scale);
+    } else if (general) {
+      Paint paint = Paints.getMediumTextPaint(19f, 0xffffffff, false);
+      Paint.FontMetrics metrics = paint.getFontMetrics();
+      c.drawText("#", centerX - paint.measureText("#") / 2f,
+        centerY - (metrics.ascent + metrics.descent) / 2f, paint);
     } else {
-      Drawables.drawCentered(c, forumIcon, left + size / 2f, top + size / 2f, Paints.whitePorterDuffPaint());
+      Drawables.drawCentered(c, forumIcon, centerX, centerY, Paints.whitePorterDuffPaint());
     }
 
     if (pinned) {
-      float pinX = left + size - Screen.dp(2f);
-      float pinY = top + size - Screen.dp(2f);
+      float pinX = left + size - Screen.dp(1f);
+      float pinY = top + Screen.dp(2f);
       c.drawCircle(pinX, pinY, Screen.dp(8f), Paints.fillingPaint(Theme.fillingColor()));
       Drawables.drawCentered(c, pinIcon, pinX, pinY, Paints.getIconGrayPorterDuffPaint());
+    }
+    if (closed) {
+      float lockX = left + size - Screen.dp(1f);
+      float lockY = top + size - Screen.dp(1f);
+      c.drawCircle(lockX, lockY, Screen.dp(8f), Paints.fillingPaint(Theme.fillingColor()));
+      Drawables.drawCentered(c, lockIcon, lockX, lockY, Paints.getIconGrayPorterDuffPaint());
     }
   }
 }
