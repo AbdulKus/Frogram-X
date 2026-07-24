@@ -129,7 +129,7 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
 
   private int textLeft;
   private int timeLeft;
-  private int muteLeft, verifyLeft;
+  private int muteLeft, forumIconLeft, verifyLeft;
   private int emojiStatusLeft;
   private int checkRight;
   private int reactionsRight;
@@ -786,6 +786,10 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
     return tdlib.chatNeedsMuteIcon(chat);
   }
 
+  public boolean showForumIcon () {
+    return !isArchive() && tdlib.isForum(chat.id);
+  }
+
   public boolean showVerify () {
     return (flags & FLAG_SHOW_VERIFY) != 0;
   }
@@ -897,6 +901,9 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
     if (showMute()) {
       avail = avail - ChatView.getMuteOffset() - Icons.getChatMuteDrawableWidth();
     }
+    if (showForumIcon()) {
+      avail -= Screen.dp(19f);
+    }
     boolean showVerify = tdlib.chatVerified(chat);
     this.flags = BitwiseUtils.setFlag(flags, FLAG_SHOW_VERIFY, showVerify);
     if (showVerify) {
@@ -966,6 +973,10 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
     if (isSecret) {
       verifyLeft += Screen.dp(14f);
       muteLeft += Screen.dp(14f);
+    }
+    forumIconLeft = muteLeft;
+    if (showForumIcon()) {
+      muteLeft += Screen.dp(19f);
     }
     if (changed && avatarPlaceholder != null) {
       setAvatar();
@@ -1116,6 +1127,10 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
 
   public int getMuteLeft() {
     return muteLeft;
+  }
+
+  public int getForumIconLeft () {
+    return forumIconLeft;
   }
 
   public int getVerifyLeft () {
