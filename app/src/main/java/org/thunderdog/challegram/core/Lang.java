@@ -254,7 +254,9 @@ public class Lang {
   private static @Nullable String getFrogramFallbackString (@StringRes int resId) {
     if (resId != R.string.Topics && resId != R.string.NoTopics && resId != R.string.MarkTopicAsRead &&
         resId != R.string.PinTopic && resId != R.string.UnpinTopic && resId != R.string.CreateTopic &&
-        resId != R.string.EditTopic && resId != R.string.TopicName) {
+        resId != R.string.EditTopic && resId != R.string.TopicName && resId != R.string.TopicIcon &&
+        resId != R.string.CloseTopic && resId != R.string.ReopenTopic && resId != R.string.DeleteTopic &&
+        resId != R.string.DeleteTopicConfirm) {
       return null;
     }
     Context context = UI.getAppContext();
@@ -459,6 +461,10 @@ public class Lang {
           warnResource(true, pluralCode(), resId);
         }
       }
+    }
+    String frogramFallback = getFrogramFallbackString(resId);
+    if (frogramFallback != null) {
+      return formatString(applyFlags(applyFrogramBranding(frogramFallback), flags), hasSpanned, creator, formatArgs);
     }
     try {
       if (creator != null || flags != 0 || hasSpanned) {
