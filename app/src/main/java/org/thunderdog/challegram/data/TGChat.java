@@ -902,7 +902,7 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
       avail = avail - ChatView.getMuteOffset() - Icons.getChatMuteDrawableWidth();
     }
     if (showForumIcon()) {
-      avail -= Screen.dp(19f);
+      avail -= Screen.dp(22f);
     }
     boolean showVerify = tdlib.chatVerified(chat);
     this.flags = BitwiseUtils.setFlag(flags, FLAG_SHOW_VERIFY, showVerify);
@@ -974,9 +974,9 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
       verifyLeft += Screen.dp(14f);
       muteLeft += Screen.dp(14f);
     }
-    forumIconLeft = muteLeft;
+    forumIconLeft = muteLeft + Screen.dp(2f);
     if (showForumIcon()) {
-      muteLeft += Screen.dp(19f);
+      muteLeft += Screen.dp(22f);
     }
     if (changed && avatarPlaceholder != null) {
       setAvatar();
