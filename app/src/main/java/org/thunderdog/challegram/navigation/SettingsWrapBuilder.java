@@ -14,6 +14,8 @@
  */
 package org.thunderdog.challegram.navigation;
 
+import android.view.View;
+
 import androidx.annotation.IdRes;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
@@ -24,6 +26,7 @@ import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.telegram.TdlibDelegate;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.ui.ListItem;
+import org.thunderdog.challegram.ui.SettingsAdapter;
 import org.thunderdog.challegram.widget.PopupLayout;
 import org.thunderdog.challegram.widget.TimerView;
 
@@ -46,6 +49,8 @@ public class SettingsWrapBuilder {
 
   public @Nullable
   ViewController.OnSettingItemClick onSettingItemClick;
+  public @Nullable
+  OnSettingItemLongClick onSettingItemLongClick;
 
   public @IdRes
   int sizeOptionId;
@@ -170,6 +175,11 @@ public class SettingsWrapBuilder {
     return this;
   }
 
+  public SettingsWrapBuilder setOnSettingItemLongClick (@Nullable OnSettingItemLongClick onSettingItemLongClick) {
+    this.onSettingItemLongClick = onSettingItemLongClick;
+    return this;
+  }
+
   public SettingsWrapBuilder setSizeOptionId (int sizeOptionId) {
     this.sizeOptionId = sizeOptionId;
     return this;
@@ -235,6 +245,10 @@ public class SettingsWrapBuilder {
 
   public interface CustomSettingProcessor {
     void setValuedSetting (ListItem item, SettingView view, boolean isUpdate);
+  }
+
+  public interface OnSettingItemLongClick {
+    boolean onLongClick (View view, ListItem item, SettingsAdapter adapter);
   }
 
   public CustomDrawerProcessor drawerProcessor;
