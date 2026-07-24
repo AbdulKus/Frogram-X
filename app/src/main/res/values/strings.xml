@@ -2132,6 +2132,11 @@
   <string name="CreateTopic">Create topic</string>
   <string name="EditTopic">Edit topic</string>
   <string name="TopicName">Topic name</string>
+  <string name="TopicIcon">Topic icon</string>
+  <string name="CloseTopic">Close topic</string>
+  <string name="ReopenTopic">Reopen topic</string>
+  <string name="DeleteTopic">Delete topic</string>
+  <string name="DeleteTopicConfirm">Delete topic “%1$s” and all its messages? This can’t be undone.</string>
   <string name="RightStories">Stories</string>
   <string name="RightMessages">Messages</string>
   <string name="RightStoriesPost">Post Stories</string>
