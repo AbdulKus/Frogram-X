@@ -614,6 +614,11 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
       chat.getChatMark().draw(c, chatMarkLeft, chatMarkY + Screen.dp(1f));
     }
 
+    if (chat.showForumIcon()) {
+      Drawables.drawRtl(c, getSparseDrawable(R.drawable.baseline_format_list_bulleted_type_16, ColorId.NONE),
+        chat.getForumIconLeft(), getMuteTop(chatListMode), Paints.getChatsMutePaint(), viewWidth, rtl);
+    }
+
     if (chat.showMute()) {
       Drawables.drawRtl(c, Icons.getChatMuteDrawable(ColorId.chatListMute), chat.getMuteLeft(), getMuteTop(chatListMode), Paints.getChatsMutePaint(), viewWidth, rtl);
     }
