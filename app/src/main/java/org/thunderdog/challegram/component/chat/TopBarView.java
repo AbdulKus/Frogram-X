@@ -51,12 +51,21 @@ public class TopBarView extends FrameLayoutFix {
     final int stringRes;
     final View.OnClickListener onClickListener;
 
+    CharSequence text;
     boolean isNegative;
     boolean noDismiss;
+    boolean noUppercase;
 
     public Item (int id, int stringRes, View.OnClickListener onClickListener) {
       this.id = id;
       this.stringRes = stringRes;
+      this.onClickListener = onClickListener;
+    }
+
+    public Item (int id, CharSequence text, View.OnClickListener onClickListener) {
+      this.id = id;
+      this.stringRes = 0;
+      this.text = text;
       this.onClickListener = onClickListener;
     }
 
@@ -67,6 +76,11 @@ public class TopBarView extends FrameLayoutFix {
 
     public Item setNoDismiss () {
       this.noDismiss = true;
+      return this;
+    }
+
+    public Item setNoUppercase () {
+      this.noUppercase = true;
       return this;
     }
   }
@@ -154,7 +168,8 @@ public class TopBarView extends FrameLayoutFix {
       button.setSingleLine(true);
       button.setBackgroundResource(R.drawable.bg_btn_header);
       button.setOnClickListener(item.onClickListener);
-      Views.setMediumText(button, Lang.getString(item.stringRes).toUpperCase());
+      CharSequence text = item.text != null ? item.text : Lang.getString(item.stringRes);
+      Views.setMediumText(button, item.noUppercase ? text : text.toString().toUpperCase());
       Views.setClickable(button);
       button.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, 2f));
       actionsList.addView(button);
