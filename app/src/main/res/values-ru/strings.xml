@@ -3,4 +3,9 @@
   <string name="Topics">Топики</string>
   <string name="NoTopics">Топики не найдены</string>
   <string name="MarkTopicAsRead">Прочитать всё</string>
+  <string name="PinTopic">Закрепить топик</string>
+  <string name="UnpinTopic">Открепить топик</string>
+  <string name="CreateTopic">Создать топик</string>
+  <string name="EditTopic">Изменить топик</string>
+  <string name="TopicName">Название топика</string>
 </resources>
