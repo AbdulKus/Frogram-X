@@ -2126,6 +2126,7 @@
   <string name="OpenTopicByDefault">Open this topic by default</string>
   <string name="StopOpeningTopicByDefault">Open chat normally by default</string>
   <string name="NoTopics">No topics found</string>
+  <string name="MarkTopicAsRead">Mark all as read</string>
   <string name="RightStories">Stories</string>
   <string name="RightMessages">Messages</string>
   <string name="RightStoriesPost">Post Stories</string>
