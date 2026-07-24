@@ -3955,6 +3955,23 @@ public class Settings {
     }
   }
 
+  private static String defaultForumTopicKey (int accountId, long chatId) {
+    return "frogram_default_forum_topic_" + accountId + "_" + chatId;
+  }
+
+  public int getDefaultForumTopicId (int accountId, long chatId) {
+    return getInt(defaultForumTopicKey(accountId, chatId), 0);
+  }
+
+  public void setDefaultForumTopicId (int accountId, long chatId, int forumTopicId) {
+    String key = defaultForumTopicKey(accountId, chatId);
+    if (forumTopicId != 0) {
+      putInt(key, forumTopicId);
+    } else {
+      remove(key);
+    }
+  }
+
   // Bots
 
   public boolean allowLocationForBot (long userId) {

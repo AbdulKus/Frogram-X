@@ -856,6 +856,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
     actionView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, actionBarHeight));
     actionView.addThemeListeners(this);
 
+    int topicBarHeight = Screen.dp(36f);
+    topicView = new TopBarView(context);
+    topicView.setDismissListener(barView -> setForumTopic(null));
+    topicView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, topicBarHeight));
+    topicView.addThemeListeners(this);
+
     int requestsViewHeight = Screen.dp(48f);
     requestsView = new JoinRequestsView(context, tdlib);
     requestsView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, requestsViewHeight));
@@ -935,6 +941,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
     topBar.initWithList(new CollapseListView.Item[] {
       // TODO voice chat bar
+      topicItem = new CollapseListView.ViewItem(topicView, topicBarHeight),
       pinnedMessagesItem,
       requestsItem = new CollapseListView.ViewItem(requestsView, requestsViewHeight),
       liveLocationItem = new CollapseListView.ViewItem(liveLocationView, liveLocationHeight),
@@ -1825,7 +1832,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Nullable
   public TdApi.DraftMessage getDraftMessage () {
-    return messageThread != null ? messageThread.getDraft() : chat != null ? chat.draftMessage : null;
+    return messageThread != null ? messageThread.getDraft() : activeForumTopic != null ? activeForumTopic.draftMessage : chat != null ? chat.draftMessage : null;
   }
 
   public long getChatUserId () {
@@ -2227,6 +2234,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
       openLinkedChat(false);
     } else if (id == R.id.btn_openDirectMessages) {
       openLinkedChat(true);
+    } else if (id == R.id.btn_topics) {
+      showForumTopics();
+    } else if (id == R.id.btn_pinTopic) {
+      toggleDefaultForumTopic();
     } else if (id == R.id.btn_manageGroup) {
       manageGroup();
     } else if (id == R.id.btn_deleteThread) {
@@ -2316,7 +2327,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       if (args.messageThread != null) {
         args.messageThread.saveTo(outState, keyPrefix + "thread");
       }
-      Td.put(outState, keyPrefix + "topicId", args.messageTopicId);
+      Td.put(outState, keyPrefix + "topicId", messageTopicId);
       Td.put(outState, keyPrefix + "filter_", args.searchFilter);
       if (args.constructor == 1 || args.constructor == 4) {
         outState.putInt(keyPrefix + "mode", args.highlightMode);
@@ -2586,6 +2597,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private TdApi.SearchMessagesFilter previewSearchFilter;
   private ThreadInfo messageThread;
   private TdApi.MessageTopic messageTopicId;
+  private TdApi.ForumTopic activeForumTopic;
   private boolean areScheduled;
   private Referrer referrer;
   private TdApi.InternalLinkTypeVideoChat voiceChatInvitation;
@@ -2618,6 +2630,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
     this.customCaptionPlaceholder = null;
     this.messageThread = args.messageThread;
     this.messageTopicId = args.messageTopicId;
+    this.activeForumTopic = null;
+    if (this.messageTopicId == null && args.messageThread == null && !args.inPreviewMode && !args.areScheduled &&
+        args.chat != null && tdlib.isForum(args.chat.id)) {
+      int forumTopicId = Settings.instance().getDefaultForumTopicId(tdlib.id(), args.chat.id);
+      if (forumTopicId != 0) {
+        this.messageTopicId = new TdApi.MessageTopicForum(forumTopicId);
+      }
+    }
     this.openedFromChatList = args.chatList;
     this.linkedChatId = 0;
     this.areScheduled = args.areScheduled;
@@ -2783,6 +2803,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
     TdApi.Chat headerChat = messageThread != null ? tdlib.chatSync(messageThread.getContextChatId()) : null;
     headerCell.setChat(tdlib, headerChat != null ? headerChat : chat, messageThread);
+    updateTopicBar(false);
 
     if (inPreviewMode) {
       switch (previewMode) {
@@ -4462,6 +4483,17 @@ public class MessagesController extends ViewController<MessagesController.Argume
       strings.append(R.string.Search);
     }
 
+    if (tdlib.isForum(chat.id)) {
+      ids.append(R.id.btn_topics);
+      strings.append(R.string.Topics);
+      int forumTopicId = getForumTopicId();
+      if (forumTopicId != 0) {
+        ids.append(R.id.btn_pinTopic);
+        strings.append(Settings.instance().getDefaultForumTopicId(tdlib.id(), chat.id) == forumTopicId ?
+          R.string.StopOpeningTopicByDefault : R.string.OpenTopicByDefault);
+      }
+    }
+
     if ((!tdlib.isChannel(chat.id) || (status != null && !TD.isLeft(status))) && !tdlib.isSelfChat(chat.id)) {
       ids.append(R.id.btn_mute);
       strings.append(tdlib.chatNotificationsEnabled(chat.id) ? R.string.Mute : R.string.Unmute);
@@ -4524,6 +4556,129 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
 
     showMore(ids.get(), strings.get(), 0);
+  }
+
+  private int forumTopicRequestId;
+
+  private int getForumTopicId () {
+    return messageTopicId != null && messageTopicId.getConstructor() == TdApi.MessageTopicForum.CONSTRUCTOR ?
+      ((TdApi.MessageTopicForum) messageTopicId).forumTopicId : 0;
+  }
+
+  private void setForumTopic (@Nullable TdApi.ForumTopic forumTopic) {
+    int currentForumTopicId = getForumTopicId();
+    int newForumTopicId = forumTopic != null ? forumTopic.info.forumTopicId : 0;
+    if (currentForumTopicId == newForumTopicId && (forumTopic == null || activeForumTopic == forumTopic)) {
+      return;
+    }
+    saveDraft();
+    messageTopicId = newForumTopicId != 0 ? new TdApi.MessageTopicForum(newForumTopicId) : null;
+    activeForumTopic = forumTopic;
+    forumTopicRequestId++;
+    updateView();
+  }
+
+  private void toggleDefaultForumTopic () {
+    int forumTopicId = getForumTopicId();
+    if (chat == null || forumTopicId == 0) {
+      return;
+    }
+    Settings settings = Settings.instance();
+    int pinnedForumTopicId = settings.getDefaultForumTopicId(tdlib.id(), chat.id);
+    settings.setDefaultForumTopicId(tdlib.id(), chat.id, pinnedForumTopicId == forumTopicId ? 0 : forumTopicId);
+    updateTopicBar(true);
+  }
+
+  private void updateTopicBar (boolean animated) {
+    if (topBar == null || topicView == null) {
+      return;
+    }
+    int forumTopicId = getForumTopicId();
+    if (chat == null || forumTopicId == 0 || inPreviewMode || areScheduled) {
+      activeForumTopic = null;
+      forumTopicRequestId++;
+      topBar.setItemVisible(topicItem, false, animated && isFocused());
+      return;
+    }
+
+    if (activeForumTopic != null && activeForumTopic.info.forumTopicId == forumTopicId) {
+      topicView.setItems(new TopBarView.Item(R.id.btn_topics, activeForumTopic.info.name, v -> showForumTopics()).setNoUppercase());
+      topBar.setItemVisible(topicItem, true, animated && isFocused());
+      return;
+    }
+
+    topicView.setItems(new TopBarView.Item(R.id.btn_topics, R.string.Topics, v -> showForumTopics()).setNoUppercase());
+    topBar.setItemVisible(topicItem, true, animated && isFocused());
+    int requestId = ++forumTopicRequestId;
+    long chatId = chat.id;
+    tdlib.send(new TdApi.GetForumTopic(chatId, forumTopicId), (forumTopic, error) -> runOnUiThreadOptional(() -> {
+      if (requestId != forumTopicRequestId || chat == null || chat.id != chatId || getForumTopicId() != forumTopicId) {
+        return;
+      }
+      if (error != null) {
+        if (error.code == 404) {
+          Settings settings = Settings.instance();
+          if (settings.getDefaultForumTopicId(tdlib.id(), chatId) == forumTopicId) {
+            settings.setDefaultForumTopicId(tdlib.id(), chatId, 0);
+          }
+          setForumTopic(null);
+        } else {
+          UI.showError(error);
+        }
+        return;
+      }
+      activeForumTopic = forumTopic;
+      updateTopicBar(true);
+    }));
+  }
+
+  private void showForumTopics () {
+    if (chat == null || !tdlib.isForum(chat.id)) {
+      return;
+    }
+    long chatId = chat.id;
+    tdlib.send(new TdApi.GetForumTopics(chatId, "", 0, 0, 0, 100), (forumTopics, error) -> runOnUiThreadOptional(() -> {
+      if (chat == null || chat.id != chatId) {
+        return;
+      }
+      if (error != null) {
+        UI.showError(error);
+        return;
+      }
+      if (forumTopics.topics.length == 0) {
+        UI.showToast(R.string.NoTopics, Toast.LENGTH_SHORT);
+        return;
+      }
+
+      int activeForumTopicId = getForumTopicId();
+      int defaultForumTopicId = Settings.instance().getDefaultForumTopicId(tdlib.id(), chatId);
+      List<ListItem> items = new ArrayList<>(forumTopics.topics.length);
+      for (TdApi.ForumTopic forumTopic : forumTopics.topics) {
+        int forumTopicId = forumTopic.info.forumTopicId;
+        int icon = forumTopicId == defaultForumTopicId ? R.drawable.deproko_baseline_pin_24 : R.drawable.baseline_forum_24;
+        items.add(new ListItem(ListItem.TYPE_INFO_SETTING, R.id.btn_topic, icon, forumTopic.info.name, false)
+          .setIntValue(forumTopicId)
+          .setData(forumTopic));
+      }
+
+      showSettings(new SettingsWrapBuilder(R.id.btn_topics)
+        .addHeaderItem(Lang.getString(R.string.Topics))
+        .setRawItems(items)
+        .setDisableFooter(true)
+        .setNeedRootInsets(true)
+        .setSettingProcessor((item, view, isUpdate) -> {
+          TdApi.ForumTopic forumTopic = (TdApi.ForumTopic) item.getData();
+          view.setData(forumTopic.lastMessage != null ?
+            Lang.getRelativeTimestamp(forumTopic.lastMessage.date, TimeUnit.SECONDS) : "");
+          view.setUnreadCounter(forumTopic.unreadCount, false, isUpdate);
+          view.setIconColorId(item.getIntValue() == activeForumTopicId || item.getIntValue() == defaultForumTopicId ?
+            ColorId.textNeutral : ColorId.icon);
+        })
+        .setOnSettingItemClick((view, settingsId, item, doneButton, settingsAdapter, window) -> {
+          window.hideWindow(true);
+          setForumTopic((TdApi.ForumTopic) item.getData());
+        }));
+    }));
   }
 
   // Clear history
@@ -6494,6 +6649,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private @Nullable ReplyBarView replyBarView;
 
   private CollapseListView topBar;
+  private TopBarView topicView;
+  private CollapseListView.Item topicItem;
   private TopBarView actionView;
   private CollapseListView.Item actionItem;
 

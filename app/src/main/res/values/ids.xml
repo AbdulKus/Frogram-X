@@ -1416,6 +1416,12 @@
   <item type="id" name="controller_reactionsPicker" />
   <item type="id" name="btn_redeemGiftLink" />
 
+  <!-- FORUM TOPICS -->
+
+  <item type="id" name="btn_topics" />
+  <item type="id" name="btn_topic" />
+  <item type="id" name="btn_pinTopic" />
+
   <!-- BROADCAST BUTTONS -->
 
   <item type="id" name="btn_convertToBroadcastGroup" />
