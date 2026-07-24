@@ -2127,6 +2127,11 @@
   <string name="StopOpeningTopicByDefault">Open chat normally by default</string>
   <string name="NoTopics">No topics found</string>
   <string name="MarkTopicAsRead">Mark all as read</string>
+  <string name="PinTopic">Pin topic</string>
+  <string name="UnpinTopic">Unpin topic</string>
+  <string name="CreateTopic">Create topic</string>
+  <string name="EditTopic">Edit topic</string>
+  <string name="TopicName">Topic name</string>
   <string name="RightStories">Stories</string>
   <string name="RightMessages">Messages</string>
   <string name="RightStoriesPost">Post Stories</string>
