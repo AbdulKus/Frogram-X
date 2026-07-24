@@ -1421,6 +1421,8 @@
   <item type="id" name="btn_topics" />
   <item type="id" name="btn_topic" />
   <item type="id" name="btn_pinTopic" />
+  <item type="id" name="btn_createTopic" />
+  <item type="id" name="btn_editTopic" />
 
   <!-- BROADCAST BUTTONS -->
 
