@@ -1,0 +1,133 @@
+name: Build Frogram X
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  APP_ID: org.frogram.messenger
+  APP_NAME: Frogram X
+  APP_DOWNLOAD_URL: https://github.com/${{ github.repository }}/actions
+  APP_SOURCES_URL: https://github.com/${{ github.repository }}
+  TGX_BUILD_FLAVORS: latest
+  TGX_BUILD_ABIS: arm64-v8a
+  TERM: xterm
+
+jobs:
+  build:
+    name: Latest ARM64 APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: true
+          submodules: recursive
+
+      - name: Pull submodule LFS files
+        run: |
+          git lfs install
+          git submodule foreach --recursive 'git lfs pull'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang git-lfs make perl unzip wget
+
+      - name: Prepare API credentials and signing
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ ! "$TELEGRAM_API_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::Add the TELEGRAM_API_ID repository secret."
+            exit 1
+          fi
+
+          TELEGRAM_API_HASH="${TELEGRAM_API_HASH,,}"
+          if [[ ! "$TELEGRAM_API_HASH" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "::error::Add the 32-character TELEGRAM_API_HASH repository secret."
+            exit 1
+          fi
+          echo "TELEGRAM_API_ID=$TELEGRAM_API_ID" >> "$GITHUB_ENV"
+          echo "TELEGRAM_API_HASH=$TELEGRAM_API_HASH" >> "$GITHUB_ENV"
+
+          KEYSTORE="$RUNNER_TEMP/frogram-x.jks"
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" &&
+                -n "$ANDROID_KEYSTORE_PASSWORD" &&
+                -n "$ANDROID_KEY_ALIAS" &&
+                -n "$ANDROID_KEY_PASSWORD" ]]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          else
+            echo "::warning::Signing secrets are missing. This run will use an ephemeral development key."
+            ANDROID_KEYSTORE_PASSWORD=android
+            ANDROID_KEY_ALIAS=frogramx
+            ANDROID_KEY_PASSWORD=android
+            keytool -genkeypair \
+              -keystore "$KEYSTORE" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" \
+              -keypass "$ANDROID_KEY_PASSWORD" \
+              -keyalg RSA \
+              -keysize 4096 \
+              -validity 10000 \
+              -dname "CN=Frogram X, O=Frogram"
+          fi
+
+          KEYSTORE_PROPERTIES="$RUNNER_TEMP/keystore.properties"
+          {
+            echo "keystore.file=$KEYSTORE"
+            echo "keystore.password=$ANDROID_KEYSTORE_PASSWORD"
+            echo "key.alias=$ANDROID_KEY_ALIAS"
+            echo "key.password=$ANDROID_KEY_PASSWORD"
+          } > "$KEYSTORE_PROPERTIES"
+          echo "KEYSTORE_FILE=$KEYSTORE_PROPERTIES" >> "$GITHUB_ENV"
+
+      - name: Set up Android and native dependencies
+        run: |
+          scripts/setup.sh
+          {
+            echo "app.experimental=true"
+            echo "app.file=Frogram-X"
+          } >> local.properties
+
+      - name: Build APK
+        run: ./gradlew assembleLatestArm64Debug --stacktrace --no-daemon
+
+      - name: Collect APK and checksum
+        run: |
+          mkdir -p artifacts
+          find app/build/outputs/apk -type f -name '*.apk' -exec cp '{}' artifacts/ ';'
+          test -n "$(find artifacts -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
+
+      - name: Upload Frogram X APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Frogram-X-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30

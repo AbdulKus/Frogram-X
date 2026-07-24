@@ -186,7 +186,7 @@ configure_make() {
   make -j"$CPU_COUNT" install
 }
 
-for ABI in arm64-v8a armeabi-v7a x86_64 x86 ; do
+for ABI in ${TGX_BUILD_ABIS:-arm64-v8a armeabi-v7a x86_64 x86} ; do
   for FLAVOR in $FLAVORS; do
     if [[ "$FLAVOR" != "legacy" || $ABI == "armeabi-v7a" || $ABI == "x86" ]]; then
       echo -e "${STYLE_INFO}- libvpx build start: ${ABI} ${FLAVOR}${STYLE_END}"
