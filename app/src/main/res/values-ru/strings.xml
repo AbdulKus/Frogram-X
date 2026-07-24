@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="Topics">Топики</string>
+  <string name="NoTopics">Топики не найдены</string>
+  <string name="MarkTopicAsRead">Прочитать всё</string>
+</resources>
