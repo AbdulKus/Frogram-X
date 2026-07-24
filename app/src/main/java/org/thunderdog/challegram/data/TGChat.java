@@ -974,7 +974,7 @@ public class TGChat implements TdlibStatusManager.HelperTarget, ContentPreview.R
       verifyLeft += Screen.dp(14f);
       muteLeft += Screen.dp(14f);
     }
-    forumIconLeft = muteLeft + Screen.dp(2f);
+    forumIconLeft = muteLeft + Screen.dp(3f);
     if (showForumIcon()) {
       muteLeft += Screen.dp(22f);
     }
