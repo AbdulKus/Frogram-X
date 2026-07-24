@@ -8,4 +8,9 @@
   <string name="CreateTopic">Создать топик</string>
   <string name="EditTopic">Изменить топик</string>
   <string name="TopicName">Название топика</string>
+  <string name="TopicIcon">Иконка топика</string>
+  <string name="CloseTopic">Закрыть топик</string>
+  <string name="ReopenTopic">Открыть топик</string>
+  <string name="DeleteTopic">Удалить топик</string>
+  <string name="DeleteTopicConfirm">Удалить топик «%1$s» и все сообщения в нём? Это действие нельзя отменить.</string>
 </resources>
