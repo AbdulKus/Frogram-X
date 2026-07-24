@@ -86,6 +86,7 @@ import tgx.td.Td;
 @SuppressWarnings(value = "SpellCheckingInspection")
 public class Lang {
   private static final int LANGUAGE_CODE_DEFAULT = 0x656e; // en
+  private static final Pattern TELEGRAM_X_BRAND_PATTERN = Pattern.compile("Telegram\\s*X", Pattern.CASE_INSENSITIVE);
 
   @Deprecated
   public static final boolean isRtl = false;
@@ -243,7 +244,21 @@ public class Lang {
   private  static String getCloudString (String key) {
     TdApi.LanguagePackInfo languagePackInfo = Settings.instance().getLanguagePackInfo();
     TdApi.LanguagePackStringValueOrdinary string = getStringValue(key, languagePackInfo);
-    return string != null ? string.value : null;
+    return string != null ? applyFrogramBranding(string.value) : null;
+  }
+
+  private static String applyFrogramBranding (String string) {
+    return StringUtils.isEmpty(string) ? string : TELEGRAM_X_BRAND_PATTERN.matcher(string).replaceAll("Frogram X");
+  }
+
+  private static @Nullable String getFrogramFallbackString (@StringRes int resId) {
+    if (resId != R.string.Topics && resId != R.string.NoTopics && resId != R.string.MarkTopicAsRead) {
+      return null;
+    }
+    Context context = UI.getAppContext();
+    Configuration configuration = new Configuration(context.getResources().getConfiguration());
+    configuration.setLocale(locale());
+    return context.createConfigurationContext(configuration).getResources().getString(resId);
   }
 
   public static CharSequence getTutorial (ViewController<?> context, @NonNull TdApi.ChatSource source) {
@@ -319,10 +334,14 @@ public class Lang {
       final String key = getResourceEntryName(resId);
       TdApi.LanguagePackStringValueOrdinary string = getStringValue(key, languagePackInfo);
       if (string != null)
-        return string.value;
+        return applyFrogramBranding(string.value);
+    }
+    String frogramFallback = getFrogramFallbackString(resId);
+    if (frogramFallback != null) {
+      return applyFrogramBranding(frogramFallback);
     }
     try {
-      return getAndroidString(resId);
+      return applyFrogramBranding(getAndroidString(resId));
     } catch (Resources.NotFoundException e) {
       Log.e("Resource not found (shitty modified lang pack?): %d %s", resId, getResourceEntryName(resId));
       return "";
@@ -433,7 +452,7 @@ public class Lang {
       TdApi.LanguagePackStringValueOrdinary string = getStringValue(key, languagePackInfo);
       if (string != null) {
         try {
-          return formatString(applyFlags(string.value, flags), hasSpanned, creator, formatArgs);
+          return formatString(applyFlags(applyFrogramBranding(string.value), flags), hasSpanned, creator, formatArgs);
         } catch (Throwable t) {
           warnResource(true, pluralCode(), resId);
         }
@@ -441,10 +460,10 @@ public class Lang {
     }
     try {
       if (creator != null || flags != 0 || hasSpanned) {
-        String format = applyFlags(getAndroidString(resId), flags);
+        String format = applyFlags(applyFrogramBranding(getAndroidString(resId)), flags);
         return formatString(format, hasSpanned, creator, formatArgs);
       } else {
-        return getAndroidString(resId, formatArgs);
+        return applyFrogramBranding(getAndroidString(resId, formatArgs));
       }
     } catch (Resources.NotFoundException e) {
       Log.e("Resource not found (shitty modified lang pack?): %d %s", resId, getResourceEntryName(resId));
@@ -1752,7 +1771,7 @@ public class Lang {
         value = string.otherValue;
       }
       try {
-        return formatString(value, creator, formatArgs);
+        return formatString(applyFrogramBranding(value), creator, formatArgs);
       } catch (Throwable t) {
         warnResource(true, languageCode, LangUtils.getPluralForm(resId, pluralForm));
       }
