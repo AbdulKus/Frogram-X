@@ -220,7 +220,7 @@ public class MessagesLoader implements Client.ResultHandler {
 
   @Nullable
   public TdApi.MessageTopic getMessageTopicId () {
-    return messageThread != null ? messageThread.getMessageTopicId() : null;
+    return messageThread != null ? messageThread.getMessageTopicId() : topicId;
   }
 
   @Nullable
@@ -240,6 +240,21 @@ public class MessagesLoader implements Client.ResultHandler {
   private volatile Client.ResultHandler lastHandler;
   private TdApi.Message[] mergeChunk;
   private int mergeMode;
+
+  private int getForumTopicId () {
+    return topicId != null && topicId.getConstructor() == TdApi.MessageTopicForum.CONSTRUCTOR ?
+      ((TdApi.MessageTopicForum) topicId).forumTopicId : 0;
+  }
+
+  private TdApi.Function<TdApi.Messages> newHistoryRequest (long chatId, long fromMessageId, int offset, int limit, boolean onlyLocal) {
+    int forumTopicId = getForumTopicId();
+    if (forumTopicId != 0) {
+      Log.ensureReturnType(TdApi.GetForumTopicHistory.class, TdApi.Messages.class);
+      return new TdApi.GetForumTopicHistory(chatId, forumTopicId, fromMessageId, offset, limit);
+    }
+    Log.ensureReturnType(TdApi.GetChatHistory.class, TdApi.Messages.class);
+    return new TdApi.GetChatHistory(chatId, fromMessageId, offset, limit, onlyLocal);
+  }
 
   private Client.ResultHandler newHandler (final boolean allowMoreTop, final boolean allowMoreBottom, boolean needFindUnread) {
     final long currentContextId = contextId;
@@ -503,15 +518,13 @@ public class MessagesLoader implements Client.ResultHandler {
             mergeMode = MERGE_MODE_TOP;
             mergeChunk = messages;
             Log.i(Log.TAG_MESSAGES_LOADER, "Loading more groupped messages on the top, count: %d, fromMessageId: %d", loadMoreTopCount, oldestMessage.id);
-            Log.ensureReturnType(TdApi.GetChatHistory.class, TdApi.Messages.class);
-            tdlib.client().send(new TdApi.GetChatHistory(messages[0].chatId, oldestMessage.id, 0, loadMoreTopCount, true), this);
+            tdlib.client().send(newHistoryRequest(messages[0].chatId, oldestMessage.id, 0, loadMoreTopCount, true), this);
             return;
           } else if (loadMoreBottomCount > 0) {
             mergeMode = MERGE_MODE_BOTTOM;
             mergeChunk = messages;
             Log.i(Log.TAG_MESSAGES_LOADER, "Loading more groupped messages on the bottom, count: %d, fromMessageId: %d", loadMoreBottomCount + 1, newestMessage.id);
-            Log.ensureReturnType(TdApi.GetChatHistory.class, TdApi.Messages.class);
-            tdlib.client().send(new TdApi.GetChatHistory(messages[0].chatId, newestMessage.id, -loadMoreBottomCount, loadMoreBottomCount + 1, true), this);
+            tdlib.client().send(newHistoryRequest(messages[0].chatId, newestMessage.id, -loadMoreBottomCount, loadMoreBottomCount + 1, true), this);
             return;
           }
         }
@@ -1152,8 +1165,10 @@ public class MessagesLoader implements Client.ResultHandler {
             Log.ensureReturnType(TdApi.GetMessageThreadHistory.class, TdApi.Messages.class);
             function = new TdApi.GetMessageThreadHistory(sourceChatId, messageThread.getOldestMessageId(), (lastFromMessageId = fromMessageId).getMessageId(), lastOffset = offset, lastLimit = limit);
           } else {
-            Log.ensureReturnType(TdApi.GetChatHistory.class, TdApi.Messages.class);
-            function = new TdApi.GetChatHistory(sourceChatId, (lastFromMessageId = fromMessageId).getMessageId(), lastOffset = offset, lastLimit = limit, loadingLocal);
+            if (getForumTopicId() != 0) {
+              loadingLocal = false;
+            }
+            function = newHistoryRequest(sourceChatId, (lastFromMessageId = fromMessageId).getMessageId(), lastOffset = offset, lastLimit = limit, loadingLocal);
           }
           break;
       }
