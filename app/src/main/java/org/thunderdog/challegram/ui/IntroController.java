@@ -1899,8 +1899,8 @@ public class IntroController extends ViewController<Void> implements GLSurfaceVi
     );
 
     N.setTelegramTextures(
-      loadTexture(gl, getSphereBitmap()),
-      loadTexture(gl, R.drawable.intro_tg_plane)
+      loadTexture(gl, R.drawable.intro_frogram_sphere),
+      loadTexture(gl, R.drawable.intro_frogram_paw)
     );
 
     N.setPowerfulTextures(

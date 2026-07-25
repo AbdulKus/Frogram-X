@@ -416,7 +416,37 @@ public class TdlibNotificationHelper implements Iterable<TdlibNotificationGroup>
   }
 
   public boolean allowNotificationPreview () {
+    if (requiresHiddenAccountUnlock()) {
+      return Passcode.instance().getHiddenNotificationMode() == Passcode.HIDDEN_NOTIFICATIONS_ALL &&
+        (!Passcode.instance().isLocked() || Passcode.instance().displayNotifications());
+    }
     return !Passcode.instance().isLocked() || Passcode.instance().displayNotifications();
+  }
+
+  public boolean requiresHiddenAccountUnlock () {
+    return Passcode.instance().isAccountHidden(tdlib.id()) &&
+      !Passcode.instance().isHiddenAccountsUnlocked();
+  }
+
+  public boolean useGenericHiddenAccountNotification () {
+    return requiresHiddenAccountUnlock() &&
+      Passcode.instance().getHiddenNotificationMode() == Passcode.HIDDEN_NOTIFICATIONS_GENERIC;
+  }
+
+  private boolean suppressHiddenAccountNotifications () {
+    return requiresHiddenAccountUnlock() &&
+      Passcode.instance().getHiddenNotificationMode() == Passcode.HIDDEN_NOTIFICATIONS_NONE;
+  }
+
+  private void cancelAllNotificationsForHiddenAccount () {
+    NotificationManagerCompat manager = manager();
+    for (TdlibNotificationGroup group : groups.values()) {
+      manager.cancel(getNotificationIdForGroup(group.getId()));
+    }
+    for (int category = TdlibNotificationGroup.CATEGORY_DEFAULT; category <= TdlibNotificationGroup.MAX_CATEGORY; category++) {
+      manager.cancel(getBaseNotificationId(category));
+    }
+    tdlib.context().setHavePendingNotifications(tdlib.id(), false);
   }
 
   public int getTotalCount (int category) {
@@ -550,6 +580,10 @@ public class TdlibNotificationHelper implements Iterable<TdlibNotificationGroup>
   // Impl
 
   private void displayNotificationGroup (@NonNull TdlibNotificationGroup group, boolean needNotification, long notificationSettingsChatId) {
+    if (suppressHiddenAccountNotifications()) {
+      cancelAllNotificationsForHiddenAccount();
+      return;
+    }
     Context context = UI.getAppContext();
     int badgeCount = tdlib.getUnreadBadgeCount();
     boolean allowPreview = allowNotificationPreview();
@@ -567,6 +601,10 @@ public class TdlibNotificationHelper implements Iterable<TdlibNotificationGroup>
   }
 
   private void rebuild (@Nullable TdApi.NotificationSettingsScope scope, long specificChatId, int specificGroupId) {
+    if (suppressHiddenAccountNotifications()) {
+      cancelAllNotificationsForHiddenAccount();
+      return;
+    }
     final boolean haveNotifications = !isEmpty();
     if (haveNotifications) {
       Context context = UI.getAppContext();

@@ -13,4 +13,20 @@
   <string name="ReopenTopic">Открыть топик</string>
   <string name="DeleteTopic">Удалить топик</string>
   <string name="DeleteTopicConfirm">Удалить топик «%1$s» и все сообщения в нём? Это действие нельзя отменить.</string>
+  <string name="DoubleBottom">Двойное дно</string>
+  <string name="DoubleBottomSetup">Настроить двойное дно</string>
+  <string name="DoubleBottomSetupInfo">Установите основной код и отдельный код скрытых аккаунтов. Основной код открывает только обычные аккаунты, скрытый — все аккаунты.</string>
+  <string name="DoubleBottomHiddenPasscode">Код скрытых аккаунтов</string>
+  <string name="DoubleBottomPasswordsMustDiffer">Скрытый код должен отличаться от основного</string>
+  <string name="DoubleBottomPrimaryAccounts">Основные аккаунты</string>
+  <string name="DoubleBottomHiddenAccounts">Скрытые аккаунты</string>
+  <string name="DoubleBottomAccountsInfo">Нажмите на аккаунт, чтобы переместить его между основными и скрытыми. Должен остаться хотя бы один основной аккаунт.</string>
+  <string name="DoubleBottomKeepPrimaryAccount">Должен остаться хотя бы один основной аккаунт</string>
+  <string name="DoubleBottomNotifications">Уведомления скрытых аккаунтов</string>
+  <string name="DoubleBottomNotificationsNone">Не показывать</string>
+  <string name="DoubleBottomNotificationsGeneric">Показывать без текста</string>
+  <string name="DoubleBottomNotificationsAll">Показывать все</string>
+  <string name="DoubleBottomGenericNotification">Проверьте новые сообщения</string>
+  <string name="DoubleBottomChangeHiddenPasscode">Изменить скрытый код</string>
+  <string name="DoubleBottomUnsupportedPasscode">Для двойного дна используется PIN-код, пароль или графический ключ. Выберите один из них для основной блокировки.</string>
 </resources>

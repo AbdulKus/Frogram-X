@@ -72,6 +72,7 @@ import org.thunderdog.challegram.ui.ListItem;
 import org.thunderdog.challegram.ui.PeopleController;
 import org.thunderdog.challegram.ui.SettingsAdapter;
 import org.thunderdog.challegram.ui.SettingsController;
+import org.thunderdog.challegram.unsorted.Passcode;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Test;
 import org.thunderdog.challegram.util.StringList;
@@ -369,7 +370,7 @@ public class DrawerController extends ViewController<Void> implements View.OnCli
           return 0;
         }
         int position = viewHolder.getBindingAdapterPosition();
-        int accountsNum = TdlibManager.instance().getActiveAccounts().size();
+        int accountsNum = TdlibManager.instance().getVisibleAccountsCount();
         if (accountsNum <= 1) {
           return 0;
         }
@@ -404,10 +405,10 @@ public class DrawerController extends ViewController<Void> implements View.OnCli
         int fromPosition = viewHolder.getBindingAdapterPosition();
         int toPosition = target.getBindingAdapterPosition();
 
-        int accountsNum = TdlibManager.instance().getActiveAccounts().size();
+        int accountsNum = TdlibManager.instance().getVisibleAccountsCount();
 
         if (fromPosition >= 1 && fromPosition < 1 + accountsNum && toPosition >= 1 && toPosition < 1 + accountsNum) {
-          TdlibManager.instance().moveAccount(fromPosition - 1, toPosition - 1);
+          TdlibManager.instance().moveVisibleAccount(fromPosition - 1, toPosition - 1);
           if (dragFrom == -1) {
             dragFrom = fromPosition;
           }
@@ -743,28 +744,46 @@ public class DrawerController extends ViewController<Void> implements View.OnCli
   @Override
   public void onActiveAccountRemoved (TdlibAccount account, int position) {
     if (showingAccounts) {
-      adapter.removeItem(1 + position);
+      List<ListItem> items = adapter.getItems();
+      for (int i = 1; i < items.size(); i++) {
+        if (items.get(i).getData() == account) {
+          adapter.removeItem(i);
+          break;
+        }
+      }
     }
   }
 
   @Override
   public void onActiveAccountAdded (TdlibAccount account, int position) {
-    if (showingAccounts) {
-      adapter.addItem(1 + position, new ListItem(ListItem.TYPE_DRAWER_ITEM_WITH_AVATAR, R.id.account).setLongId(account.id).setData(account));
+    if (showingAccounts && Passcode.instance().isAccountVisible(account.id)) {
+      int visiblePosition = TdlibManager.instance().getVisibleAccounts().indexOf(account);
+      adapter.addItem(1 + Math.max(0, visiblePosition), new ListItem(ListItem.TYPE_DRAWER_ITEM_WITH_AVATAR, R.id.account).setLongId(account.id).setData(account));
     }
   }
 
   @Override
   public void onActiveAccountMoved (TdlibAccount account, int fromPosition, int toPosition) {
-    if (showingAccounts) {
-      adapter.moveItem(1 + fromPosition, 1 + toPosition);
+    if (showingAccounts && Passcode.instance().isAccountVisible(account.id)) {
+      int currentPosition = -1;
+      List<ListItem> items = adapter.getItems();
+      for (int i = 1; i < items.size(); i++) {
+        if (items.get(i).getData() == account) {
+          currentPosition = i;
+          break;
+        }
+      }
+      int visiblePosition = TdlibManager.instance().getVisibleAccounts().indexOf(account);
+      if (currentPosition != -1 && visiblePosition != -1) {
+        adapter.moveItem(currentPosition, 1 + visiblePosition);
+      }
     }
   }
 
   private boolean showingAccounts;
 
   private void fillAccountItems (List<ListItem> items) {
-    ArrayList<TdlibAccount> accounts = TdlibManager.instance().getActiveAccounts();
+    ArrayList<TdlibAccount> accounts = TdlibManager.instance().getVisibleAccounts();
     for (TdlibAccount account : accounts) {
       items.add(new ListItem(ListItem.TYPE_DRAWER_ITEM_WITH_AVATAR, R.id.account).setLongId(account.id).setData(account));
     }

@@ -5874,4 +5874,21 @@
   <string name="RestrictedContent">Restricted Content</string>
   <string name="SensitiveContent">Sensitive Content</string>
 
+  <string name="DoubleBottom">Double bottom</string>
+  <string name="DoubleBottomSetup">Set up double bottom</string>
+  <string name="DoubleBottomSetupInfo">Set a primary passcode and a separate hidden passcode. The primary passcode opens only regular accounts; the hidden passcode opens all accounts.</string>
+  <string name="DoubleBottomHiddenPasscode">Hidden accounts passcode</string>
+  <string name="DoubleBottomPasswordsMustDiffer">The hidden passcode must differ from the primary passcode</string>
+  <string name="DoubleBottomPrimaryAccounts">Primary accounts</string>
+  <string name="DoubleBottomHiddenAccounts">Hidden accounts</string>
+  <string name="DoubleBottomAccountsInfo">Tap an account to move it between the primary and hidden sections. At least one primary account must remain.</string>
+  <string name="DoubleBottomKeepPrimaryAccount">At least one primary account must remain</string>
+  <string name="DoubleBottomNotifications">Hidden account notifications</string>
+  <string name="DoubleBottomNotificationsNone">Do not show</string>
+  <string name="DoubleBottomNotificationsGeneric">Show without text</string>
+  <string name="DoubleBottomNotificationsAll">Show all</string>
+  <string name="DoubleBottomGenericNotification">Check for new messages</string>
+  <string name="DoubleBottomChangeHiddenPasscode">Change hidden passcode</string>
+  <string name="DoubleBottomUnsupportedPasscode">Double bottom supports a PIN, password, or pattern. Choose one for the primary lock.</string>
+
 </resources>

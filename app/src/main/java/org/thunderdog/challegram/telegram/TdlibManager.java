@@ -48,6 +48,7 @@ import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.player.AudioController;
 import org.thunderdog.challegram.player.TGPlayerController;
 import org.thunderdog.challegram.tool.UI;
+import org.thunderdog.challegram.unsorted.Passcode;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.util.AppBuildInfo;
 import org.thunderdog.challegram.util.Crash;
@@ -594,6 +595,8 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
       boolean onlyActive = Settings.instance().checkNotificationFlag(Settings.NOTIFICATION_FLAG_ONLY_ACTIVE_ACCOUNT);
       boolean onlySelected = Settings.instance().checkNotificationFlag(Settings.NOTIFICATION_FLAG_ONLY_SELECTED_ACCOUNTS);
       for (TdlibAccount account : this) {
+        if (!Passcode.instance().isAccountVisible(account.id))
+          continue;
         if (onlyActive && account.id != preferredAccountId)
           continue;
         if (onlySelected && !account.forceEnableNotifications())
@@ -602,7 +605,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
       }
     } else {
       for (TdlibAccount account : this) {
-        if (account.id != excludeAccountId) {
+        if (account.id != excludeAccountId && Passcode.instance().isAccountVisible(account.id)) {
           counter.add(account.getUnreadBadge());
         }
       }
@@ -660,7 +663,8 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
 
   public void onUpdateNotifications (@Nullable TdApi.NotificationSettingsScope scope, @Nullable Filter<TdlibAccount> filter) {
     for (TdlibAccount account : this) {
-      if ((filter == null || filter.accept(account)) && account.haveVisibleNotifications()) {
+      if ((filter == null || filter.accept(account)) &&
+          (account.haveVisibleNotifications() || Passcode.instance().isAccountHidden(account.id))) {
         account.tdlib().notifications().onUpdateNotifications(scope);
       }
     }
@@ -1036,6 +1040,16 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
       currentAccount = accounts.get(preferredAccountId);
       currentAccount.markAsUsed();
     }
+    if (!Passcode.instance().isAccountVisible(currentAccount.id)) {
+      for (TdlibAccount account : activeAccounts) {
+        if (Passcode.instance().isAccountVisible(account.id)) {
+          currentAccount = account;
+          preferredAccountId = account.id;
+          currentAccount.markAsUsed();
+          break;
+        }
+      }
+    }
   }
 
   public static class AccountConfig {
@@ -1290,6 +1304,12 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     }
     if (accountId < 0 || accountId >= accounts.size()) {
       throw new IllegalArgumentException("accountId == " + accountId);
+    }
+    if (!Passcode.instance().isAccountVisible(accountId)) {
+      if (after != null) {
+        after.runWithBool(false);
+      }
+      return;
     }
     TdlibAccount newPreferredAccount = accounts.get(accountId);
     if (newPreferredAccount.isUnauthorized() || newPreferredAccount.tdlibInstanceMode() == Tdlib.Mode.SERVICE) {
@@ -1937,25 +1957,65 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     return activeAccounts;
   }
 
+  public ArrayList<TdlibAccount> getVisibleAccounts () {
+    ArrayList<TdlibAccount> result = new ArrayList<>(activeAccounts.size());
+    for (TdlibAccount account : activeAccounts) {
+      if (Passcode.instance().isAccountVisible(account.id)) {
+        result.add(account);
+      }
+    }
+    return result;
+  }
+
+  public void moveVisibleAccount (int fromPosition, int toPosition) {
+    ArrayList<TdlibAccount> visibleAccounts = getVisibleAccounts();
+    if (fromPosition < 0 || fromPosition >= visibleAccounts.size() ||
+        toPosition < 0 || toPosition >= visibleAccounts.size() ||
+        fromPosition == toPosition) {
+      return;
+    }
+    TdlibAccount source = visibleAccounts.get(fromPosition);
+    TdlibAccount target = visibleAccounts.get(toPosition);
+    moveAccount(activeAccounts.indexOf(source), activeAccounts.indexOf(target));
+  }
+
+  public int getVisibleAccountsCount () {
+    return getVisibleAccounts().size();
+  }
+
+  public void onHiddenAccountAccessChanged () {
+    if (currentAccount != null && !Passcode.instance().isAccountVisible(currentAccount.id)) {
+      for (TdlibAccount account : activeAccounts) {
+        if (Passcode.instance().isAccountVisible(account.id)) {
+          changePreferredAccountId(account.id, SWITCH_REASON_NAVIGATION);
+          break;
+        }
+      }
+    }
+    resetBadge(false);
+    onUpdateAllNotifications();
+  }
+
   /**
    * @param excludeAccountId Account identifier, which neighbor should be found
    * @return Next account in the list to be switched to
    */
   public int findNextAccountId (int excludeAccountId) {
     TdlibAccount account = account(excludeAccountId);
-    int sourceIndex = Collections.binarySearch(activeAccounts, account);
+    ArrayList<TdlibAccount> visibleAccounts = getVisibleAccounts();
+    int sourceIndex = Collections.binarySearch(visibleAccounts, account);
     if (sourceIndex >= 0) {
-      if (activeAccounts.size() > sourceIndex + 1)
-        return activeAccounts.get(sourceIndex + 1).id;
+      if (visibleAccounts.size() > sourceIndex + 1)
+        return visibleAccounts.get(sourceIndex + 1).id;
       else if (sourceIndex > 0)
-        return activeAccounts.get(0).id;
+        return visibleAccounts.get(0).id;
     } else {
       sourceIndex = (-sourceIndex) - 1;
-      if (sourceIndex < activeAccounts.size())
-        return activeAccounts.get(sourceIndex).id;
+      if (sourceIndex < visibleAccounts.size())
+        return visibleAccounts.get(sourceIndex).id;
       int nextAccountId = TdlibAccount.NO_ID;
       int index = 0, indexDiff = 0;
-      for (TdlibAccount nextAccount : activeAccounts) {
+      for (TdlibAccount nextAccount : visibleAccounts) {
         if (nextAccountId == TdlibAccount.NO_ID || Math.abs(index - sourceIndex) <= indexDiff) {
           nextAccountId = nextAccount.id;
           indexDiff = Math.abs(index - sourceIndex);
@@ -1975,7 +2035,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
   public int getNumberOfAccountsWithEnabledNotifications () {
     int selectedCount = 0;
     for (TdlibAccount account : this) {
-      if (account.forceEnableNotifications()) {
+      if (Passcode.instance().isAccountVisible(account.id) && account.forceEnableNotifications()) {
         selectedCount++;
       }
     }
@@ -2004,7 +2064,9 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
       }
     } else {
       for (TdlibAccount tdlib : this) {
-        accounts.add(tdlib);
+        if (Passcode.instance().isAccountVisible(tdlib.id)) {
+          accounts.add(tdlib);
+        }
       }
     }
     return accounts;

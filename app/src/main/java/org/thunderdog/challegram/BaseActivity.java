@@ -1650,6 +1650,14 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
   private final ArrayList<PasscodeListener> passcodeListeners = new ArrayList<>();
 
   public void showPasscode (boolean byUserLock) {
+    showPasscode(byUserLock, false);
+  }
+
+  public void showHiddenAccountPasscode () {
+    showPasscode(false, true);
+  }
+
+  private void showPasscode (boolean byUserLock, boolean requireHiddenAccess) {
     if (isPasscodeShowing) {
       return;
     }
@@ -1658,6 +1666,9 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     updateNavigationBarColor();
     passcodeController = new PasscodeController(this, null);
     passcodeController.setPasscodeMode(PasscodeController.MODE_UNLOCK);
+    if (requireHiddenAccess) {
+      passcodeController.requireHiddenAccess();
+    }
     passcodeController.onPrepareToShow();
     rootView.removeView(contentView);
     addToRoot(passcodeController.getValue(), true);

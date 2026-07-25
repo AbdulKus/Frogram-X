@@ -134,6 +134,9 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
 
   private int controllerMode = MODE_UNLOCK;
   private int mode;
+  private boolean setupHiddenPasscode;
+  private boolean requireHiddenAccess;
+  private Runnable afterStandaloneUnlock;
 
   private FrameLayoutFix contentView;
   private PasscodeView passcodeView;
@@ -162,6 +165,18 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
 
   public void setPasscodeMode (int mode) {
     controllerMode = mode;
+  }
+
+  public void setHiddenPasscodeSetup () {
+    setupHiddenPasscode = true;
+  }
+
+  public void requireHiddenAccess () {
+    requireHiddenAccess = true;
+  }
+
+  public void setAfterStandaloneUnlock (Runnable afterStandaloneUnlock) {
+    this.afterStandaloneUnlock = afterStandaloneUnlock;
   }
 
   private boolean inBiometricsSetup;
@@ -251,7 +266,7 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
       }
     }
 
-    setName(Passcode.getModeName(mode));
+    setName(setupHiddenPasscode || requireHiddenAccess ? Lang.getString(R.string.DoubleBottomHiddenPasscode) : Passcode.getModeName(mode));
     updateHeaderText();
 
     if (this.mode != 0) {
@@ -661,10 +676,12 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
   private boolean processPasswordSetup (String password) {
     if (passcodeView.getState() == Passcode.STATE_CONFIRM) {
       if (Passcode.isValidPassword(password) && password.equals(confirmPassword)) {
-        setPassword(password);
-        Keyboard.hide(passwordView);
-        navigateBack();
-        return true;
+        if (setPassword(password)) {
+          Keyboard.hide(passwordView);
+          navigateBack();
+          return true;
+        }
+        UI.showToast(R.string.DoubleBottomPasswordsMustDiffer, Toast.LENGTH_SHORT);
       } else {
         UI.showToast(getMismatchString(Passcode.MODE_PASSWORD), Toast.LENGTH_SHORT);
       }
@@ -747,8 +764,11 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
         Background.instance().post(() -> {
           String patternStr = pattern.toString();
           if (Passcode.isValidPattern(patternStr)) {
-            setPattern(patternStr);
-            postNavigateBack();
+            if (setPattern(patternStr)) {
+              postNavigateBack();
+            } else {
+              UI.showToast(R.string.DoubleBottomPasswordsMustDiffer, Toast.LENGTH_SHORT);
+            }
           } else {
             UI.showToast("Error setting up pattern", Toast.LENGTH_SHORT);
           }
@@ -797,8 +817,11 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
         Background.instance().post(() -> {
           String pincodeStr = pincode.toString();
           if (Passcode.isValidPincode(pincodeStr)) {
-            setPincode(pincodeStr);
-            postNavigateBack();
+            if (setPincode(pincodeStr)) {
+              postNavigateBack();
+            } else {
+              UI.showToast(R.string.DoubleBottomPasswordsMustDiffer, Toast.LENGTH_SHORT);
+            }
           } else {
             UI.showToast("Error setting up pincode", Toast.LENGTH_SHORT);
           }
@@ -888,6 +911,11 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     hideTooltipsAndPopUps();
     if (specificChat != null) {
       tdlib.ui().openChat(this, specificChat, (chatOpenParameters != null ? chatOpenParameters : new TdlibUi.ChatOpenParameters()).passcodeUnlocked());
+    } else if (afterStandaloneUnlock != null) {
+      Runnable action = afterStandaloneUnlock;
+      afterStandaloneUnlock = null;
+      navigateBack();
+      UI.post(action, 120l);
     } else {
       context().hidePasscode();
     }
@@ -1059,7 +1087,7 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
         headerCell.setSubtitle(Lang.getStringBold(R.string.SecretChatWithUser, tdlib.chatTitle(specificChat)));
         this.headerCell = headerCell;
       }
-    } else if (controllerMode == MODE_SETUP && !inBiometricsSetup) {
+    } else if (controllerMode == MODE_SETUP && !inBiometricsSetup && !setupHiddenPasscode) {
       if (headerCell == null) {
         headerCell = this.context.navigation().getHeaderView().genToggleTitle(context(), this);
       }
@@ -1165,6 +1193,9 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
   }
 
   private boolean needUnlockWithBiometrics () {
+    if (requireHiddenAccess || setupHiddenPasscode) {
+      return false;
+    }
     if (specificChat != null) {
       return chatPasscode != null && chatPasscode.mode != Passcode.MODE_BIOMETRICS && !StringUtils.isEmpty(chatPasscode.biometricsHash);
     } else {
@@ -1181,7 +1212,7 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
         return chatPasscode.unlockWitBiometrics(hash, strong);
       }
     } else {
-      return Passcode.instance().unlockByBiometrics(biometricsId, strong);
+      return !requireHiddenAccess && Passcode.instance().unlockByBiometrics(biometricsId, strong);
     }
   }
 
@@ -1204,13 +1235,17 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     }
   }
 
-  private void setPassword (String password) {
+  private boolean setPassword (String password) {
     if (specificChat != null) {
       chatPasscode.hash = Passcode.getPasscodeHash(password);
       chatPasscode.mode = Passcode.MODE_PASSWORD;
       tdlib.setPasscode(specificChat, chatPasscode);
+      return true;
+    } else if (setupHiddenPasscode) {
+      return Passcode.instance().setHiddenPasscode(Passcode.MODE_PASSWORD, password);
     } else {
       Passcode.instance().setPassword(password);
+      return true;
     }
   }
 
@@ -1218,17 +1253,21 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     if (specificChat != null) {
       return chatPasscode.mode == Passcode.MODE_PATTERN && chatPasscode.hash.equals(Passcode.getPasscodeHash(pattern));
     } else {
-      return Passcode.instance().unlockByPattern(pattern);
+      return Passcode.instance().unlockByPattern(pattern, requireHiddenAccess);
     }
   }
 
-  private void setPattern (String pattern) {
+  private boolean setPattern (String pattern) {
     if (specificChat != null) {
       chatPasscode.hash = Passcode.getPasscodeHash(pattern);
       chatPasscode.mode = Passcode.MODE_PATTERN;
       tdlib.setPasscode(specificChat, chatPasscode);
+      return true;
+    } else if (setupHiddenPasscode) {
+      return Passcode.instance().setHiddenPasscode(Passcode.MODE_PATTERN, pattern);
     } else {
       Passcode.instance().setPattern(pattern);
+      return true;
     }
   }
 
@@ -1236,17 +1275,21 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     if (specificChat != null) {
       return chatPasscode.mode == Passcode.MODE_PINCODE && chatPasscode.hash.equals(Passcode.getPasscodeHash(pincode));
     } else {
-      return Passcode.instance().unlockByPincode(pincode);
+      return Passcode.instance().unlockByPincode(pincode, requireHiddenAccess);
     }
   }
 
-  private void setPincode (String pincode) {
+  private boolean setPincode (String pincode) {
     if (specificChat != null) {
       chatPasscode.hash = Passcode.getPasscodeHash(pincode);
       chatPasscode.mode = Passcode.MODE_PINCODE;
       tdlib.setPasscode(specificChat, chatPasscode);
+      return true;
+    } else if (setupHiddenPasscode) {
+      return Passcode.instance().setHiddenPasscode(Passcode.MODE_PINCODE, pincode);
     } else {
       Passcode.instance().setPincode(pincode);
+      return true;
     }
   }
 
@@ -1254,7 +1297,7 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     if (specificChat != null) {
       return chatPasscode.mode == Passcode.MODE_PASSWORD && chatPasscode.hash.equals(Passcode.getPasscodeHash(password));
     } else {
-      return Passcode.instance().unlockByPassword(password);
+      return Passcode.instance().unlockByPassword(password, requireHiddenAccess);
     }
   }
 
@@ -1295,7 +1338,10 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
 
   @Override
   public @Nullable String makeBruteForceSuffix () {
-    return specificChat != null ? (uniqueSuffix != null ? uniqueSuffix : (uniqueSuffix = tdlib.uniqueSuffix(specificChat.id))) : null;
+    if (specificChat != null) {
+      return uniqueSuffix != null ? uniqueSuffix : (uniqueSuffix = tdlib.uniqueSuffix(specificChat.id));
+    }
+    return requireHiddenAccess ? "hidden_accounts" : null;
   }
 
   @Override

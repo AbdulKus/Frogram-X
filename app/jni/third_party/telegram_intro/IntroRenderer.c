@@ -2774,8 +2774,8 @@ JNIEXPORT void Java_org_thunderdog_challegram_N_onSurfaceCreated(JNIEnv *env, jc
     mask1 = create_rounded_rectangle(CSizeMake(60, 60), 0, 16, black_color);
 
     telegram_sphere = create_textured_rectangle(CSizeMake(148, 148), telegram_sphere_texture);
-    telegram_plane = create_textured_rectangle(CSizeMake(82, 74), telegram_plane_texture);
-    telegram_plane.params.anchor = xyzMake(6, -5, 0);
+    telegram_plane = create_textured_rectangle(CSizeMake(90, 92), telegram_plane_texture);
+    telegram_plane.params.anchor = xyzMake(0, 0, 0);
 
     fast_body = create_textured_rectangle(CSizeMake(148, 148), fast_body_texture);
 

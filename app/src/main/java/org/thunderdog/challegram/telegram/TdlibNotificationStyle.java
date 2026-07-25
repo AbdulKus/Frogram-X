@@ -1187,10 +1187,11 @@ public class TdlibNotificationStyle implements TdlibNotificationStyleDelegate, F
         b.setStyle(style);
       }
     } else {
-      String text = Lang.getString(R.string.NotificationLocked);
+      boolean hiddenAccountNotification = helper.useGenericHiddenAccountNotification();
+      String text = Lang.getString(hiddenAccountNotification ? R.string.DoubleBottomGenericNotification : R.string.NotificationLocked);
       b.setTicker(text);
       b.setContentText(text);
-      b.setContentTitle(Lang.getString(R.string.NotificationLockedTitle));
+      b.setContentTitle(hiddenAccountNotification ? BuildConfig.PROJECT_NAME : Lang.getString(R.string.NotificationLockedTitle));
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasCustomText != null) {

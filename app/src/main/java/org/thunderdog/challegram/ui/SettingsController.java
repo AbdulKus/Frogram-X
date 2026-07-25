@@ -73,6 +73,7 @@ import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Strings;
 import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.tool.Views;
+import org.thunderdog.challegram.unsorted.Passcode;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Size;
 import org.thunderdog.challegram.util.AppBuildInfo;
@@ -784,6 +785,18 @@ public class SettingsController extends ViewController<Void> implements
   @Override
   public boolean onLongClick (View v) {
     final int viewId = v.getId();
+    if (viewId == R.id.btn_privacySettings) {
+      if (Passcode.instance().isDoubleBottomEnabled() && !Passcode.instance().isHiddenAccountsUnlocked()) {
+        PasscodeController controller = new PasscodeController(context, tdlib);
+        controller.setPasscodeMode(PasscodeController.MODE_UNLOCK);
+        controller.requireHiddenAccess();
+        controller.setAfterStandaloneUnlock(() -> navigateTo(new DoubleBottomSettingsController(context, tdlib)));
+        navigateTo(controller);
+      } else {
+        navigateTo(new DoubleBottomSettingsController(context, tdlib));
+      }
+      return true;
+    }
     if (viewId == R.id.btn_build) {
       showBuildOptions(true);
       return true;

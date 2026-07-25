@@ -1426,6 +1426,15 @@
   <item type="id" name="btn_closeTopic" />
   <item type="id" name="btn_deleteTopic" />
 
+  <!-- DOUBLE BOTTOM -->
+
+  <item type="id" name="controller_doubleBottom" />
+  <item type="id" name="btn_doubleBottomSetup" />
+  <item type="id" name="btn_doubleBottomAccount" />
+  <item type="id" name="btn_doubleBottomNotifications" />
+  <item type="id" name="btn_doubleBottomAutoLock" />
+  <item type="id" name="btn_doubleBottomChangePasscode" />
+
   <!-- BROADCAST BUTTONS -->
 
   <item type="id" name="btn_convertToBroadcastGroup" />

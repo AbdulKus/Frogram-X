@@ -91,6 +91,7 @@ import org.thunderdog.challegram.ui.SettingsPrivacyController;
 import org.thunderdog.challegram.ui.SettingsPrivacyKeyController;
 import org.thunderdog.challegram.ui.SettingsThemeController;
 import org.thunderdog.challegram.ui.WaitForPremiumController;
+import org.thunderdog.challegram.unsorted.Passcode;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.util.Crash;
 import org.thunderdog.challegram.widget.GearView;
@@ -739,6 +740,23 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
           }
         }
       });
+      return false;
+    }
+
+    int targetAccountId = intent.getIntExtra("account_id", TdlibAccount.NO_ID);
+    if (targetAccountId != TdlibAccount.NO_ID &&
+        Passcode.instance().isAccountHidden(targetAccountId) &&
+        !Passcode.instance().isHiddenAccountsUnlocked()) {
+      addPasscodeListener(new PasscodeListener() {
+        @Override
+        public void onPasscodeShowing (BaseActivity context, boolean isShowing) {
+          if (!isShowing) {
+            handleIntent(actionRaw, intent, false);
+            removePasscodeListener(this);
+          }
+        }
+      });
+      showHiddenAccountPasscode();
       return false;
     }
 

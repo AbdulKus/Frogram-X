@@ -25,6 +25,9 @@ import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.telegram.TdlibManager;
 import org.thunderdog.challegram.tool.UI;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import me.vkryl.core.BitwiseUtils;
@@ -92,6 +95,11 @@ public class Passcode implements UI.StateListener {
   private int biometricsOptions;
 
   private boolean isLocked;
+  private int hiddenPasscodeMode;
+  private String hiddenPasscodeHash;
+  private boolean hiddenAccountsUnlocked;
+  private int hiddenNotificationMode;
+  private final Set<Integer> hiddenAccountIds = new HashSet<>();
   private final ReferenceList<LockListener> listeners = new ReferenceList<>(true);
 
   public static final String KEY_PASSCODE_MODE = "pc_mode";
@@ -103,9 +111,17 @@ public class Passcode implements UI.StateListener {
   private static final String KEY_PASSCODE_AUTOLOCK_TIME = "pc_time";
   private static final String KEY_PASSCODE_DISPLAY_NOTIFICATIONS = "pc_notifications";
   public static final String KEY_PASSCODE_BIOMETRICS_HASH = "pc_finger_hash";
+  private static final String KEY_HIDDEN_PASSCODE_MODE = "pc_hidden_mode";
+  private static final String KEY_HIDDEN_PASSCODE_HASH = "pc_hidden_hash";
+  private static final String KEY_HIDDEN_ACCOUNT_IDS = "pc_hidden_accounts";
+  private static final String KEY_HIDDEN_NOTIFICATION_MODE = "pc_hidden_notifications";
 
   public static final String KEY_PASSCODE_BIOMETRICS_OPTIONS = "pc_biometrics";
   public static final int BIOMETRICS_OPTION_ONLY_STRONG = 1;
+
+  public static final int HIDDEN_NOTIFICATIONS_NONE = 0;
+  public static final int HIDDEN_NOTIFICATIONS_GENERIC = 1;
+  public static final int HIDDEN_NOTIFICATIONS_ALL = 2;
 
   private Passcode () {
     Settings prefs = Settings.instance();
@@ -123,8 +139,35 @@ public class Passcode implements UI.StateListener {
       }
       passcodeHash = prefs.getString(KEY_PASSCODE_HASH, null);
     }
+    hiddenPasscodeMode = prefs.getInt(KEY_HIDDEN_PASSCODE_MODE, MODE_NONE);
+    hiddenPasscodeHash = prefs.getString(KEY_HIDDEN_PASSCODE_HASH, null);
+    hiddenNotificationMode = prefs.getInt(KEY_HIDDEN_NOTIFICATION_MODE, HIDDEN_NOTIFICATIONS_GENERIC);
+    parseHiddenAccountIds(prefs.getString(KEY_HIDDEN_ACCOUNT_IDS, null));
 
     UI.addStateListener(this);
+  }
+
+  private void parseHiddenAccountIds (String value) {
+    hiddenAccountIds.clear();
+    if (value == null || value.isEmpty()) {
+      return;
+    }
+    for (String part : value.split(",")) {
+      try {
+        hiddenAccountIds.add(Integer.parseInt(part));
+      } catch (NumberFormatException ignored) { }
+    }
+  }
+
+  private String serializeHiddenAccountIds () {
+    StringBuilder builder = new StringBuilder();
+    for (int accountId : hiddenAccountIds) {
+      if (builder.length() > 0) {
+        builder.append(',');
+      }
+      builder.append(accountId);
+    }
+    return builder.toString();
   }
 
   public boolean displayNotifications () {
@@ -163,6 +206,11 @@ public class Passcode implements UI.StateListener {
   }
 
   private void setLocked (boolean isLocked) {
+    boolean hiddenAccessChanged = false;
+    if (isLocked && hiddenAccountsUnlocked) {
+      hiddenAccountsUnlocked = false;
+      hiddenAccessChanged = true;
+    }
     if (this.isLocked != isLocked) {
       this.isLocked = isLocked;
       SharedPreferences.Editor editor = Settings.instance().edit();
@@ -174,6 +222,9 @@ public class Passcode implements UI.StateListener {
       editor.apply();
       UI.checkDisallowScreenshots();
       notifyLockListeners(isLocked);
+    }
+    if (hiddenAccessChanged) {
+      onHiddenAccountAccessChanged();
     }
   }
 
@@ -317,6 +368,7 @@ public class Passcode implements UI.StateListener {
 
   public void disable () {
     if (mode != MODE_NONE) {
+      disableDoubleBottom();
       mode = MODE_NONE;
       Settings.instance().putInt(KEY_PASSCODE_MODE, MODE_NONE);
       setLocked(false);
@@ -337,6 +389,9 @@ public class Passcode implements UI.StateListener {
 
   public void setPasscodeHash (int mode, String passcode, int extraOptions) {
     boolean turnedOn = this.mode == MODE_NONE && mode != MODE_NONE;
+    if (isDoubleBottomEnabled() && this.mode != mode) {
+      disableDoubleBottom();
+    }
     this.mode = mode;
     this.passcodeHash = getPasscodeHashOld(passcode);
     SharedPreferences.Editor edit = Settings.instance().edit();
@@ -415,39 +470,178 @@ public class Passcode implements UI.StateListener {
   }
 
   public boolean unlockByPassword (String password) {
-    if (comparePassword(password)) {
-      setLocked(false);
-      return true;
-    }
-    return false;
+    return unlockByPassword(password, false);
+  }
+
+  public boolean unlockByPassword (String password, boolean requireHiddenAccess) {
+    return unlockWithPasscode(MODE_PASSWORD, password, requireHiddenAccess);
   }
 
   public boolean unlockByPincode (String pincode) {
-    if (comparePincode(pincode)) {
-      setLocked(false);
-      return true;
-    }
-    return false;
+    return unlockByPincode(pincode, false);
+  }
+
+  public boolean unlockByPincode (String pincode, boolean requireHiddenAccess) {
+    return unlockWithPasscode(MODE_PINCODE, pincode, requireHiddenAccess);
   }
 
   public void unlock () {
+    setHiddenAccountsUnlocked(false);
     setLocked(false);
   }
 
   public boolean unlockByPattern (String pattern) {
-    if (comparePattern(pattern)) {
+    return unlockByPattern(pattern, false);
+  }
+
+  public boolean unlockByPattern (String pattern, boolean requireHiddenAccess) {
+    return unlockWithPasscode(MODE_PATTERN, pattern, requireHiddenAccess);
+  }
+
+  public boolean unlockByBiometrics (long biometricsId, boolean strong) {
+    if (compareBiometrics(biometricsId, strong)) {
+      setHiddenAccountsUnlocked(false);
       setLocked(false);
       return true;
     }
     return false;
   }
 
-  public boolean unlockByBiometrics (long biometricsId, boolean strong) {
-    if (compareBiometrics(biometricsId, strong)) {
+  public boolean isDoubleBottomEnabled () {
+    return hiddenPasscodeHash != null && isValidHiddenMode(hiddenPasscodeMode);
+  }
+
+  public static boolean isValidHiddenMode (int mode) {
+    return mode == MODE_PINCODE || mode == MODE_PASSWORD || mode == MODE_PATTERN;
+  }
+
+  public int getHiddenPasscodeMode () {
+    return hiddenPasscodeMode;
+  }
+
+  public boolean isHiddenAccountsUnlocked () {
+    return isDoubleBottomEnabled() && hiddenAccountsUnlocked && !isLocked();
+  }
+
+  public boolean isAccountHidden (int accountId) {
+    return isDoubleBottomEnabled() && hiddenAccountIds.contains(accountId);
+  }
+
+  public boolean isAccountVisible (int accountId) {
+    return !isAccountHidden(accountId) || isHiddenAccountsUnlocked();
+  }
+
+  public Set<Integer> getHiddenAccountIds () {
+    return Collections.unmodifiableSet(new HashSet<>(hiddenAccountIds));
+  }
+
+  public boolean setAccountHidden (int accountId, boolean hidden) {
+    boolean changed = hidden ? hiddenAccountIds.add(accountId) : hiddenAccountIds.remove(accountId);
+    if (changed) {
+      Settings.instance().putString(KEY_HIDDEN_ACCOUNT_IDS, serializeHiddenAccountIds());
+      onHiddenAccountAccessChanged();
+    }
+    return changed;
+  }
+
+  public int getHiddenNotificationMode () {
+    return hiddenNotificationMode;
+  }
+
+  public void setHiddenNotificationMode (int mode) {
+    if (mode < HIDDEN_NOTIFICATIONS_NONE || mode > HIDDEN_NOTIFICATIONS_ALL) {
+      throw new IllegalArgumentException("mode == " + mode);
+    }
+    if (hiddenNotificationMode != mode) {
+      hiddenNotificationMode = mode;
+      Settings.instance().putInt(KEY_HIDDEN_NOTIFICATION_MODE, mode);
+      TdlibManager.instance().onUpdateAllNotifications();
+    }
+  }
+
+  public boolean shouldHideNotifications (int accountId) {
+    return isAccountHidden(accountId) && !isHiddenAccountsUnlocked() &&
+      hiddenNotificationMode == HIDDEN_NOTIFICATIONS_NONE;
+  }
+
+  public boolean shouldUseGenericNotifications (int accountId) {
+    return isAccountHidden(accountId) && !isHiddenAccountsUnlocked() &&
+      hiddenNotificationMode == HIDDEN_NOTIFICATIONS_GENERIC;
+  }
+
+  public boolean setHiddenPasscode (int mode, String passcode) {
+    if (!isValidHiddenMode(mode) || passcode == null || matchesPrimaryPasscode(mode, passcode)) {
+      return false;
+    }
+    hiddenPasscodeMode = mode;
+    hiddenPasscodeHash = getPasscodeHash(passcode);
+    hiddenAccountsUnlocked = true;
+    Settings.instance().edit()
+      .putInt(KEY_HIDDEN_PASSCODE_MODE, mode)
+      .putString(KEY_HIDDEN_PASSCODE_HASH, hiddenPasscodeHash)
+      .apply();
+    onHiddenAccountAccessChanged();
+    return true;
+  }
+
+  public void disableDoubleBottom () {
+    if (!isDoubleBottomEnabled() && hiddenAccountIds.isEmpty()) {
+      return;
+    }
+    hiddenPasscodeMode = MODE_NONE;
+    hiddenPasscodeHash = null;
+    hiddenAccountsUnlocked = false;
+    hiddenAccountIds.clear();
+    Settings.instance().edit()
+      .remove(KEY_HIDDEN_PASSCODE_MODE)
+      .remove(KEY_HIDDEN_PASSCODE_HASH)
+      .remove(KEY_HIDDEN_ACCOUNT_IDS)
+      .apply();
+    onHiddenAccountAccessChanged();
+  }
+
+  private boolean matchesPrimaryPasscode (int mode, String passcode) {
+    switch (mode) {
+      case MODE_PINCODE:
+        return comparePincode(passcode);
+      case MODE_PASSWORD:
+        return comparePassword(passcode);
+      case MODE_PATTERN:
+        return comparePattern(passcode);
+      default:
+        return false;
+    }
+  }
+
+  private boolean compareHiddenPasscode (int mode, String passcode) {
+    return isDoubleBottomEnabled() && hiddenPasscodeMode == mode && passcode != null &&
+      hiddenPasscodeHash.equals(getPasscodeHash(passcode));
+  }
+
+  private boolean unlockWithPasscode (int mode, String passcode, boolean requireHiddenAccess) {
+    if (compareHiddenPasscode(mode, passcode)) {
+      setHiddenAccountsUnlocked(true);
+      setLocked(false);
+      return true;
+    }
+    if (!requireHiddenAccess && matchesPrimaryPasscode(mode, passcode)) {
+      setHiddenAccountsUnlocked(false);
       setLocked(false);
       return true;
     }
     return false;
+  }
+
+  private void setHiddenAccountsUnlocked (boolean unlocked) {
+    boolean value = unlocked && isDoubleBottomEnabled();
+    if (hiddenAccountsUnlocked != value) {
+      hiddenAccountsUnlocked = value;
+      onHiddenAccountAccessChanged();
+    }
+  }
+
+  private void onHiddenAccountAccessChanged () {
+    TdlibManager.instance().onHiddenAccountAccessChanged();
   }
 
   // Strings
