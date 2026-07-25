@@ -109,6 +109,7 @@ public class MessagesLoader implements Client.ResultHandler {
   private @Nullable TdApi.Chat chat;
   private @Nullable ThreadInfo messageThread;
   private @Nullable TdApi.MessageTopic topicId;
+  private @Nullable TdApi.ForumTopic forumTopic;
 
   private Tdlib.CancellableResultHandler<TdApi.SponsoredMessages> sponsoredResultHandler;
   private final MessagesSearchManagerMiddleware searchManagerMiddleware;
@@ -147,10 +148,14 @@ public class MessagesLoader implements Client.ResultHandler {
     reuse();
   }
 
-  public void setChat (@Nullable TdApi.Chat chat, @Nullable ThreadInfo messageThread, @Nullable TdApi.MessageTopic topicId, int mode, TdApi.SearchMessagesFilter filter) {
+  public void setChat (@Nullable TdApi.Chat chat, @Nullable ThreadInfo messageThread, @Nullable TdApi.MessageTopic topicId,
+                       @Nullable TdApi.ForumTopic forumTopic, int mode, TdApi.SearchMessagesFilter filter) {
     this.chat = chat;
     this.messageThread = messageThread;
     this.topicId = topicId;
+    this.forumTopic = forumTopic != null && topicId != null &&
+      topicId.getConstructor() == TdApi.MessageTopicForum.CONSTRUCTOR &&
+      forumTopic.info.forumTopicId == ((TdApi.MessageTopicForum) topicId).forumTopicId ? forumTopic : null;
     this.specialMode = mode;
     this.searchFilter = filter;
     this.messageSource = newMessageSource();
@@ -226,6 +231,25 @@ public class MessagesLoader implements Client.ResultHandler {
   @Nullable
   public TdApi.MessageTopic getTopicId () {
     return topicId;
+  }
+
+  @Nullable
+  public TdApi.ForumTopic getForumTopic () {
+    return forumTopic;
+  }
+
+  public void updateForumTopic (@Nullable TdApi.ForumTopic forumTopic) {
+    if (topicId != null && topicId.getConstructor() == TdApi.MessageTopicForum.CONSTRUCTOR &&
+        forumTopic != null && forumTopic.info.forumTopicId == ((TdApi.MessageTopicForum) topicId).forumTopicId) {
+      this.forumTopic = forumTopic;
+    }
+  }
+
+  public void updateForumTopicLastMessage (TdApi.Message message) {
+    if (forumTopic != null && Td.matchesTopic(message.topicId, topicId) &&
+        (forumTopic.lastMessage == null || forumTopic.lastMessage.id < message.id)) {
+      forumTopic.lastMessage = message;
+    }
   }
 
   @Nullable
@@ -1338,6 +1362,11 @@ public class MessagesLoader implements Client.ResultHandler {
       lastReadOutboxMessageId = messageThread.getLastReadOutboxMessageId();
       lastReadInboxMessageId = messageThread.getLastReadInboxMessageId();
       hasUnreadMessages = messageThread.hasUnreadMessages(chat);
+    } else if (forumTopic != null && chat != null) {
+      chatId = chat.id;
+      lastReadOutboxMessageId = forumTopic.lastReadOutboxMessageId;
+      lastReadInboxMessageId = forumTopic.lastReadInboxMessageId;
+      hasUnreadMessages = forumTopic.unreadCount > 0;
     } else if (chat != null) {
       chatId = chat.id;
       lastReadOutboxMessageId = chat.lastReadOutboxMessageId;
@@ -1478,7 +1507,7 @@ public class MessagesLoader implements Client.ResultHandler {
           }
         } else if (!unreadFound) {
           if (top != null && top.getBiggestId() >= lastReadInboxMessageId ||
-              (messageThread != null && cur.getBiggestId() > lastReadInboxMessageId)) {
+              ((messageThread != null || forumTopic != null) && cur.getBiggestId() > lastReadInboxMessageId)) {
             unreadFound = true;
             if (cur.isOutgoing()) {
               lookForInbox = true;
