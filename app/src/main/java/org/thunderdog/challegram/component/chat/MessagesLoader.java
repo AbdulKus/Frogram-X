@@ -246,7 +246,7 @@ public class MessagesLoader implements Client.ResultHandler {
   }
 
   public void updateForumTopicLastMessage (TdApi.Message message) {
-    if (forumTopic != null && Td.matchesTopic(message.getMessageTopicId(), topicId) &&
+    if (forumTopic != null && Td.matchesTopic(message.topicId, topicId) &&
         (forumTopic.lastMessage == null || forumTopic.lastMessage.id < message.id)) {
       forumTopic.lastMessage = message;
     }
