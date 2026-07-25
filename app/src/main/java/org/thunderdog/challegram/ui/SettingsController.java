@@ -786,7 +786,7 @@ public class SettingsController extends ViewController<Void> implements
   public boolean onLongClick (View v) {
     final int viewId = v.getId();
     if (viewId == R.id.btn_privacySettings) {
-      if (Passcode.instance().isDoubleBottomEnabled() && !Passcode.instance().isHiddenAccountsUnlocked()) {
+      if (Passcode.instance().isDoubleBottomEnabled()) {
         PasscodeController controller = new PasscodeController(context, tdlib);
         controller.setPasscodeMode(PasscodeController.MODE_UNLOCK);
         controller.requireHiddenAccess();

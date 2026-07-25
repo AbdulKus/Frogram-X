@@ -46,8 +46,8 @@ import me.vkryl.core.reference.ReferenceList;
 
 public class ThemeManager implements FactorAnimator.Target, GlobalAccountListener {
   public static final int DEFAULT_DARK_THEME = ThemeId.NIGHT_BLUE;
-  public static final int DEFAULT_LIGHT_THEME = ThemeId.CLASSIC;
-  public static final int DEFAULT_THEME = DEFAULT_DARK_THEME;
+  public static final int DEFAULT_LIGHT_THEME = ThemeId.GREEN;
+  public static final int DEFAULT_THEME = DEFAULT_LIGHT_THEME;
 
   public static final int CHAT_STYLE_UNKNOWN = 0;
   public static final int CHAT_STYLE_MODERN = 1; // default

@@ -604,6 +604,7 @@
   <item type="id" name="btn_biometrics" />
   <item type="id" name="btn_screenCapture" />
   <item type="id" name="btn_notificationContent" />
+  <item type="id" name="btn_passcodeNotificationActions" />
   <item type="id" name="btn_passcode_change" />
   <item type="id" name="btn_passcode_auto" />
   <item type="id" name="btn_addMember" />

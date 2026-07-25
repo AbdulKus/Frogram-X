@@ -90,7 +90,7 @@ public class Passcode implements UI.StateListener {
   private static final String SALT_NEW = "VGhpcyBpcyB0aGUgbW9yZSBzZWN1cmUgc2FsdCBvZiBUZWxlZ3JhbSBY";
 
   private int mode;
-  private Boolean _visible, _allowScreenshots, _displayNotifications;
+  private Boolean _visible, _allowScreenshots, _displayNotifications, _allowNotificationActions;
 
   private int autolockMode;
   private long autolockTime;
@@ -114,6 +114,7 @@ public class Passcode implements UI.StateListener {
   private static final String KEY_PASSCODE_AUTOLOCK_MODE = "pc_al_mode";
   private static final String KEY_PASSCODE_AUTOLOCK_TIME = "pc_time";
   private static final String KEY_PASSCODE_DISPLAY_NOTIFICATIONS = "pc_notifications";
+  private static final String KEY_PASSCODE_NOTIFICATION_ACTIONS = "pc_notification_actions";
   public static final String KEY_PASSCODE_BIOMETRICS_HASH = "pc_finger_hash";
   private static final String KEY_HIDDEN_PASSCODE_MODE = "pc_hidden_mode";
   private static final String KEY_HIDDEN_PASSCODE_HASH = "pc_hidden_hash";
@@ -186,6 +187,20 @@ public class Passcode implements UI.StateListener {
       Settings.instance().putBoolean(KEY_PASSCODE_DISPLAY_NOTIFICATIONS, display);
     else
       Settings.instance().remove(KEY_PASSCODE_DISPLAY_NOTIFICATIONS);
+  }
+
+  public boolean allowNotificationActions () {
+    if (_allowNotificationActions == null)
+      _allowNotificationActions = Settings.instance().getBoolean(KEY_PASSCODE_NOTIFICATION_ACTIONS, false);
+    return _allowNotificationActions;
+  }
+
+  public void setAllowNotificationActions (boolean allow) {
+    this._allowNotificationActions = allow;
+    if (allow)
+      Settings.instance().putBoolean(KEY_PASSCODE_NOTIFICATION_ACTIONS, true);
+    else
+      Settings.instance().remove(KEY_PASSCODE_NOTIFICATION_ACTIONS);
   }
 
   @Override

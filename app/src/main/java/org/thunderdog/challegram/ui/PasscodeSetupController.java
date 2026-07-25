@@ -77,7 +77,7 @@ public class PasscodeSetupController extends ViewController<PasscodeSetupControl
   private @Nullable SettingView autoLockView;
   private SettingView visibilityView;
   private @Nullable SeparatorView visibilitySeparator;
-  private @Nullable SettingView screenshotView, notificationsView;
+  private @Nullable SettingView screenshotView, notificationsView, notificationActionsView;
   private SettingView biometricsView;
   private SeparatorView biometricsSeparator;
   private ShadowView topShadowView, bottomShadowView;
@@ -283,6 +283,19 @@ public class PasscodeSetupController extends ViewController<PasscodeSetupControl
       notificationsView.addThemeListeners(this);
       autoLockWrap.addView(notificationsView);
 
+      SeparatorView notificationsSeparator = SeparatorView.simpleSeparator(context, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(1f)), true);
+      addThemeInvalidateListener(notificationsSeparator);
+      autoLockWrap.addView(notificationsSeparator);
+
+      notificationActionsView = new SettingView(context, tdlib);
+      notificationActionsView.setId(R.id.btn_passcodeNotificationActions);
+      notificationActionsView.setType(SettingView.TYPE_RADIO);
+      notificationActionsView.setName(R.string.PasscodeNotificationActions);
+      notificationActionsView.getToggler().setRadioEnabled(Passcode.instance().allowNotificationActions(), false);
+      notificationActionsView.setOnClickListener(this);
+      notificationActionsView.addThemeListeners(this);
+      autoLockWrap.addView(notificationActionsView);
+
       shadow = new ShadowView(context);
       addThemeInvalidateListener(shadow);
       shadow.setSimpleBottomTransparentShadow(true);
@@ -397,6 +410,12 @@ public class PasscodeSetupController extends ViewController<PasscodeSetupControl
     boolean biometricsEnabled = needUnlockWithBiometrics();
     biometricsView.getToggler().setRadioEnabled(biometricsEnabled, biometricsView.getVisibility() == View.VISIBLE && isFocused());
     biometricsView.setData(Lang.getMarkdownString(this, useStrongBiometrics(biometricsEnabled) ? R.string.BiometricsStrong : R.string.BiometricsWeak));
+    if (notificationsView != null) {
+      notificationsView.getToggler().setRadioEnabled(Passcode.instance().displayNotifications(), isFocused());
+    }
+    if (notificationActionsView != null) {
+      notificationActionsView.getToggler().setRadioEnabled(Passcode.instance().allowNotificationActions(), isFocused());
+    }
     if (!removedPasscodeItem && isAttachedToNavigationController()) {
       removedPasscodeItem = true;
       if (isPasscodeEnabled()) {
@@ -530,6 +549,11 @@ public class PasscodeSetupController extends ViewController<PasscodeSetupControl
     } else if (viewId == R.id.btn_notificationContent) {
       if (notificationsView != null) {
         Passcode.instance().setDisplayNotifications(notificationsView.toggleRadio());
+        TdlibManager.instance().onUpdateAllNotifications();
+      }
+    } else if (viewId == R.id.btn_passcodeNotificationActions) {
+      if (notificationActionsView != null) {
+        Passcode.instance().setAllowNotificationActions(notificationActionsView.toggleRadio());
         TdlibManager.instance().onUpdateAllNotifications();
       }
     } else if (viewId == R.id.btn_screenCapture) {

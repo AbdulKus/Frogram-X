@@ -343,7 +343,12 @@ public class TdlibNotificationStyle implements TdlibNotificationStyleDelegate, F
     // Notification itself
 
     final boolean needPreview = helper.needPreview(group);
-    final boolean needReply = !Passcode.instance().isLocked() && needPreview && (!isSummary || Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) && !isChannel && tdlib.canSendBasicMessage(chat) && !group.isOnlyScheduled();
+    final boolean isPasscodeLocked = Passcode.instance().isLocked();
+    final boolean allowLockedNotificationActions = isPasscodeLocked &&
+      !helper.requiresHiddenAccountUnlock() &&
+      Passcode.instance().allowNotificationActions();
+    final boolean needNotificationActions = needPreview || allowLockedNotificationActions;
+    final boolean needReply = needNotificationActions && (!isSummary || Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) && !isChannel && tdlib.canSendBasicMessage(chat) && !group.isOnlyScheduled();
     final boolean needReplyToMessage = needReply && canReplyTo(group) && (!ChatId.isPrivate(chatId) || (singleNotification != null && chat.unreadCount > 1));
     final long[] allMessageIds = group.getAllMessageIds();
     final long[] allUserIds = group.isMention() ? group.getAllUserIds() : null;
@@ -373,7 +378,7 @@ public class TdlibNotificationStyle implements TdlibNotificationStyleDelegate, F
         .build();
     }
 
-    if (needPreview) {
+    if (needNotificationActions) {
       // mark as read
       Intent intent = new Intent(UI.getAppContext(), TGMessageReceiver.class);
       styleIntent(Intents.ACTION_MESSAGE_READ, intent, tdlib, group, needReplyToMessage, allMessageIds, allUserIds);
@@ -644,8 +649,8 @@ public class TdlibNotificationStyle implements TdlibNotificationStyleDelegate, F
       builder.setSubText(Lang.getNotificationCategory(category));
     }
 
-    if (!Passcode.instance().isLocked() && !helper.requiresHiddenAccountUnlock()) {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+    if (!helper.requiresHiddenAccountUnlock() && (!isPasscodeLocked || allowLockedNotificationActions)) {
+      if (!isPasscodeLocked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
         if (muteAction != null)
           builder.addInvisibleAction(muteAction);
         if (unmuteAction != null)

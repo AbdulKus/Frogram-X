@@ -29,4 +29,7 @@
   <string name="DoubleBottomGenericNotification">Проверьте новые сообщения</string>
   <string name="DoubleBottomChangeHiddenPasscode">Изменить скрытый код</string>
   <string name="DoubleBottomUnsupportedPasscode">Для двойного дна используется PIN-код, пароль или графический ключ. Выберите один из них для основной блокировки.</string>
+  <string name="AllowNotifications">Показывать текст в уведомлениях</string>
+  <string name="AllowNotificationsInfo">Если включено, при блокировке будет виден текст уведомлений. Кнопки «Ответить» и «Прочитано» настраиваются отдельно.</string>
+  <string name="PasscodeNotificationActions">Ответить и прочитать при блокировке</string>
 </resources>

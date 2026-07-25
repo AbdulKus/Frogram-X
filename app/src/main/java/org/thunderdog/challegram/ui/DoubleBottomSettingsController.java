@@ -53,10 +53,15 @@ public class DoubleBottomSettingsController extends RecyclerViewController<Void>
     adapter = new SettingsAdapter(this) {
       @Override
       protected void setValuedSetting (ListItem item, SettingView view, boolean isUpdate) {
+        view.setCenterIcon(true);
         if (item.getId() == R.id.btn_doubleBottomNotifications) {
           view.setData(getNotificationModeName());
         } else if (item.getId() == R.id.btn_doubleBottomAutoLock) {
           view.setData(Passcode.instance().getAutolockModeNames()[Passcode.instance().getAutolockMode()]);
+        } else if (item.getId() == R.id.btn_notificationContent) {
+          view.getToggler().setRadioEnabled(Passcode.instance().displayNotifications(), isUpdate);
+        } else if (item.getId() == R.id.btn_passcodeNotificationActions) {
+          view.getToggler().setRadioEnabled(Passcode.instance().allowNotificationActions(), isUpdate);
         }
       }
     };
@@ -167,11 +172,18 @@ public class DoubleBottomSettingsController extends RecyclerViewController<Void>
 
     items.add(new ListItem(ListItem.TYPE_HEADER, 0, 0, R.string.Notifications));
     items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
-    items.add(new ListItem(ListItem.TYPE_VALUED_SETTING, R.id.btn_doubleBottomNotifications, R.drawable.baseline_notifications_24, R.string.DoubleBottomNotifications));
-    items.add(new ListItem(ListItem.TYPE_SEPARATOR));
-    items.add(new ListItem(ListItem.TYPE_VALUED_SETTING, R.id.btn_doubleBottomAutoLock, R.drawable.deproko_baseline_clock_24, R.string.AutoLock));
-    items.add(new ListItem(ListItem.TYPE_SEPARATOR));
-    items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_doubleBottomChangePasscode, R.drawable.mrgrigri_baseline_textbox_password_24, R.string.DoubleBottomChangeHiddenPasscode));
+    items.add(new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_notificationContent, R.drawable.baseline_visibility_24, R.string.AllowNotifications));
+    items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+    items.add(new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_passcodeNotificationActions, R.drawable.baseline_reply_24, R.string.PasscodeNotificationActions));
+    items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+    items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_doubleBottomNotifications, R.drawable.baseline_notifications_24, R.string.DoubleBottomNotifications));
+    items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
+
+    items.add(new ListItem(ListItem.TYPE_HEADER, 0, 0, R.string.SecurityTitle));
+    items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
+    items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_doubleBottomAutoLock, R.drawable.baseline_schedule_24, R.string.AutoLock));
+    items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+    items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_doubleBottomChangePasscode, R.drawable.baseline_vpn_key_24, R.string.DoubleBottomChangeHiddenPasscode));
     items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
 
     adapter.setItems(items, true);
@@ -317,6 +329,12 @@ public class DoubleBottomSettingsController extends RecyclerViewController<Void>
       rebuildCells();
     } else if (item.getId() == R.id.btn_doubleBottomNotifications) {
       showNotificationOptions();
+    } else if (item.getId() == R.id.btn_notificationContent) {
+      Passcode.instance().setDisplayNotifications(adapter.toggleView(v, item));
+      TdlibManager.instance().onUpdateAllNotifications();
+    } else if (item.getId() == R.id.btn_passcodeNotificationActions) {
+      Passcode.instance().setAllowNotificationActions(adapter.toggleView(v, item));
+      TdlibManager.instance().onUpdateAllNotifications();
     } else if (item.getId() == R.id.btn_doubleBottomAutoLock) {
       showAutoLockOptions();
     } else if (item.getId() == R.id.btn_doubleBottomChangePasscode) {

@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: android-debug-${{ github.ref }}
+  group: android-release-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -112,12 +112,12 @@ jobs:
         run: |
           scripts/setup.sh
           {
-            echo "app.experimental=true"
+            echo "app.experimental=false"
             echo "app.file=Frogram-X"
           } >> local.properties
 
       - name: Build APK
-        run: ./gradlew assembleLatestArm64Debug --stacktrace --no-daemon
+        run: ./gradlew assembleLatestArm64Release --stacktrace --no-daemon
 
       - name: Collect APK and checksum
         run: |
