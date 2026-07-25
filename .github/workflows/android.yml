@@ -113,6 +113,7 @@ jobs:
           scripts/setup.sh
           {
             echo "app.experimental=false"
+            echo "app.google_services=false"
             echo "app.file=Frogram-X"
           } >> local.properties
 

@@ -39,6 +39,7 @@ val checkEmojiKeyboard = tasks.register<CheckEmojiKeyboardTask>("checkEmojiKeybo
 }
 
 val config = extra["config"] as ApplicationConfig
+val useGoogleServices = loadProperties().getProperty("app.google_services", "true") == "true"
 
 //noinspection WrongGradleMethod
 android {
@@ -512,7 +513,7 @@ gradle.projectsEvaluated {
     it.startsWith("pre") && it.endsWith("ReleaseBuild")
   }.configureEach {
     dependsOn(updateLanguages)
-    if (!config.isExperimentalBuild) {
+    if (!config.isExperimentalBuild && useGoogleServices) {
       dependsOn(validateApiTokens)
     }
   }
@@ -712,7 +713,7 @@ dependencies {
   compileOnly(libs.annotations.kotlin)
 }
 
-if (!config.isExperimentalBuild) {
+if (!config.isExperimentalBuild && useGoogleServices) {
   apply(plugin = libs.plugins.google.services.get().pluginId)
   if (config.isHuaweiBuild) {
     apply(plugin = libs.huawei.agconnect.get().group)
