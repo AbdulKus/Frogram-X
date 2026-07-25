@@ -302,7 +302,7 @@ public class PasscodeSetupController extends ViewController<PasscodeSetupControl
       autoLockWrap.addView(shadow);
 
       textView = newDescription(this);
-      textView.setText(Lang.getString(R.string.AllowNotificationsInfo));
+      textView.setText(Lang.getString(R.string.PasscodeNotificationsInfo));
       autoLockWrap.addView(textView);
 
       shadow = new ShadowView(context);

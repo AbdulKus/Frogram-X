@@ -3803,7 +3803,8 @@
   <string name="NotificationChannelMaybe">Missed notifications</string>
 
   <string name="AllowNotifications">Display Notifications Content</string>
-  <string name="AllowNotificationsInfo">If enabled, notification content is shown while the app is locked. Reply and Mark as Read are controlled separately.</string>
+  <string name="AllowNotificationsInfo">If enabled, you will see notifications content when app is locked, however, actions such as Reply or Mark as Read will not be available until you unlock the app.</string>
+  <string name="PasscodeNotificationsInfo">If enabled, notification content is shown while the app is locked. Reply and Mark as Read are controlled separately.</string>
   <string name="PasscodeNotificationActions">Reply and Mark as Read While Locked</string>
   <string name="AutoLockInstantWarn">Can\'t unlock app, because of instant Auto-Lock. Hold lock button to change this.</string>
   <string name="ForwardAuthorHidden">This account was hidden by the user.</string>

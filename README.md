@@ -5,7 +5,7 @@
 <h1 align="center">Frogram X</h1>
 
 <p align="center">
-  Экспериментальный независимый форк Telegram X для Android на базе TDLib.
+  Независимый форк Telegram X для Android на базе TDLib.
 </p>
 
 ## Что изменено
@@ -17,7 +17,7 @@ Frogram X находится в разработке. Перед обновле�
 
 ## Скачать сборку
 
-Откройте [GitHub Actions](https://github.com/AbdulKus/Xfork/actions/workflows/android.yml), выберите последнюю успешную сборку **Build Frogram X** и скачайте артефакт `Frogram-X-…`.
+Откройте [GitHub Actions](https://github.com/AbdulKus/Frogram-X/actions/workflows/android.yml), выберите последнюю успешную сборку **Build Frogram X** и скачайте артефакт `Frogram-X-…`.
 
 Артефакты хранятся 30 дней. Рядом с APK публикуется файл `SHA256SUMS.txt` для проверки контрольной суммы.
 
@@ -36,13 +36,15 @@ Workflow `.github/workflows/android.yml` запускается при изме�
 
 Если секреты подписи не заданы, Actions создаст временный ключ. Такой APK нельзя будет установить как обновление поверх сборки, подписанной другим ключом. Храните исходный keystore и пароли в нескольких защищённых резервных копиях.
 
+Для push-уведомлений зарегистрируйте Android-приложение `org.frogram.messenger` в бесплатном проекте Firebase, скачайте `google-services.json` и добавьте его в secret `GOOGLE_SERVICES_JSON_BASE64` в виде одной base64-строки. Без этого секрета release собирается, но Firebase Cloud Messaging отключается.
+
 ## Локальная сборка
 
 Требуются Git с LFS, Java 21, Android SDK/NDK и стандартные инструменты сборки Linux.
 
 ```bash
-git clone --recursive https://github.com/AbdulKus/Xfork.git
-cd Xfork
+git clone --recursive https://github.com/AbdulKus/Frogram-X.git
+cd Frogram-X
 scripts/setup.sh
 ./gradlew assembleLatestArm64Debug
 ```

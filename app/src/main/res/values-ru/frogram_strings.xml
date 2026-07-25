@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <!-- Frogram X strings live separately because updateLanguages regenerates strings.xml. -->
   <string name="Topics">Топики</string>
   <string name="NoTopics">Топики не найдены</string>
   <string name="MarkTopicAsRead">Прочитать всё</string>
@@ -30,6 +31,6 @@
   <string name="DoubleBottomChangeHiddenPasscode">Изменить скрытый код</string>
   <string name="DoubleBottomUnsupportedPasscode">Для двойного дна используется PIN-код, пароль или графический ключ. Выберите один из них для основной блокировки.</string>
   <string name="AllowNotifications">Показывать текст в уведомлениях</string>
-  <string name="AllowNotificationsInfo">Если включено, при блокировке будет виден текст уведомлений. Кнопки «Ответить» и «Прочитано» настраиваются отдельно.</string>
+  <string name="PasscodeNotificationsInfo">Если включено, при блокировке будет виден текст уведомлений. Кнопки «Ответить» и «Прочитано» настраиваются отдельно.</string>
   <string name="PasscodeNotificationActions">Ответить и прочитать при блокировке</string>
 </resources>

@@ -256,7 +256,16 @@ public class Lang {
         resId != R.string.PinTopic && resId != R.string.UnpinTopic && resId != R.string.CreateTopic &&
         resId != R.string.EditTopic && resId != R.string.TopicName && resId != R.string.TopicIcon &&
         resId != R.string.CloseTopic && resId != R.string.ReopenTopic && resId != R.string.DeleteTopic &&
-        resId != R.string.DeleteTopicConfirm) {
+        resId != R.string.DeleteTopicConfirm && resId != R.string.DoubleBottom &&
+        resId != R.string.DoubleBottomSetup && resId != R.string.DoubleBottomSetupInfo &&
+        resId != R.string.DoubleBottomHiddenPasscode && resId != R.string.DoubleBottomPasswordsMustDiffer &&
+        resId != R.string.DoubleBottomPrimaryAccounts && resId != R.string.DoubleBottomHiddenAccounts &&
+        resId != R.string.DoubleBottomAccountsInfo && resId != R.string.DoubleBottomKeepPrimaryAccount &&
+        resId != R.string.DoubleBottomNotifications && resId != R.string.DoubleBottomNotificationsNone &&
+        resId != R.string.DoubleBottomNotificationsGeneric && resId != R.string.DoubleBottomNotificationsAll &&
+        resId != R.string.DoubleBottomGenericNotification && resId != R.string.DoubleBottomChangeHiddenPasscode &&
+        resId != R.string.DoubleBottomUnsupportedPasscode && resId != R.string.PasscodeNotificationsInfo &&
+        resId != R.string.PasscodeNotificationActions) {
       return null;
     }
     Context context = UI.getAppContext();
@@ -332,6 +341,10 @@ public class Lang {
   private static String getStringImpl (@Nullable TdApi.LanguagePackInfo languagePackInfo, @StringRes int resId, boolean allowCloud) {
     if (resId == 0)
       throw new Resources.NotFoundException("resId == 0");
+    String frogramFallback = getFrogramFallbackString(resId);
+    if (frogramFallback != null) {
+      return applyFrogramBranding(frogramFallback);
+    }
     if (allowCloud) {
       if (languagePackInfo == null)
         languagePackInfo = Settings.instance().getLanguagePackInfo();
@@ -339,10 +352,6 @@ public class Lang {
       TdApi.LanguagePackStringValueOrdinary string = getStringValue(key, languagePackInfo);
       if (string != null)
         return applyFrogramBranding(string.value);
-    }
-    String frogramFallback = getFrogramFallbackString(resId);
-    if (frogramFallback != null) {
-      return applyFrogramBranding(frogramFallback);
     }
     try {
       return applyFrogramBranding(getAndroidString(resId));
