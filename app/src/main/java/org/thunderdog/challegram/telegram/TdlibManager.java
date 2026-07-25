@@ -1924,6 +1924,9 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
         return false;
       }
       activeAccounts.remove(position);
+      if (account.isUnauthorized()) {
+        Passcode.instance().forgetHiddenAccount(account.id);
+      }
     }
     global().notifyAccountAddedOrRemoved(account, position, needAdd);
     resetBadge(false);
@@ -2103,7 +2106,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
   }
 
   public boolean isMultiUser () {
-    return activeAccounts.size() > 1;
+    return getVisibleAccountsCount() > 1;
   }
 
   private void onAccountProfileChanged (TdlibAccount account, TdApi.User user, boolean isCurrent, boolean isFirstTimeLoaded) {

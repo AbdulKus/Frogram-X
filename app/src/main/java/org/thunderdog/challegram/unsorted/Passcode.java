@@ -389,7 +389,8 @@ public class Passcode implements UI.StateListener {
 
   public void setPasscodeHash (int mode, String passcode, int extraOptions) {
     boolean turnedOn = this.mode == MODE_NONE && mode != MODE_NONE;
-    if (isDoubleBottomEnabled() && this.mode != mode) {
+    if (isDoubleBottomEnabled() &&
+        (this.mode != mode || (hiddenPasscodeMode == mode && hiddenPasscodeHash.equals(getPasscodeHash(passcode))))) {
       disableDoubleBottom();
     }
     this.mode = mode;
@@ -542,6 +543,12 @@ public class Passcode implements UI.StateListener {
       onHiddenAccountAccessChanged();
     }
     return changed;
+  }
+
+  public void forgetHiddenAccount (int accountId) {
+    if (hiddenAccountIds.remove(accountId)) {
+      Settings.instance().putString(KEY_HIDDEN_ACCOUNT_IDS, serializeHiddenAccountIds());
+    }
   }
 
   public int getHiddenNotificationMode () {

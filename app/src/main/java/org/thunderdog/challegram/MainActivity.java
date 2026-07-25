@@ -1075,7 +1075,8 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
     LinkedList<TdlibAccount> accounts = new LinkedList<>();
 
     for (TdlibAccount account : TdlibManager.instance()) {
-      if (account.hasTdlib(true) && account.tdlib().cache().hasOutputLocations()) {
+      if (Passcode.instance().isAccountVisible(account.id) &&
+          account.hasTdlib(true) && account.tdlib().cache().hasOutputLocations()) {
         accounts.add(account);
       }
     }

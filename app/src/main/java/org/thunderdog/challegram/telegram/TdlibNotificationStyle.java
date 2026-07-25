@@ -644,7 +644,7 @@ public class TdlibNotificationStyle implements TdlibNotificationStyleDelegate, F
       builder.setSubText(Lang.getNotificationCategory(category));
     }
 
-    if (!Passcode.instance().isLocked()) {
+    if (!Passcode.instance().isLocked() && !helper.requiresHiddenAccountUnlock()) {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
         if (muteAction != null)
           builder.addInvisibleAction(muteAction);
