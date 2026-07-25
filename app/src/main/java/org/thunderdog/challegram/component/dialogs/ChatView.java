@@ -562,6 +562,13 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
     return false;
   }
 
+  private static void drawForumIconRow (Canvas c, float bulletX, float lineLeft, float lineRight,
+                                        float centerY, Paint paint, RectF lineRect) {
+    c.drawCircle(bulletX, centerY, Screen.dpf(1.25f), paint);
+    lineRect.set(lineLeft, centerY - Screen.dpf(.9f), lineRight, centerY + Screen.dpf(.9f));
+    c.drawRoundRect(lineRect, Screen.dpf(.9f), Screen.dpf(.9f), paint);
+  }
+
   @Override
   protected void onDraw (Canvas c) {
     if (chat == null) {
@@ -615,11 +622,18 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
     }
 
     if (chat.showForumIcon()) {
-      Drawable forumIcon = getSparseDrawable(R.drawable.baseline_format_list_bulleted_type_16, ColorId.NONE);
-      int forumIconTop = getTitleTop2(chatListMode) +
-        (title != null ? (title.getHeight() - forumIcon.getMinimumHeight()) / 2 : Screen.dp(2f));
-      Drawables.drawRtl(c, forumIcon, chat.getForumIconLeft(), forumIconTop,
-        Paints.getChatsMutePaint(), viewWidth, rtl);
+      int iconSize = Screen.dp(16f);
+      float iconLeft = rtl ? viewWidth - chat.getForumIconLeft() - iconSize : chat.getForumIconLeft();
+      float iconTop = getTitleTop2(chatListMode) +
+        ((title != null ? title.getHeight() : Screen.dp(20f)) - iconSize) / 2f;
+      float bulletX = iconLeft + Screen.dpf(2.5f);
+      float lineLeft = iconLeft + Screen.dpf(6f);
+      float lineRight = iconLeft + Screen.dpf(15f);
+      Paint iconPaint = Paints.fillingPaint(Theme.getColor(ColorId.chatListMute));
+      RectF lineRect = Paints.getRectF();
+      drawForumIconRow(c, bulletX, lineLeft, lineRight, iconTop + Screen.dpf(4f), iconPaint, lineRect);
+      drawForumIconRow(c, bulletX, lineLeft, lineRight, iconTop + Screen.dpf(8f), iconPaint, lineRect);
+      drawForumIconRow(c, bulletX, lineLeft, lineRight, iconTop + Screen.dpf(12f), iconPaint, lineRect);
     }
 
     if (chat.showMute()) {
