@@ -2442,8 +2442,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       this.chat = chat;
       this.messageThread = messageThread;
       this.messageTopicId = messageTopicId;
-      this.highlightMode = MessagesManager.getAnchorHighlightMode(tdlib.id(), chat, messageThread);
-      this.highlightMessageId = MessagesManager.getAnchorMessageId(tdlib.id(), chat, messageThread, highlightMode);
+      this.highlightMode = MessagesManager.getAnchorHighlightMode(tdlib.id(), chat, messageThread, messageTopicId, null);
+      this.highlightMessageId = MessagesManager.getAnchorMessageId(tdlib.id(), chat, messageThread, messageTopicId, null, highlightMode);
       this.searchFilter = filter;
 
       this.inPreviewMode = false;
@@ -2633,11 +2633,13 @@ public class MessagesController extends ViewController<MessagesController.Argume
     this.messageThread = args.messageThread;
     this.messageTopicId = args.messageTopicId;
     this.activeForumTopic = null;
+    boolean restoredDefaultForumTopic = false;
     if (this.messageTopicId == null && args.messageThread == null && !args.inPreviewMode && !args.areScheduled &&
         args.chat != null && tdlib.isForum(args.chat.id)) {
       int forumTopicId = Settings.instance().getDefaultForumTopicId(tdlib.id(), args.chat.id);
       if (forumTopicId != 0) {
         this.messageTopicId = new TdApi.MessageTopicForum(forumTopicId);
+        restoredDefaultForumTopic = true;
       }
     }
     this.openedFromChatList = args.chatList;
@@ -2648,7 +2650,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
     this.previewSearchQuery = args.searchQuery;
     this.previewSearchSender = args.searchSender;
     this.previewSearchFilter = args.searchFilter;
-    this.manager.setHighlightMessageId(args.highlightMessageId, args.highlightMode);
+    if (restoredDefaultForumTopic) {
+      int highlightMode = MessagesManager.getAnchorHighlightMode(tdlib.id(), chat, null, messageTopicId, null);
+      this.manager.setHighlightMessageId(
+        MessagesManager.getAnchorMessageId(tdlib.id(), chat, null, messageTopicId, null, highlightMode),
+        highlightMode
+      );
+    } else {
+      this.manager.setHighlightMessageId(args.highlightMessageId, args.highlightMode);
+    }
     this.inPreviewMode = args.inPreviewMode;
     this.previewMode = args.previewMode;
     this.openKeyboard = args.openKeyboard;
@@ -2886,7 +2896,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     closeCommandsKeyboard(false);
 
     if (previewSearchSender == null) {
-      manager.openChat(chat, messageThread, messageTopicId, previewSearchFilter, this, areScheduled, !inPreviewMode && !isInForceTouchMode());
+      manager.openChat(chat, messageThread, messageTopicId, activeForumTopic, previewSearchFilter, this, areScheduled, !inPreviewMode && !isInForceTouchMode());
     }
 
     updateShadowColor();
@@ -2983,6 +2993,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
         setUnreadCountBadge(unreadCount, animated);
         setMentionCountBadge(0);
         setReactionCountBadge(0);
+      } else if (activeForumTopic != null) {
+        setUnreadCountBadge(activeForumTopic.unreadCount, animated);
+        setMentionCountBadge(activeForumTopic.unreadMentionCount);
+        setReactionCountBadge(activeForumTopic.unreadReactionCount);
       } else {
         setUnreadCountBadge(chat.unreadCount, true);
         setMentionCountBadge(chat.unreadMentionCount);
@@ -2995,15 +3009,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void scrollToUnreadOrStartMessage () {
-    int anchorMode = MessagesManager.getAnchorHighlightMode(tdlib.id(), chat, messageThread);
+    int anchorMode = MessagesManager.getAnchorHighlightMode(tdlib.id(), chat, messageThread, messageTopicId, activeForumTopic);
     if (!manager.hasReturnMessage()) {
       if (!inPreviewMode && !isInForceTouchMode() && anchorMode == MessagesManager.HIGHLIGHT_MODE_UNREAD) {
-        MessageId messageId = MessagesManager.getAnchorMessageId(tdlib.id(), chat, messageThread, anchorMode);
+        MessageId messageId = MessagesManager.getAnchorMessageId(tdlib.id(), chat, messageThread, messageTopicId, activeForumTopic, anchorMode);
         manager.highlightMessage(messageId, MessagesManager.HIGHLIGHT_MODE_UNREAD_NEXT, null, true);
         return;
       }
-      if (chat != null && MessagesManager.canGoUnread(chat, messageThread)) {
-        MessageId messageId = MessagesManager.getAnchorMessageId(tdlib.id(), chat, messageThread, MessagesManager.HIGHLIGHT_MODE_UNREAD);
+      if (chat != null && MessagesManager.canGoUnread(chat, messageThread, activeForumTopic)) {
+        MessageId messageId = MessagesManager.getAnchorMessageId(tdlib.id(), chat, messageThread, messageTopicId, activeForumTopic, MessagesManager.HIGHLIGHT_MODE_UNREAD);
         int firstUnreadIndex = manager.indexOfFirstUnreadMessage();
         TGMessage bottom = manager.findBottomMessage();
         MessageId bottomMessageId = bottom != null ? bottom.toMessageId() : null;
@@ -4576,6 +4590,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
     messageTopicId = newForumTopicId != 0 ? new TdApi.MessageTopicForum(newForumTopicId) : null;
     activeForumTopic = forumTopic;
     forumTopicRequestId++;
+    int highlightMode = MessagesManager.getAnchorHighlightMode(tdlib.id(), chat, null, messageTopicId, forumTopic);
+    manager.setHighlightMessageId(
+      MessagesManager.getAnchorMessageId(tdlib.id(), chat, null, messageTopicId, forumTopic, highlightMode),
+      highlightMode
+    );
     updateView();
   }
 
@@ -4629,6 +4648,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
         return;
       }
       activeForumTopic = forumTopic;
+      manager.updateForumTopic(forumTopic);
+      updateCounters(true);
       updateTopicBar(true);
     }));
   }
@@ -8739,6 +8760,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public void onMessageThreadReadInbox (long chatId, TdApi.MessageTopic topicId, long lastReadInboxMessageId, int remainingUnreadCount) {
     if (messageThread != null && messageThread.belongsTo(chatId, topicId)) {
       updateCounters(true);
+    } else if (activeForumTopic != null && getChatId() == chatId && Td.matchesTopic(topicId, messageTopicId)) {
+      activeForumTopic.lastReadInboxMessageId = lastReadInboxMessageId;
+      activeForumTopic.unreadCount = remainingUnreadCount;
+      manager.updateForumTopic(activeForumTopic);
+      updateCounters(true);
     }
   }
 
@@ -11470,6 +11496,39 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override
+  public void onForumTopicInfoChanged (TdApi.ForumTopicInfo info) {
+    tdlib.ui().post(() -> {
+      if (activeForumTopic != null && getChatId() == info.chatId &&
+          activeForumTopic.info.forumTopicId == info.forumTopicId) {
+        activeForumTopic.info = info;
+        manager.updateForumTopic(activeForumTopic);
+        updateTopicBar(true);
+      }
+    });
+  }
+
+  @Override
+  public void onForumTopicUpdated (long chatId, long forumTopicId, boolean isPinned,
+                                   long lastReadInboxMessageId, long lastReadOutboxMessageId,
+                                   TdApi.ChatNotificationSettings notificationSettings) {
+    tdlib.ui().post(() -> {
+      if (activeForumTopic != null && getChatId() == chatId &&
+          activeForumTopic.info.forumTopicId == forumTopicId) {
+        activeForumTopic.isPinned = isPinned;
+        activeForumTopic.lastReadInboxMessageId = lastReadInboxMessageId;
+        activeForumTopic.lastReadOutboxMessageId = lastReadOutboxMessageId;
+        activeForumTopic.notificationSettings = notificationSettings;
+        if (activeForumTopic.lastMessage != null && lastReadInboxMessageId >= activeForumTopic.lastMessage.id) {
+          activeForumTopic.unreadCount = 0;
+        }
+        manager.updateForumTopic(activeForumTopic);
+        manager.updateChatReadOutbox(lastReadOutboxMessageId);
+        updateCounters(true);
+      }
+    });
+  }
+
+  @Override
   public void onChatReplyMarkupChanged (final long chatId, final @Nullable TdApi.Message replyMarkupMessage) {
     tdlib.ui().post(() -> {
       if (getChatId() == chatId && botHelper != null) {
@@ -12770,7 +12829,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private void onSetSearchFilteredShowMode (boolean inSearchMode) {
     // Reopen chat if needed
     if (!inSearchMode && searchMessagesFilterMode) {
-      manager.openChat(chat, messageThread, messageTopicId, previewSearchFilter, this, areScheduled, !inPreviewMode && !isInForceTouchMode());
+      manager.openChat(chat, messageThread, messageTopicId, activeForumTopic, previewSearchFilter, this, areScheduled, !inPreviewMode && !isInForceTouchMode());
     } else if (inSearchMode && !searchMessagesFilterMode) {
       applyQueryForManagerInFilteredShowMode(getLastMessageSearchQuery());
     }
