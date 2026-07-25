@@ -77,6 +77,10 @@ public class Passcode implements UI.StateListener {
   public static final int STATE_CHOOSE  = 0x02;
   public static final int STATE_CONFIRM = 0x03;
 
+  public static final int UNLOCK_RESULT_FAILED = 0;
+  public static final int UNLOCK_RESULT_PRIMARY = 1;
+  public static final int UNLOCK_RESULT_HIDDEN = 2;
+
   public static final int MIN_PASSWORD_SIZE = 1;
   public static final int MIN_PATTERN_SIZE = 4;
   public static final int PINCODE_SIZE = 4;
@@ -231,6 +235,12 @@ public class Passcode implements UI.StateListener {
   public boolean toggleLock () {
     setLocked(!isLocked);
     return isLocked;
+  }
+
+  public void lock () {
+    if (isEnabled()) {
+      setLocked(true);
+    }
   }
 
   public void setAutolockMode (int mode) {
@@ -475,7 +485,11 @@ public class Passcode implements UI.StateListener {
   }
 
   public boolean unlockByPassword (String password, boolean requireHiddenAccess) {
-    return unlockWithPasscode(MODE_PASSWORD, password, requireHiddenAccess);
+    return unlockWithPasscode(MODE_PASSWORD, password, !requireHiddenAccess) != UNLOCK_RESULT_FAILED;
+  }
+
+  public int unlockByPasswordResult (String password) {
+    return unlockWithPasscode(MODE_PASSWORD, password, true);
   }
 
   public boolean unlockByPincode (String pincode) {
@@ -483,7 +497,11 @@ public class Passcode implements UI.StateListener {
   }
 
   public boolean unlockByPincode (String pincode, boolean requireHiddenAccess) {
-    return unlockWithPasscode(MODE_PINCODE, pincode, requireHiddenAccess);
+    return unlockWithPasscode(MODE_PINCODE, pincode, !requireHiddenAccess) != UNLOCK_RESULT_FAILED;
+  }
+
+  public int unlockByPincodeResult (String pincode) {
+    return unlockWithPasscode(MODE_PINCODE, pincode, true);
   }
 
   public void unlock () {
@@ -496,7 +514,11 @@ public class Passcode implements UI.StateListener {
   }
 
   public boolean unlockByPattern (String pattern, boolean requireHiddenAccess) {
-    return unlockWithPasscode(MODE_PATTERN, pattern, requireHiddenAccess);
+    return unlockWithPasscode(MODE_PATTERN, pattern, !requireHiddenAccess) != UNLOCK_RESULT_FAILED;
+  }
+
+  public int unlockByPatternResult (String pattern) {
+    return unlockWithPasscode(MODE_PATTERN, pattern, true);
   }
 
   public boolean unlockByBiometrics (long biometricsId, boolean strong) {
@@ -625,18 +647,18 @@ public class Passcode implements UI.StateListener {
       hiddenPasscodeHash.equals(getPasscodeHash(passcode));
   }
 
-  private boolean unlockWithPasscode (int mode, String passcode, boolean requireHiddenAccess) {
+  private int unlockWithPasscode (int mode, String passcode, boolean acceptPrimaryPasscode) {
     if (compareHiddenPasscode(mode, passcode)) {
+      setLocked(false);
       setHiddenAccountsUnlocked(true);
-      setLocked(false);
-      return true;
+      return UNLOCK_RESULT_HIDDEN;
     }
-    if (!requireHiddenAccess && matchesPrimaryPasscode(mode, passcode)) {
+    if (acceptPrimaryPasscode && matchesPrimaryPasscode(mode, passcode)) {
+      setLocked(false);
       setHiddenAccountsUnlocked(false);
-      setLocked(false);
-      return true;
+      return UNLOCK_RESULT_PRIMARY;
     }
-    return false;
+    return UNLOCK_RESULT_FAILED;
   }
 
   private void setHiddenAccountsUnlocked (boolean unlocked) {

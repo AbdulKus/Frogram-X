@@ -808,6 +808,20 @@ public class DrawerController extends ViewController<Void> implements View.OnCli
     }
   }
 
+  public void onHiddenAccountAccessChanged () {
+    if (!showingAccounts) {
+      return;
+    }
+    int count = adapter.indexOfViewById(R.id.btn_contacts) - 1;
+    if (count > 0) {
+      adapter.removeRange(1, count);
+    }
+    List<ListItem> items = new ArrayList<>();
+    fillAccountItems(items);
+    adapter.getItems().addAll(1, items);
+    adapter.notifyItemRangeInserted(1, items.size());
+  }
+
   // Other
 
   private CancellableRunnable supportOpen;

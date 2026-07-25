@@ -53,6 +53,7 @@ import org.thunderdog.challegram.navigation.BackHeaderButton;
 import org.thunderdog.challegram.navigation.DoubleHeaderView;
 import org.thunderdog.challegram.navigation.HeaderView;
 import org.thunderdog.challegram.navigation.Menu;
+import org.thunderdog.challegram.navigation.NavigationController;
 import org.thunderdog.challegram.navigation.ToggleHeaderView;
 import org.thunderdog.challegram.navigation.TooltipOverlayView;
 import org.thunderdog.challegram.navigation.ViewController;
@@ -136,7 +137,9 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
   private int mode;
   private boolean setupHiddenPasscode;
   private boolean requireHiddenAccess;
-  private Runnable afterStandaloneUnlock;
+  private Runnable afterPrimaryStandaloneUnlock;
+  private Runnable afterHiddenStandaloneUnlock;
+  private int lastUnlockResult = Passcode.UNLOCK_RESULT_FAILED;
 
   private FrameLayoutFix contentView;
   private PasscodeView passcodeView;
@@ -176,7 +179,12 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
   }
 
   public void setAfterStandaloneUnlock (Runnable afterStandaloneUnlock) {
-    this.afterStandaloneUnlock = afterStandaloneUnlock;
+    setAfterStandaloneUnlock(afterStandaloneUnlock, afterStandaloneUnlock);
+  }
+
+  public void setAfterStandaloneUnlock (Runnable afterPrimaryUnlock, Runnable afterHiddenUnlock) {
+    this.afterPrimaryStandaloneUnlock = afterPrimaryUnlock;
+    this.afterHiddenStandaloneUnlock = afterHiddenUnlock;
   }
 
   private boolean inBiometricsSetup;
@@ -911,14 +919,32 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     hideTooltipsAndPopUps();
     if (specificChat != null) {
       tdlib.ui().openChat(this, specificChat, (chatOpenParameters != null ? chatOpenParameters : new TdlibUi.ChatOpenParameters()).passcodeUnlocked());
-    } else if (afterStandaloneUnlock != null) {
-      Runnable action = afterStandaloneUnlock;
-      afterStandaloneUnlock = null;
+    } else if (afterPrimaryStandaloneUnlock != null || afterHiddenStandaloneUnlock != null) {
+      Runnable action = lastUnlockResult == Passcode.UNLOCK_RESULT_HIDDEN ?
+        afterHiddenStandaloneUnlock : afterPrimaryStandaloneUnlock;
+      afterPrimaryStandaloneUnlock = null;
+      afterHiddenStandaloneUnlock = null;
       navigateBack();
-      UI.post(action, 120l);
+      if (action != null) {
+        runAfterNavigation(action);
+      }
     } else {
       context().hidePasscode();
     }
+  }
+
+  private void runAfterNavigation (Runnable action) {
+    UI.post(new Runnable() {
+      @Override
+      public void run () {
+        NavigationController navigation = context().navigation();
+        if (navigation != null && navigation.isAnimating()) {
+          UI.post(this, 50l);
+        } else {
+          action.run();
+        }
+      }
+    }, 180l);
   }
 
   @Override
@@ -1253,7 +1279,8 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     if (specificChat != null) {
       return chatPasscode.mode == Passcode.MODE_PATTERN && chatPasscode.hash.equals(Passcode.getPasscodeHash(pattern));
     } else {
-      return Passcode.instance().unlockByPattern(pattern, requireHiddenAccess);
+      lastUnlockResult = Passcode.instance().unlockByPatternResult(pattern);
+      return lastUnlockResult != Passcode.UNLOCK_RESULT_FAILED;
     }
   }
 
@@ -1275,7 +1302,8 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     if (specificChat != null) {
       return chatPasscode.mode == Passcode.MODE_PINCODE && chatPasscode.hash.equals(Passcode.getPasscodeHash(pincode));
     } else {
-      return Passcode.instance().unlockByPincode(pincode, requireHiddenAccess);
+      lastUnlockResult = Passcode.instance().unlockByPincodeResult(pincode);
+      return lastUnlockResult != Passcode.UNLOCK_RESULT_FAILED;
     }
   }
 
@@ -1297,7 +1325,8 @@ public class PasscodeController extends ViewController<PasscodeController.Args> 
     if (specificChat != null) {
       return chatPasscode.mode == Passcode.MODE_PASSWORD && chatPasscode.hash.equals(Passcode.getPasscodeHash(password));
     } else {
-      return Passcode.instance().unlockByPassword(password, requireHiddenAccess);
+      lastUnlockResult = Passcode.instance().unlockByPasswordResult(password);
+      return lastUnlockResult != Passcode.UNLOCK_RESULT_FAILED;
     }
   }
 

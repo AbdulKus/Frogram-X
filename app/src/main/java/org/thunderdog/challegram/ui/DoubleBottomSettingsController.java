@@ -31,6 +31,7 @@ public class DoubleBottomSettingsController extends RecyclerViewController<Void>
   private boolean primarySetupOffered;
   private boolean hiddenSetupOffered;
   private boolean accessPromptOffered;
+  private Runnable pendingSecureNavigation;
 
   public DoubleBottomSettingsController (Context context, Tdlib tdlib) {
     super(context, tdlib);
@@ -76,19 +77,47 @@ public class DoubleBottomSettingsController extends RecyclerViewController<Void>
         rebuildCells();
       } else if (!accessPromptOffered) {
         accessPromptOffered = true;
-        openHiddenAccessPrompt();
+        navigateWhenReady(this::openHiddenAccessPrompt);
       }
     } else if (passcode.isEnabled() && Passcode.isValidHiddenMode(passcode.getMode())) {
       if (!hiddenSetupOffered) {
         hiddenSetupOffered = true;
-        openHiddenPasscodeSetup();
+        navigateWhenReady(this::openHiddenPasscodeSetup);
       } else {
         rebuildCells();
       }
     } else if (!primarySetupOffered) {
       primarySetupOffered = true;
-      UI.post(this::offerPrimaryPasscodeType, 120l);
+      navigateWhenReady(this::offerPrimaryPasscodeType);
     }
+  }
+
+  private void navigateWhenReady (Runnable action) {
+    if (pendingSecureNavigation != null) {
+      return;
+    }
+    pendingSecureNavigation = new Runnable() {
+      @Override
+      public void run () {
+        if (pendingSecureNavigation != this) {
+          return;
+        }
+        if (isDestroyed() || !isFocused()) {
+          pendingSecureNavigation = null;
+          primarySetupOffered = false;
+          hiddenSetupOffered = false;
+          accessPromptOffered = false;
+          return;
+        }
+        if (isNavigationAnimating()) {
+          UI.post(this, 50l);
+          return;
+        }
+        pendingSecureNavigation = null;
+        action.run();
+      }
+    };
+    UI.post(pendingSecureNavigation, 180l);
   }
 
   private void rebuildCells () {
@@ -217,7 +246,7 @@ public class DoubleBottomSettingsController extends RecyclerViewController<Void>
     PasscodeController controller = new PasscodeController(context, tdlib);
     controller.setPasscodeMode(PasscodeController.MODE_UNLOCK);
     controller.requireHiddenAccess();
-    controller.setAfterStandaloneUnlock(this::rebuildCells);
+    controller.setAfterStandaloneUnlock(this::navigateBack, this::rebuildCells);
     navigateTo(controller);
   }
 

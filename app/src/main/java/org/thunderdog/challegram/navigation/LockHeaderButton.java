@@ -30,7 +30,6 @@ import org.thunderdog.challegram.tool.Drawables;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.UI;
-import org.thunderdog.challegram.ui.PasscodeController;
 import org.thunderdog.challegram.unsorted.Passcode;
 
 import me.vkryl.android.animator.BoolAnimator;
@@ -90,15 +89,10 @@ public class LockHeaderButton extends HeaderButton implements View.OnClickListen
 
   @Override
   public boolean onLongClick (View v) {
-    NavigationController navigation = UI.getContext(getContext()).navigation();
-    ViewController<?> current = navigation != null ? navigation.getCurrentStackItem() : null;
-    if (current != null) {
-      PasscodeController passcode = new PasscodeController(UI.getContext(getContext()), current.tdlib());
-      passcode.setPasscodeMode(PasscodeController.MODE_UNLOCK_SETUP);
-      navigation.navigateTo(passcode);
-      return true;
-    }
-    return false;
+    Passcode.instance().lock();
+    animator.setValue(false, true);
+    UI.getContext(getContext()).showPasscode(true);
+    return true;
   }
 
   public void update () {

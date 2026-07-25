@@ -790,7 +790,10 @@ public class SettingsController extends ViewController<Void> implements
         PasscodeController controller = new PasscodeController(context, tdlib);
         controller.setPasscodeMode(PasscodeController.MODE_UNLOCK);
         controller.requireHiddenAccess();
-        controller.setAfterStandaloneUnlock(() -> navigateTo(new DoubleBottomSettingsController(context, tdlib)));
+        controller.setAfterStandaloneUnlock(
+          this::openExperimentalSettingsAfterPrimaryUnlock,
+          () -> navigateTo(new DoubleBottomSettingsController(context, tdlib))
+        );
         navigateTo(controller);
       } else {
         navigateTo(new DoubleBottomSettingsController(context, tdlib));
@@ -802,6 +805,12 @@ public class SettingsController extends ViewController<Void> implements
       return true;
     }
     return false;
+  }
+
+  private void openExperimentalSettingsAfterPrimaryUnlock () {
+    tdlib.getTesterLevel(level ->
+      runOnUiThreadOptional(() -> openExperimentalSettings(level))
+    );
   }
 
   @Override

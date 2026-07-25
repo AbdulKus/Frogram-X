@@ -730,29 +730,32 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
     intent.setAction("");
     setIntent(intent);
 
+    int targetAccountId = intent.getIntExtra("account_id", TdlibAccount.NO_ID);
+    boolean targetsLockedHiddenAccount =
+      targetAccountId != TdlibAccount.NO_ID &&
+      Passcode.instance().isAccountHidden(targetAccountId) &&
+      !Passcode.instance().isHiddenAccountsUnlocked();
+
     if (isPasscodeShowing()) {
       addPasscodeListener(new PasscodeListener() {
         @Override
         public void onPasscodeShowing (BaseActivity context, boolean isShowing) {
           if (!isShowing) {
-            handleIntent(actionRaw, intent, false);
             removePasscodeListener(this);
+            resumeIntentAfterPasscode(actionRaw, intent, targetAccountId);
           }
         }
       });
       return false;
     }
 
-    int targetAccountId = intent.getIntExtra("account_id", TdlibAccount.NO_ID);
-    if (targetAccountId != TdlibAccount.NO_ID &&
-        Passcode.instance().isAccountHidden(targetAccountId) &&
-        !Passcode.instance().isHiddenAccountsUnlocked()) {
+    if (targetsLockedHiddenAccount) {
       addPasscodeListener(new PasscodeListener() {
         @Override
         public void onPasscodeShowing (BaseActivity context, boolean isShowing) {
           if (!isShowing) {
-            handleIntent(actionRaw, intent, false);
             removePasscodeListener(this);
+            resumeIntentAfterPasscode(actionRaw, intent, targetAccountId);
           }
         }
       });
@@ -901,6 +904,25 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
     }
 
     return false;
+  }
+
+  private void resumeIntentAfterPasscode (String actionRaw, Intent intent, int targetAccountId) {
+    UI.post(() -> {
+      if (targetAccountId != TdlibAccount.NO_ID &&
+          Passcode.instance().isAccountHidden(targetAccountId) &&
+          !Passcode.instance().isHiddenAccountsUnlocked()) {
+        TdlibAccount account = TdlibManager.instance().currentAccount();
+        if (account == null || !Passcode.instance().isAccountVisible(account.id)) {
+          ArrayList<TdlibAccount> visibleAccounts = TdlibManager.instance().getVisibleAccounts();
+          account = visibleAccounts.isEmpty() ? null : visibleAccounts.get(0);
+        }
+        if (account != null) {
+          openMainController(account.id);
+        }
+      } else {
+        handleIntent(actionRaw, intent, false);
+      }
+    }, 120l);
   }
 
   public void performAs (@Nullable CharSequence prompt, @Nullable String action, final @NonNull RunnableData<TdlibAccount> callback) {

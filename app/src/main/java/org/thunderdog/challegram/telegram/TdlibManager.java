@@ -33,6 +33,7 @@ import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
 import org.drinkmore.Tracer;
 import org.jetbrains.annotations.NotNull;
+import org.thunderdog.challegram.BaseActivity;
 import org.thunderdog.challegram.BuildConfig;
 import org.thunderdog.challegram.Log;
 import org.thunderdog.challegram.R;
@@ -45,6 +46,7 @@ import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.core.WatchDog;
 import org.thunderdog.challegram.core.WatchDogContext;
 import org.thunderdog.challegram.data.TD;
+import org.thunderdog.challegram.navigation.DrawerController;
 import org.thunderdog.challegram.player.AudioController;
 import org.thunderdog.challegram.player.TGPlayerController;
 import org.thunderdog.challegram.tool.UI;
@@ -1997,6 +1999,13 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     }
     resetBadge(false);
     onUpdateAllNotifications();
+    UI.post(() -> {
+      BaseActivity activity = UI.getUiContext();
+      DrawerController drawer = activity != null ? activity.getDrawer() : null;
+      if (drawer != null) {
+        drawer.onHiddenAccountAccessChanged();
+      }
+    });
   }
 
   /**
