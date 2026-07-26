@@ -2558,7 +2558,6 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
     ShadowView shadowView = new ShadowView(context);
     shadowView.setSimpleTopShadow(true);
-    shadowView.setDrawNothing(true);
     optionsWrap.addView(shadowView, 0);
     addThemeInvalidateListener(shadowView);
 
@@ -2584,14 +2583,12 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
       if (item == OptionItem.SEPARATOR) {
         ShadowView shadowViewBottom = new ShadowView(context);
         shadowViewBottom.setSimpleBottomTransparentShadow(false);
-        shadowViewBottom.setDrawNothing(true);
         ViewSupport.setThemedBackground(shadowViewBottom, ColorId.background, this);
         addThemeInvalidateListener(shadowViewBottom);
         optionsWrap.addView(shadowViewBottom, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(6f)));
 
         ShadowView shadowViewTop = new ShadowView(context);
         shadowViewTop.setSimpleTopShadow(true, this);
-        shadowViewTop.setDrawNothing(true);
         addThemeInvalidateListener(shadowViewTop);
         optionsWrap.addView(shadowViewTop, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(6f)));
         index++;
@@ -2638,7 +2635,6 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
     ShadowView shadowView = new ShadowView(context);
     shadowView.setSimpleTopShadow(true);
-    shadowView.setDrawNothing(true);
     optionsWrap.addView(shadowView, 0);
     addThemeInvalidateListener(shadowView);
     totalHeight += shadowView.getLayoutParams().height;

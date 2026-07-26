@@ -112,14 +112,6 @@ public class ShadowView extends View {
 
   private boolean isTopShadow;
   private boolean isTransparent;
-  private boolean drawNothing;
-
-  public void setDrawNothing (boolean drawNothing) {
-    if (this.drawNothing != drawNothing) {
-      this.drawNothing = drawNothing;
-      invalidate();
-    }
-  }
 
   public void setSimpleTopShadow (boolean withDefaultSize) {
     final int height = simpleTopShadowHeight();
@@ -177,9 +169,6 @@ public class ShadowView extends View {
 
   @Override
   protected void onDraw (Canvas c) {
-    if (drawNothing) {
-      return;
-    }
     float separatorFactor = Theme.getSeparatorReplacement();
     if (separatorFactor == 0f) {
       drawSimpleShadow(c, (isTransparent ? Theme.getShadowDepth() : 1f));

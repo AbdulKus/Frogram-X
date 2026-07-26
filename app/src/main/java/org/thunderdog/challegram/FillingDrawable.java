@@ -16,7 +16,6 @@ package org.thunderdog.challegram;
 
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
-import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
@@ -41,9 +40,6 @@ public class FillingDrawable extends Drawable {
   private ThemeDelegate forcedTheme;
 
   private float cornerRadius;
-  private float topCornerRadius;
-  private float bottomCornerRadius;
-  private Path roundedPath;
 
   public FillingDrawable (int colorId) {
     this.colorId = colorId;
@@ -54,12 +50,6 @@ public class FillingDrawable extends Drawable {
     this.cornerRadius = radius;
   }
 
-  public FillingDrawable (int colorId, float topRadius, float bottomRadius) {
-    this.colorId = colorId;
-    this.topCornerRadius = topRadius;
-    this.bottomCornerRadius = bottomRadius;
-  }
-
   public final void setForcedTheme (ThemeDelegate forcedTheme) {
     if (this.forcedTheme != forcedTheme) {
       this.forcedTheme = forcedTheme;
@@ -68,10 +58,8 @@ public class FillingDrawable extends Drawable {
   }
 
   public void setCornerRadius (float radius) {
-    if (this.cornerRadius != radius || topCornerRadius != 0 || bottomCornerRadius != 0) {
+    if (this.cornerRadius != radius) {
       this.cornerRadius = radius;
-      this.topCornerRadius = 0;
-      this.bottomCornerRadius = 0;
       invalidateSelf();
     }
   }
@@ -102,25 +90,7 @@ public class FillingDrawable extends Drawable {
   @Override
   public final void draw (@NonNull Canvas c) {
     if (colorId != 0) {
-      if (topCornerRadius != 0 || bottomCornerRadius != 0) {
-        RectF rectF = Paints.getRectF();
-        rectF.set(getBounds());
-        float topRadius = Screen.dp(topCornerRadius);
-        float bottomRadius = Screen.dp(bottomCornerRadius);
-        float[] radii = {
-          topRadius, topRadius,
-          topRadius, topRadius,
-          bottomRadius, bottomRadius,
-          bottomRadius, bottomRadius
-        };
-        if (roundedPath == null) {
-          roundedPath = new Path();
-        } else {
-          roundedPath.reset();
-        }
-        roundedPath.addRoundRect(rectF, radii, Path.Direction.CW);
-        c.drawPath(roundedPath, Paints.fillingPaint(getFillingColor()));
-      } else if (cornerRadius != 0) {
+      if (cornerRadius != 0) {
         RectF rectF = Paints.getRectF();
         rectF.set(getBounds());
         float radius = Screen.dp(cornerRadius);

@@ -15,6 +15,9 @@
 package org.thunderdog.challegram.navigation;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
@@ -31,7 +34,6 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.thunderdog.challegram.FillingDrawable;
 import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.telegram.Tdlib;
@@ -41,7 +43,6 @@ import org.thunderdog.challegram.theme.ThemeDelegate;
 import org.thunderdog.challegram.theme.ThemeListenerList;
 import org.thunderdog.challegram.tool.Drawables;
 import org.thunderdog.challegram.tool.Fonts;
-import org.thunderdog.challegram.tool.FrogramUi;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.UI;
@@ -70,7 +71,7 @@ public class OptionsLayout extends LinearLayout implements Animated, RootFrameLa
 
     headerView = new CustomTextView(context, parent.tdlib());
     headerView.setTextSize(18f);
-    headerView.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(18f), Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(6f));
+    headerView.setPadding(Screen.dp(16f), Screen.dp(18f), Screen.dp(16f), Screen.dp(6f));
     headerView.setTextColorId(ColorId.text);
     headerView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     headerView.setMaxLineCount(1);
@@ -78,14 +79,32 @@ public class OptionsLayout extends LinearLayout implements Animated, RootFrameLa
     addView(headerView);
 
     textView = new CustomTextView(context, parent.tdlib());
-    textView.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(14f), Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(6f));
+    textView.setPadding(Screen.dp(16f), Screen.dp(14f), Screen.dp(16f), Screen.dp(6f));
     textView.setTextColorId(ColorId.textLight);
     textView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     addView(textView);
 
-    FillingDrawable background = new FillingDrawable(ColorId.filling, FrogramUi.BOTTOM_SHEET_RADIUS, 0f);
-    background.setForcedTheme(forcedTheme);
-    ViewUtils.setBackground(this, background);
+    ViewUtils.setBackground(this, new Drawable() {
+      @Override
+      public void draw (@NonNull Canvas c) {
+        View view = getChildAt(0);
+        int height = view != null ? view.getMeasuredHeight() : 0;
+        if (height > 0)
+          c.drawRect(0, height, getMeasuredWidth(), getMeasuredHeight(), Paints.fillingPaint(forcedTheme != null ? forcedTheme.getColor(ColorId.filling) : Theme.getColor(ColorId.filling)));
+      }
+
+      @Override
+      public void setAlpha (int alpha) { }
+
+      @Override
+      public void setColorFilter (@Nullable ColorFilter colorFilter) { }
+
+      @Override
+      @SuppressWarnings("deprecation")
+      public int getOpacity () {
+        return PixelFormat.UNKNOWN;
+      }
+    });
 
     if (forcedTheme != null) {
       textView.setForcedTheme(forcedTheme);
@@ -162,8 +181,8 @@ public class OptionsLayout extends LinearLayout implements Animated, RootFrameLa
     text.setSingleLine(true);
     text.setEllipsize(TextUtils.TruncateAt.END);
     text.setGravity(Lang.rtl() ? Gravity.RIGHT | Gravity.CENTER_VERTICAL : Gravity.LEFT | Gravity.CENTER_VERTICAL);
-    text.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(1f), Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), 0);
-    text.setCompoundDrawablePadding(Screen.dp(16f));
+    text.setPadding(Screen.dp(17f), Screen.dp(1f), Screen.dp(17f), 0);
+    text.setCompoundDrawablePadding(Screen.dp(18f));
     if (icon != 0) {
       Drawable drawable = Drawables.get(context.getResources(), icon);
       if (drawable != null) {
@@ -251,7 +270,7 @@ public class OptionsLayout extends LinearLayout implements Animated, RootFrameLa
     text.setTypeface(Fonts.getRobotoRegular());
     text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f);
     text.setGravity(Lang.rtl() ? Gravity.RIGHT | Gravity.CENTER_VERTICAL : Gravity.LEFT | Gravity.CENTER_VERTICAL);
-    text.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(6f), Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), 0);
+    text.setPadding(Screen.dp(17f), Screen.dp(6f), Screen.dp(17f), 0);
     text.setCompoundDrawablePadding(Screen.dp(8f));
     text.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     return text;
