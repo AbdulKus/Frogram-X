@@ -52,6 +52,7 @@ import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.PorterDuffColorId;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Drawables;
+import org.thunderdog.challegram.tool.FrogramUi;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.PorterDuffPaint;
 import org.thunderdog.challegram.tool.Screen;
@@ -167,13 +168,13 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
       }
       case TYPE_RADIO: {
         addToggler();
-        setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(55f)));
+        setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(FrogramUi.SETTING_ROW_HEIGHT)));
         break;
       }
       case TYPE_SETTING:
       case TYPE_SETTING_INACTIVE:
       case TYPE_INFO_SUPERCOMPACT: {
-        setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(55f)));
+        setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(FrogramUi.SETTING_ROW_HEIGHT)));
         break;
       }
       default: {
@@ -316,7 +317,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
   }
 
   private int measurePaddingLeft () {
-    return forcedPaddingLeft != 0 ? forcedPaddingLeft : Screen.dp(icon == null ? 16f : 73f);
+    return forcedPaddingLeft != 0 ? forcedPaddingLeft : Screen.dp(icon == null ? FrogramUi.CONTENT_HORIZONTAL_PADDING : FrogramUi.SETTING_ICON_TEXT_START);
   }
 
   @SuppressWarnings ("Range")
@@ -566,7 +567,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
     lastMeasuredHeight = totalHeight;
 
     int paddingLeft = measurePaddingLeft();
-    int paddingRight = Screen.dp(17f) + forcedPaddingRight;
+    int paddingRight = Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING) + forcedPaddingRight;
 
     pLeft = paddingLeft;
 
@@ -636,7 +637,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
     }
 
     pIconTop = (flags & FLAG_CENTER_ICON) != 0 && icon != null ?  (totalHeight / 2f - icon.getMinimumHeight() / 2f) : Screen.dp(type == TYPE_INFO || type == TYPE_INFO_COMPACT || type == TYPE_INFO_MULTILINE ? 20f : 16f);
-    pIconLeft = Screen.dp(18f);
+    pIconLeft = Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING);
   }
 
   private boolean subscribedToEmojiUpdates;

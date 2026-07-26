@@ -558,6 +558,23 @@ public class Theme {
     }
   }
 
+  public static Drawable fillingSelector (@ColorId int backgroundColorId, float topRadius, float bottomRadius) {
+    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP) {
+      return fillingRippleSelector(backgroundColorId, topRadius, bottomRadius);
+    } else {
+      return fillingSimpleSelector(backgroundColorId, topRadius, bottomRadius);
+    }
+  }
+
+  @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+  private static Drawable fillingRippleSelector (@ColorId int backgroundColorId, float topRadius, float bottomRadius) {
+    return new android.graphics.drawable.RippleDrawable(
+      new ColorStateList(new int[][] {StateSet.WILD_CARD}, new int[] {RIPPLE_COLOR}),
+      new FillingDrawable(backgroundColorId, topRadius, bottomRadius),
+      createRoundRectDrawable(0xFFFFFFFF, topRadius, bottomRadius)
+    );
+  }
+
   @TargetApi(Build.VERSION_CODES.LOLLIPOP)
   private static Drawable fillingRippleSelector (@ColorId int backgroundColorId, float radius) {
     return new android.graphics.drawable.RippleDrawable(
@@ -729,6 +746,13 @@ public class Theme {
 
   private static Drawable fillingSimpleSelector (@ColorId int backgroundColorId, float radius) {
     return Drawables.getColorSelector(new FillingDrawable(backgroundColorId, radius), new FillingDrawable(ColorId.fillingPressed, radius));
+  }
+
+  private static Drawable fillingSimpleSelector (@ColorId int backgroundColorId, float topRadius, float bottomRadius) {
+    return Drawables.getColorSelector(
+      new FillingDrawable(backgroundColorId, topRadius, bottomRadius),
+      new FillingDrawable(ColorId.fillingPressed, topRadius, bottomRadius)
+    );
   }
 
   // Transparent drawable
@@ -964,6 +988,17 @@ public class Theme {
     ShapeDrawable defaultDrawable = new ShapeDrawable(new RoundRectShape(new float[]{rad, rad, rad, rad, rad, rad, rad, rad}, null, null));
     defaultDrawable.getPaint().setColor(color);
     return defaultDrawable;
+  }
+
+  private static Drawable createRoundRectDrawable (int color, float topRadius, float bottomRadius) {
+    final int top = Screen.dp(topRadius);
+    final int bottom = Screen.dp(bottomRadius);
+    ShapeDrawable drawable = new ShapeDrawable(new RoundRectShape(new float[]{
+      top, top, top, top,
+      bottom, bottom, bottom, bottom
+    }, null, null));
+    drawable.getPaint().setColor(color);
+    return drawable;
   }
 
   // TODO REMOVE
