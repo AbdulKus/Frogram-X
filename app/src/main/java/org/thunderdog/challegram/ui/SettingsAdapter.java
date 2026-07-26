@@ -65,7 +65,6 @@ import org.thunderdog.challegram.telegram.TdlibAccount;
 import org.thunderdog.challegram.telegram.TdlibDelegate;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
-import org.thunderdog.challegram.tool.FrogramUi;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.UI;
@@ -1341,110 +1340,6 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
     }
   }
 
-  private boolean isGroupBoundary (int position, int type) {
-    return position >= 0 && position < items.size() && items.get(position).getViewType() == type;
-  }
-
-  private boolean isInsideSettingsGroup (int position) {
-    boolean hasTop = false;
-    for (int i = position - 1; i >= 0; i--) {
-      int type = items.get(i).getViewType();
-      if (type == ListItem.TYPE_SHADOW_TOP) {
-        hasTop = true;
-        break;
-      }
-      if (type == ListItem.TYPE_SHADOW_BOTTOM) {
-        break;
-      }
-    }
-    if (!hasTop) {
-      return false;
-    }
-    for (int i = position + 1; i < items.size(); i++) {
-      int type = items.get(i).getViewType();
-      if (type == ListItem.TYPE_SHADOW_BOTTOM) {
-        return true;
-      }
-      if (type == ListItem.TYPE_SHADOW_TOP) {
-        return false;
-      }
-    }
-    return false;
-  }
-
-  private static boolean supportsFrogramGroupSurface (int viewType) {
-    switch (viewType) {
-      case ListItem.TYPE_SETTING:
-      case ListItem.TYPE_RADIO_SETTING:
-      case ListItem.TYPE_RADIO_SETTING_WITH_NEGATIVE_STATE:
-      case ListItem.TYPE_CHECKBOX_OPTION:
-      case ListItem.TYPE_CHECKBOX_OPTION_MULTILINE:
-      case ListItem.TYPE_CHECKBOX_OPTION_REVERSE:
-      case ListItem.TYPE_CHECKBOX_OPTION_DOUBLE_LINE:
-      case ListItem.TYPE_CHECKBOX_OPTION_WITH_AVATAR:
-      case ListItem.TYPE_RADIO_OPTION:
-      case ListItem.TYPE_RADIO_OPTION_LEFT:
-      case ListItem.TYPE_RADIO_OPTION_WITH_AVATAR:
-      case ListItem.TYPE_VALUED_SETTING:
-      case ListItem.TYPE_VALUED_SETTING_WITH_RADIO:
-      case ListItem.TYPE_VALUED_SETTING_COMPACT:
-      case ListItem.TYPE_VALUED_SETTING_COMPACT_WITH_COLOR:
-      case ListItem.TYPE_VALUED_SETTING_COMPACT_WITH_RADIO:
-      case ListItem.TYPE_VALUED_SETTING_COMPACT_WITH_RADIO_2:
-      case ListItem.TYPE_VALUED_SETTING_COMPACT_WITH_TOGGLER:
-      case ListItem.TYPE_VALUED_SETTING_COMPACT_WITH_CHECKBOX:
-      case ListItem.TYPE_INFO_SETTING:
-      case ListItem.TYPE_INFO_MULTILINE:
-      case ListItem.TYPE_DESCRIPTION:
-      case ListItem.TYPE_DESCRIPTION_SMALL:
-      case ListItem.TYPE_DESCRIPTION_CENTERED:
-      case ListItem.TYPE_SEPARATOR:
-      case ListItem.TYPE_SEPARATOR_FULL:
-      case ListItem.TYPE_SESSION:
-      case ListItem.TYPE_SESSION_WITH_AVATAR:
-      case ListItem.TYPE_BUTTON:
-      case ListItem.TYPE_SLIDER:
-      case ListItem.TYPE_SLIDER_BRIGHTNESS:
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  private void applyFrogramGroupStyle (View view, int position, int viewType) {
-    if (!supportsFrogramGroupSurface(viewType)) {
-      return;
-    }
-
-    boolean insideGroup = isInsideSettingsGroup(position);
-    ViewGroup.LayoutParams rawParams = view.getLayoutParams();
-    if (rawParams instanceof RecyclerView.LayoutParams) {
-      RecyclerView.LayoutParams params = (RecyclerView.LayoutParams) rawParams;
-      int margin = insideGroup ? Screen.dp(FrogramUi.SETTINGS_GROUP_MARGIN) : 0;
-      if (params.leftMargin != margin || params.rightMargin != margin) {
-        params.leftMargin = margin;
-        params.rightMargin = margin;
-        view.setLayoutParams(params);
-      }
-    }
-
-    if (insideGroup) {
-      float topRadius = isGroupBoundary(position - 1, ListItem.TYPE_SHADOW_TOP) ? FrogramUi.SETTINGS_GROUP_RADIUS : 0f;
-      float bottomRadius = isGroupBoundary(position + 1, ListItem.TYPE_SHADOW_BOTTOM) ? FrogramUi.SETTINGS_GROUP_RADIUS : 0f;
-      view.setBackground(Theme.fillingSelector(ColorId.filling, topRadius, bottomRadius));
-    } else {
-      switch (viewType) {
-        case ListItem.TYPE_DESCRIPTION:
-        case ListItem.TYPE_DESCRIPTION_CENTERED:
-          view.setBackground(null);
-          break;
-        default:
-          view.setBackground(Theme.fillingSelector(ColorId.filling));
-          break;
-      }
-    }
-  }
-
   @Override
   public void onFactorChangeFinished (int id, float finalFactor, FactorAnimator callee) { }
 
@@ -1943,8 +1838,8 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
       case ListItem.TYPE_DESCRIPTION_CENTERED: {
         TextView textView = (TextView) holder.itemView;
         textView.setTextColor(Theme.getColor(item.getTextColorId(viewType == ListItem.TYPE_DESCRIPTION_CENTERED ? ColorId.textLight : ColorId.background_textLight)));
-        int paddingLeft = Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING) + item.getTextPaddingLeft();
-        int paddingRight = Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING) + item.getTextPaddingRight();
+        int paddingLeft = Screen.dp(16f) + item.getTextPaddingLeft();
+        int paddingRight = Screen.dp(16f) + item.getTextPaddingRight();
         textView.setText(item.getString());
         if (holder.itemView.getPaddingLeft() != paddingLeft || holder.itemView.getPaddingRight() != paddingRight) {
           holder.itemView.setPadding(paddingLeft, holder.itemView.getPaddingTop(), paddingRight, holder.itemView.getPaddingBottom());
@@ -1981,7 +1876,6 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
         break;
       }
     }
-    applyFrogramGroupStyle(holder.itemView, position, viewType);
   }
 
   @Override

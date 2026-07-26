@@ -16,6 +16,8 @@ package org.thunderdog.challegram.navigation;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
@@ -31,12 +33,12 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
-import org.thunderdog.challegram.FillingDrawable;
 import org.thunderdog.challegram.R;
 import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.loader.AvatarReceiver;
 import org.thunderdog.challegram.loader.ComplexReceiver;
 import org.thunderdog.challegram.support.RippleSupport;
+import org.thunderdog.challegram.support.ViewSupport;
 import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
@@ -44,7 +46,6 @@ import org.thunderdog.challegram.theme.ThemeDelegate;
 import org.thunderdog.challegram.theme.ThemeListenerList;
 import org.thunderdog.challegram.tool.Drawables;
 import org.thunderdog.challegram.tool.Fonts;
-import org.thunderdog.challegram.tool.FrogramUi;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.PorterDuffPaint;
 import org.thunderdog.challegram.tool.Screen;
@@ -121,18 +122,20 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
     this.forcedTheme = forcedTheme;
 
     setMinimumWidth(Screen.dp(196f));
-    FillingDrawable drawable = new FillingDrawable(ColorId.overlayFilling, FrogramUi.POPUP_RADIUS);
-    drawable.setForcedTheme(forcedTheme);
+    Drawable drawable;
+    if (forcedTheme != null) {
+      drawable = ViewSupport.getDrawableFilter(getContext(), R.drawable.bg_popup_fixed, new PorterDuffColorFilter(forcedTheme.getColor(ColorId.overlayFilling), PorterDuff.Mode.MULTIPLY));
+    } else {
+      drawable = ViewSupport.getDrawableFilter(getContext(), R.drawable.bg_popup_fixed, new PorterDuffColorFilter(Theme.headerFloatBackgroundColor(), PorterDuff.Mode.MULTIPLY));
+    }
     ViewUtils.setBackground(this, drawable);
 
     if (themeProvider != null && forcedTheme == null) {
+      themeProvider.addThemeSpecialFilterListener(drawable, ColorId.overlayFilling);
       themeProvider.addThemeInvalidateListener(this);
     }
 
     setOrientation(VERTICAL);
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-      setElevation(Screen.dp(8f));
-    }
     setLayerType(LAYER_TYPE_HARDWARE, Views.getLayerPaint());
     setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | (Lang.rtl() ? Gravity.LEFT : Gravity.RIGHT)));
   }
@@ -380,8 +383,8 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
     menuItem.setEllipsize(TextUtils.TruncateAt.END);
     menuItem.setOnClickListener(listener);
     menuItem.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(ITEM_HEIGHT)));
-    menuItem.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), 0, Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), 0);
-    menuItem.setCompoundDrawablePadding(Screen.dp(16f));
+    menuItem.setPadding(Screen.dp(17f), 0, Screen.dp(17f), 0);
+    menuItem.setCompoundDrawablePadding(Screen.dp(18f));
     icon = iconRes != 0 ? Drawables.get(getResources(), iconRes) : icon;
     if (icon != null) {
       if (forcedTheme != null) {

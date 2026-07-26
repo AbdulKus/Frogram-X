@@ -23,7 +23,6 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.os.SystemClock;
@@ -82,7 +81,7 @@ import me.vkryl.core.StringUtils;
 import me.vkryl.core.lambda.Destroyable;
 
 public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener, View.OnClickListener, View.OnLongClickListener, Destroyable, TGLegacyManager.EmojiLoadListener, FactorAnimator.Target {
-  public static final @Dimension(unit = Dimension.DP) float SELECTION_HEIGHT = 3f;
+  public static final @Dimension(unit = Dimension.DP) float SELECTION_HEIGHT = 2f;
   public static final @Dimension(unit = Dimension.DP) float ICON_SIZE = 24f;
   public static final @Dimension(unit = Dimension.DP) float DEFAULT_ITEM_PADDING = 19f;
   public static final @Dimension(unit = Dimension.DP) float COMPACT_ITEM_PADDING = 10f;
@@ -1079,11 +1078,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
       int selectionTop = this.drawSelectionAtTop ? 0 : viewHeight - selectionHeight;
       int selectionBottom = selectionTop + selectionHeight;
 
-      int selectionInset = Math.min(Screen.dp(12f), Math.max(0, this.selectionWidth / 6));
-      RectF selectionRect = Paints.getRectF();
-      selectionRect.set(selectionLeft + selectionInset, selectionTop, selectionRight - selectionInset, selectionBottom);
-      c.drawRoundRect(selectionRect, selectionHeight / 2f, selectionHeight / 2f,
-        Paints.fillingPaint(disabledFactor == 0f ? selectionColor : ColorUtils.fromToArgb(selectionColor, textFromColor, disabledFactor)));
+      c.drawRect(selectionLeft, selectionTop, selectionRight, selectionBottom, Paints.fillingPaint(disabledFactor == 0f ? selectionColor : ColorUtils.fromToArgb(selectionColor, textFromColor, disabledFactor)));
 
       int cx = rtl ? totalWidth : 0;
       int itemIndex = 0;
