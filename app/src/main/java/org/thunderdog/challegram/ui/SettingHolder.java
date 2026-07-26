@@ -71,6 +71,7 @@ import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Drawables;
 import org.thunderdog.challegram.tool.Fonts;
+import org.thunderdog.challegram.tool.FrogramUi;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Views;
@@ -160,10 +161,10 @@ public class SettingHolder extends RecyclerView.ViewHolder {
         return Screen.dp(64f);
       }
       case ListItem.TYPE_SHADOW_TOP: { // 2 OK
-        return Screen.dp(6f);
+        return Screen.dp(FrogramUi.SETTINGS_GROUP_TOP_GAP);
       }
       case ListItem.TYPE_SHADOW_BOTTOM: { // 3 OK
-        return Screen.dp(6f);
+        return Screen.dp(FrogramUi.SETTINGS_GROUP_BOTTOM_GAP);
       }
       case ListItem.TYPE_MEMBERS_LIST: {
         return Screen.dp(95f);
@@ -204,7 +205,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
       case ListItem.TYPE_RADIO_OPTION_LEFT:
       case ListItem.TYPE_RADIO_OPTION_WITH_AVATAR:
       case ListItem.TYPE_SHADOWED_OFFSET: {
-        return Screen.dp(55f);
+        return Screen.dp(FrogramUi.SETTING_ROW_HEIGHT);
       }
       case ListItem.TYPE_INFO_MULTILINE:
       case ListItem.TYPE_CHECKBOX_OPTION_DOUBLE_LINE: {
@@ -632,8 +633,8 @@ public class SettingHolder extends RecyclerView.ViewHolder {
         if (themeProvider != null) {
           themeProvider.addThemeInvalidateListener(shadowView);
         }
-        shadowView.setSimpleTopShadow(true);
-        shadowView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(6f)));
+        shadowView.setDrawNothing(true);
+        shadowView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(FrogramUi.SETTINGS_GROUP_TOP_GAP)));
         return new SettingHolder(shadowView);
       }
       case ListItem.TYPE_SLIDER:
@@ -704,8 +705,8 @@ public class SettingHolder extends RecyclerView.ViewHolder {
         if (themeProvider != null) {
           themeProvider.addThemeInvalidateListener(shadowView);
         }
-        shadowView.setSimpleBottomTransparentShadow(false);
-        shadowView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(6f)));
+        shadowView.setDrawNothing(true);
+        shadowView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(FrogramUi.SETTINGS_GROUP_BOTTOM_GAP)));
         return new SettingHolder(shadowView);
       }
       case ListItem.TYPE_DRAWER_ITEM:
@@ -1297,7 +1298,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
         TextView textView = new CustomEmojiTextView(context, tdlib);
         textView.setGravity(Lang.gravity(Gravity.CENTER_VERTICAL));
         int paddingTop = viewType == ListItem.TYPE_HEADER_MULTILINE ? Screen.dp(6f) : viewType == ListItem.TYPE_HEADER_PADDED ? Screen.dp(4f) : 0;
-        textView.setPadding(Screen.dp(16f), paddingTop, Screen.dp(16f), viewType == ListItem.TYPE_HEADER_MULTILINE ? Screen.dp(6f) : 0);
+        textView.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), paddingTop, Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), viewType == ListItem.TYPE_HEADER_MULTILINE ? Screen.dp(6f) : 0);
         textView.setSingleLine(viewType != ListItem.TYPE_HEADER_MULTILINE);
         textView.setEllipsize(TextUtils.TruncateAt.END);
         textView.setTextColor(Theme.textAccent2Color());
@@ -1305,7 +1306,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
           themeProvider.addThemeTextColorListener(textView, ColorId.background_text);
         }
         textView.setTypeface(Fonts.getRobotoMedium());
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13f);
 
         if (viewType == ListItem.TYPE_HEADER_WITH_ACTION) {
           FrameLayoutFix wrapView = new FrameLayoutFix(context);
@@ -1336,7 +1337,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
               setText(replacement);
             }
           };
-          textButton.setPadding(Screen.dp(16f), 0, Screen.dp(16f), 0);
+          textButton.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), 0, Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), 0);
           textButton.setGravity(Gravity.CENTER_VERTICAL);
           textButton.setSingleLine(true);
           textButton.setTextColor(Theme.textAccent2Color());
@@ -1344,7 +1345,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
             themeProvider.addThemeTextColorListener(textButton, ColorId.background_text);
           }
           textButton.setTypeface(Fonts.getRobotoRegular());
-          textButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f);
+          textButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f);
           textButton.setOnClickListener(onClickListener);
           wrapView.addView(textButton, isRtl ? 0 : 1, LayoutHelper.createLinear(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
           wrapView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(32f)));
@@ -2489,7 +2490,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
     if (viewType == ListItem.TYPE_DESCRIPTION_SMALL) {
       textView.setTextColor(Theme.textDecentColor());
       textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12f);
-      textView.setPadding(Screen.dp(16f), 0, Screen.dp(16f), Screen.dp(12f));
+      textView.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), 0, Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(12f));
       ViewUtils.setBackground(textView, new FillingDrawable(ColorId.filling));
       if (themeProvider != null) {
         themeProvider.addThemeTextColorListener(textView, ColorId.textLight);
@@ -2501,7 +2502,7 @@ public class SettingHolder extends RecyclerView.ViewHolder {
         themeProvider.addThemeTextColorListener(textView, textColorId);
       }
       textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f);
-      textView.setPadding(Screen.dp(16f), Screen.dp(6f), Screen.dp(16f), Screen.dp(12f));
+      textView.setPadding(Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(6f), Screen.dp(FrogramUi.CONTENT_HORIZONTAL_PADDING), Screen.dp(12f));
     }
     textView.setLinkTextColor(Theme.textLinkColor());
     textView.setHighlightColor(Theme.textLinkHighlightColor());

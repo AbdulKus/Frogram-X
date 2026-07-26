@@ -918,7 +918,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     text.setGravity(Gravity.LEFT);
     text.setSingleLine();
     text.setEllipsize(TextUtils.TruncateAt.END);
-    text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 19f);
+    text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20f);
     text.setTextColor(0xffffffff);
     text.setLayoutParams(params);
     return text;

@@ -129,7 +129,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
   }
 
   public static int getAvatarLeft (int chatListMode) {
-    return Screen.dp(/*inMultiLineMode ? 6f : */7f);
+    return Screen.dp(/*inMultiLineMode ? 6f : */10f);
   }
 
   public static int getAvatarRadius (int chatListMode) {
@@ -226,7 +226,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return Screen.dp(78f);
       case Settings.CHAT_MODE_2LINE:
       default:
-        return Screen.dp(72f);
+        return Screen.dp(76f);
     }
   }
 
@@ -238,7 +238,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return 58f;
       case Settings.CHAT_MODE_2LINE:
       default:
-        return 52f;
+        return 54f;
     }
   }
 
@@ -253,7 +253,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
       case Settings.CHAT_MODE_3LINE:
       case Settings.CHAT_MODE_2LINE:
       default:
-        return Screen.dp(10f);
+        return Screen.dp(11f);
     }
   }
 
@@ -269,7 +269,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return Screen.dp(44f);
       case Settings.CHAT_MODE_2LINE:
       default:
-        return Screen.dp(38f);
+        return Screen.dp(40f);
     }
   }
 
@@ -285,7 +285,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return Screen.dp(33f);
       case Settings.CHAT_MODE_2LINE:
       default:
-        return Screen.dp(39.5f);
+        return Screen.dp(41.5f);
     }
   }
 
@@ -300,7 +300,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return getTextOffset() + Screen.dp(14f);
       case Settings.CHAT_MODE_2LINE:
       default:
-        return getTextOffset() + Screen.dp(16f);
+        return getTextOffset() + Screen.dp(18f);
     }
   }
 
@@ -311,7 +311,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return Screen.dp(15f);
       case Settings.CHAT_MODE_2LINE:
       default:
-        return Screen.dp(17f);
+        return Screen.dp(19f);
     }
   }
 
@@ -322,7 +322,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return Screen.dp(9f);
       case Settings.CHAT_MODE_2LINE:
       default:
-        return Screen.dp(11f);
+        return Screen.dp(13f);
     }
   }
 
@@ -333,7 +333,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
         return Screen.dp(10f);
       case Settings.CHAT_MODE_2LINE:
       default:
-        return Screen.dp(12f);
+        return Screen.dp(14f);
     }
   }
 
@@ -573,6 +573,10 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
     boolean rtl = Lang.rtl();
     int viewWidth = getMeasuredWidth();
 
+    float selectedFactor = isSelected.getFloatValue();
+    if (selectedFactor > 0f) {
+      c.drawColor(ColorUtils.alphaColor(selectedFactor, Theme.getColor(ColorId.fillingActive)));
+    }
     if (isDragging) {
       c.drawColor(ColorUtils.alphaColor(.8f, Theme.fillingColor()));
     }
