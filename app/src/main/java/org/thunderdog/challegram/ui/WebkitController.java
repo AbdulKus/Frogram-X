@@ -42,6 +42,7 @@ import me.vkryl.android.widget.FrameLayoutFix;
 public class WebkitController<T> extends ViewController<T> {
   private WebView webView;
   private DoubleHeaderView headerCell;
+  private FrameLayoutFix contentView;
 
   public WebkitController (Context context, Tdlib tdlib) {
     super(context, tdlib);
@@ -59,7 +60,7 @@ public class WebkitController<T> extends ViewController<T> {
     headerCell.setThemedTextColor(this);
     headerCell.initWithMargin(Screen.dp(49f), true);
 
-    FrameLayoutFix contentView = new FrameLayoutFix(context) {
+    contentView = new FrameLayoutFix(context) {
       @Override
       public boolean onTouchEvent (MotionEvent event) {
         return true;
@@ -138,8 +139,37 @@ public class WebkitController<T> extends ViewController<T> {
     onCreateWebView(headerCell, webView);
 
     contentView.addView(webView);
+    onCreateContentView(contentView, webView);
 
     return contentView;
+  }
+
+  /** Allows specialized web views to add native controls around the page. */
+  protected void onCreateContentView (FrameLayoutFix contentView, WebView webView) { }
+
+  protected final WebView webView () {
+    return webView;
+  }
+
+  protected final void setWebViewBottomInset (int bottomInset) {
+    if (webView == null) {
+      return;
+    }
+    FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) webView.getLayoutParams();
+    if (params.bottomMargin != bottomInset) {
+      params.bottomMargin = bottomInset;
+      webView.setLayoutParams(params);
+    }
+  }
+
+  protected final void evaluateJavascript (String script) {
+    if (webView != null && !isDestroyed()) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        webView.evaluateJavascript(script, null);
+      } else {
+        webView.loadUrl("javascript:" + script);
+      }
+    }
   }
 
   @Override
@@ -167,7 +197,11 @@ public class WebkitController<T> extends ViewController<T> {
   @Override
   public void destroy () {
     super.destroy();
-    webView.destroy();
+    if (webView != null) {
+      webView.destroy();
+      webView = null;
+    }
+    contentView = null;
   }
 
   @Override

@@ -5893,4 +5893,11 @@
   <string name="DoubleBottomChangeHiddenPasscode">Change hidden passcode</string>
   <string name="DoubleBottomUnsupportedPasscode">Double bottom supports a PIN, password, or pattern. Choose one for the primary lock.</string>
 
+  <string name="MiniApp">Mini App</string>
+  <string name="MiniAppOpen">Open Mini App</string>
+  <string name="MiniAppOpenConfirm">Mini Apps are provided by third-party bots. The app will receive basic account and chat information. Open it?</string>
+  <string name="MiniAppClose">Close Mini App?</string>
+  <string name="MiniAppCloseAction">Close</string>
+  <string name="MiniAppCloseConfirm">Any unsaved changes may be lost.</string>
+
 </resources>

@@ -107,6 +107,7 @@ import org.thunderdog.challegram.ui.MainController;
 import org.thunderdog.challegram.ui.MapController;
 import org.thunderdog.challegram.ui.MapControllerFactory;
 import org.thunderdog.challegram.ui.MessagesController;
+import org.thunderdog.challegram.ui.MiniAppController;
 import org.thunderdog.challegram.ui.PasscodeController;
 import org.thunderdog.challegram.ui.PasscodeSetupController;
 import org.thunderdog.challegram.ui.PasswordController;
@@ -3494,6 +3495,130 @@ public class TdlibUi extends Handler {
     });
   }
 
+  private static int rgb (int color) {
+    return color & 0x00ffffff;
+  }
+
+  private static TdApi.ThemeParameters miniAppTheme () {
+    return new TdApi.ThemeParameters(
+      rgb(Theme.fillingColor()), rgb(Theme.backgroundColor()), rgb(Theme.headerColor()), rgb(Theme.fillingColor()),
+      rgb(Theme.fillingColor()), rgb(Theme.separatorColor()), rgb(Theme.textAccentColor()), rgb(Theme.textLinkColor()),
+      rgb(Theme.textDecentColor()), rgb(Theme.textDecentColor()), rgb(Theme.getColor(ColorId.textNegative)),
+      rgb(Theme.textDecentColor()), rgb(Theme.textLinkColor()), rgb(Theme.getColor(ColorId.fillingPositive)),
+      rgb(Theme.getColor(ColorId.fillingPositiveContent))
+    );
+  }
+
+  private static TdApi.WebAppOpenParameters miniAppParameters (@Nullable TdApi.WebAppOpenMode mode) {
+    return new TdApi.WebAppOpenParameters(miniAppTheme(), "FrogramX", mode != null ? mode : new TdApi.WebAppOpenModeFullSize());
+  }
+
+  private void showMiniApp (TdlibDelegate context, long botUserId, @Nullable String title, TdApi.WebAppUrl url, long launchId, @Nullable String keyboardButtonText) {
+    post(() -> {
+      ViewController<?> current = context.context().navigation().getCurrentStackItem();
+      if (current == null || current.isDestroyed() || url == null || StringUtils.isEmpty(url.url)) {
+        return;
+      }
+      String botName = tdlib.cache().userName(botUserId);
+      MiniAppController controller = new MiniAppController(context.context(), tdlib);
+      controller.setArguments(new MiniAppController.Args(botUserId,
+        StringUtils.isEmpty(title) ? botName : title, botName, url, launchId, keyboardButtonText));
+      current.navigateTo(controller);
+    });
+  }
+
+  private final LongSet confirmedMiniAppBots = new LongSet();
+
+  private void withMiniAppConfirmation (TdlibDelegate context, long botUserId, Runnable action) {
+    post(() -> {
+      if (confirmedMiniAppBots.contains(botUserId)) {
+        action.run();
+        return;
+      }
+      ViewController<?> current = context.context().navigation().getCurrentStackItem();
+      if (current != null && !current.isDestroyed()) {
+        current.showConfirm(Lang.getString(R.string.MiniAppOpenConfirm), Lang.getString(R.string.MiniAppOpen), () -> {
+          confirmedMiniAppBots.add(botUserId);
+          action.run();
+        });
+      }
+    });
+  }
+
+  public void openInlineWebApp (TdlibDelegate context, long chatId, long botUserId, String url, @Nullable TdApi.MessageTopic topicId) {
+    if (botUserId == 0 || StringUtils.isEmpty(url)) {
+      return;
+    }
+    withMiniAppConfirmation(context, botUserId, () -> tdlib.send(
+      new TdApi.OpenWebApp(chatId, botUserId, url, topicId, null, miniAppParameters(new TdApi.WebAppOpenModeFullSize())),
+      (info, error) -> {
+        if (error != null) UI.showError(error);
+        else showMiniApp(context, botUserId, null, info.url, info.launchId, null);
+      }
+    ));
+  }
+
+  public void openKeyboardWebApp (TdlibDelegate context, long botUserId, String buttonText, String url) {
+    if (botUserId == 0 || StringUtils.isEmpty(url)) {
+      return;
+    }
+    withMiniAppConfirmation(context, botUserId, () -> tdlib.send(new TdApi.GetWebAppUrl(botUserId, url, miniAppParameters(new TdApi.WebAppOpenModeFullSize())), (webAppUrl, error) -> {
+      if (error != null) UI.showError(error);
+      else showMiniApp(context, botUserId, null, webAppUrl, 0, buttonText);
+    }));
+  }
+
+  private void openWebAppLink (TdlibDelegate context, TdApi.InternalLinkTypeWebApp link) {
+    tdlib.send(new TdApi.SearchPublicChat(link.botUsername), (chat, chatError) -> {
+      if (chatError != null) {
+        UI.showError(chatError);
+        return;
+      }
+      if (!tdlib.isBotChat(chat)) {
+        post(() -> UI.showToast(R.string.BotNotFound, Toast.LENGTH_SHORT));
+        return;
+      }
+      final long botUserId = tdlib.chatUserId(chat);
+      tdlib.send(new TdApi.SearchWebApp(botUserId, link.webAppShortName), (found, searchError) -> {
+        if (searchError != null) {
+          UI.showError(searchError);
+          return;
+        }
+        Runnable open = () -> {
+          ViewController<?> current = context.context().navigation().getCurrentStackItem();
+          long sourceChatId = current != null ? current.getChatId() : 0;
+          tdlib.send(new TdApi.GetWebAppLinkUrl(sourceChatId, botUserId, link.webAppShortName, link.startParameter, false, miniAppParameters(link.mode)), (webAppUrl, error) -> {
+            if (error != null) UI.showError(error);
+            else showMiniApp(context, botUserId, found.webApp != null ? found.webApp.title : null, webAppUrl, 0, null);
+          });
+        };
+        if (found.skipConfirmation) open.run(); else withMiniAppConfirmation(context, botUserId, open);
+      });
+    });
+  }
+
+  private void openMainWebAppLink (TdlibDelegate context, TdApi.InternalLinkTypeMainWebApp link) {
+    tdlib.send(new TdApi.SearchPublicChat(link.botUsername), (chat, chatError) -> {
+      if (chatError != null) {
+        UI.showError(chatError);
+        return;
+      }
+      if (!tdlib.isBotChat(chat)) {
+        post(() -> UI.showToast(R.string.BotNotFound, Toast.LENGTH_SHORT));
+        return;
+      }
+      long botUserId = tdlib.chatUserId(chat);
+      withMiniAppConfirmation(context, botUserId, () -> {
+        ViewController<?> current = context.context().navigation().getCurrentStackItem();
+        long sourceChatId = current != null ? current.getChatId() : 0;
+        tdlib.send(new TdApi.GetMainWebApp(sourceChatId, botUserId, link.startParameter, miniAppParameters(link.mode)), (mainWebApp, error) -> {
+          if (error != null) UI.showError(error);
+          else showMiniApp(context, botUserId, null, mainWebApp.url, 0, null);
+        });
+      });
+    });
+  }
+
   public void openInternalLinkType (TdlibDelegate context, @Nullable String originalUrl, @NonNull TdApi.InternalLinkType linkType, @Nullable UrlOpenParameters openParameters, @Nullable RunnableBool after) {
     if (!UI.inUiThread()) {
       post(() ->
@@ -3512,6 +3637,14 @@ public class TdlibUi extends Handler {
     };
     boolean ok = true;
     switch (linkType.getConstructor()) {
+      case TdApi.InternalLinkTypeWebApp.CONSTRUCTOR: {
+        openWebAppLink(context, (TdApi.InternalLinkTypeWebApp) linkType);
+        break;
+      }
+      case TdApi.InternalLinkTypeMainWebApp.CONSTRUCTOR: {
+        openMainWebAppLink(context, (TdApi.InternalLinkTypeMainWebApp) linkType);
+        break;
+      }
       case TdApi.InternalLinkTypeStickerSet.CONSTRUCTOR: {
         TdApi.InternalLinkTypeStickerSet stickerSet = (TdApi.InternalLinkTypeStickerSet) linkType;
         showStickerSet(context, stickerSet.stickerSetName, openParameters);
@@ -4063,9 +4196,6 @@ public class TdlibUi extends Handler {
       case TdApi.InternalLinkTypeStoryAlbum.CONSTRUCTOR:
 
       case TdApi.InternalLinkTypeAttachmentMenuBot.CONSTRUCTOR:
-      case TdApi.InternalLinkTypeWebApp.CONSTRUCTOR:
-      case TdApi.InternalLinkTypeMainWebApp.CONSTRUCTOR:
-
       case TdApi.InternalLinkTypeInvoice.CONSTRUCTOR:
 
       case TdApi.InternalLinkTypeRestorePurchases.CONSTRUCTOR:

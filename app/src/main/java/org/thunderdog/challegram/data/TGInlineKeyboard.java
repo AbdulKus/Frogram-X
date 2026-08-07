@@ -428,6 +428,7 @@ public class TGInlineKeyboard {
     private final Rect dirtyRect;
     private EmojiString wrapper;
     private @Nullable TdApi.InlineKeyboardButtonType type;
+    private @Nullable TdApi.ButtonStyle style;
     private TGInlineKeyboard context;
     private boolean needFakeBold;
 
@@ -448,6 +449,7 @@ public class TGInlineKeyboard {
       TextPaint textPaint = Paints.getBoldPaint14(needFakeBold);
       this.wrapper = new EmojiString(text, maxWidth, textPaint);
       this.type = button.type;
+      this.style = button.style;
       if (type.getConstructor() == TdApi.InlineKeyboardButtonTypeBuy.CONSTRUCTOR) {
         currencyChar = CurrencyUtils.getCurrencyChar(((TdApi.MessageInvoice) parent.getMessage().content).currency);
         currencyCharWidth = U.measureText(currencyChar, Paints.getBoldTextPaint(CURRENCY_TEXT_SIZE_DP));
@@ -475,7 +477,10 @@ public class TGInlineKeyboard {
     }
 
     public void set (TdApi.InlineKeyboardButton button, int maxWidth) {
+      TdApi.InlineKeyboardButtonType oldType = this.type;
+      TdApi.ButtonStyle oldStyle = this.style;
       this.type = button.type;
+      this.style = button.style;
       String text = uppercase(cleanButtonText(button.text));
       final boolean reset = !wrapper.getText().equals(text);
       if (reset || wrapper.getMaxWidth() != maxWidth) {
@@ -483,7 +488,7 @@ public class TGInlineKeyboard {
         TextPaint textPaint = Paints.getBoldPaint14(needFakeBold);
         this.wrapper = new EmojiString(uppercase(text), maxWidth, textPaint);
       }
-      if (reset || !Td.equalsTo(type, button.type)) {
+      if (reset || !Td.equalsTo(oldType, button.type) || !Td.equalsTo(oldStyle, button.style)) {
         if (contextId == Integer.MAX_VALUE) {
           contextId = 0;
         } else {
@@ -516,6 +521,16 @@ public class TGInlineKeyboard {
       return context.context.useBubbles() && !isCustom;
     }
 
+    private int buttonStyleColor () {
+      if (style == null) return 0;
+      switch (style.getConstructor()) {
+        case TdApi.ButtonStylePrimary.CONSTRUCTOR: return 0xff229af0;
+        case TdApi.ButtonStyleDanger.CONSTRUCTOR: return 0xffdb4646;
+        case TdApi.ButtonStyleSuccess.CONSTRUCTOR: return 0xff40b135;
+        default: return 0;
+      }
+    }
+
     private static final float CUSTOM_ICON_PADDING = 2f;
 
     public void draw (MessageView view, Canvas c, int cx, int cy, int buttonWidth, int buttonHeight, int strokePadding, RectF rounder, int row, int column) {
@@ -545,12 +560,16 @@ public class TGInlineKeyboard {
         }
       }
 
-      final boolean useBubbleMode = useWhiteMode();
+      final int buttonStyleColor = buttonStyleColor();
+      final boolean useStyledMode = buttonStyleColor != 0;
+      final boolean useBubbleMode = useWhiteMode() && !useStyledMode;
       // float darkFactor = Theme.getDarkFactor();
       int inlineOutlineColor = customColorId != ColorId.NONE ? Theme.getColor(customColorId) : Theme.inlineOutlineColor(isOutBubble);
       int fillingColor = 0;
 
-      if (useBubbleMode) {
+      if (useStyledMode) {
+        c.drawRoundRect(rounder, radius, radius, Paints.fillingPaint(buttonStyleColor));
+      } else if (useBubbleMode) {
         c.drawRoundRect(rounder, radius, radius, Paints.fillingPaint(fillingColor = context.context.getBubbleButtonBackgroundColor()));
       } else {
         Paint paint = Paints.getInlineButtonOuterPaint();
@@ -560,7 +579,7 @@ public class TGInlineKeyboard {
 
       //noinspection ConstantConditions
       float selectionColorFactor = ALLOW_INVERSE ? (ALLOW_ALWAYS_ACTIVE && isAlwaysActive() ? selectionFactor : activeFactor) : (ALLOW_ALWAYS_ACTIVE ? selectionFactor : 0f); // : Utils.color((int) (255f * (1f - fadeFactor)), selectionChanger.getColor(inverseFactor));
-      int selectionColor = useBubbleMode ? context.context.getBubbleButtonRippleColor() : ColorUtils.fromToArgb(ColorUtils.color(0x1a, inlineOutlineColor), inlineOutlineColor, selectionColorFactor);
+      int selectionColor = useStyledMode ? ColorUtils.color(0x33, Color.WHITE) : useBubbleMode ? context.context.getBubbleButtonRippleColor() : ColorUtils.fromToArgb(ColorUtils.color(0x1a, inlineOutlineColor), inlineOutlineColor, selectionColorFactor);
       if (fadeFactor != 0f) {
         selectionColor = ColorUtils.color((int) ((float) Color.alpha(selectionColor) * (1f - fadeFactor)), selectionColor);
       }
@@ -591,7 +610,7 @@ public class TGInlineKeyboard {
 
       //noinspection ConstantConditions
       final float textColorFactor = ALLOW_INVERSE ? (selectionFactor * activeFactor * (1f - fadeFactor)) : ALLOW_ALWAYS_ACTIVE ? selectionFactor * (1f - fadeFactor) : 0f;
-      final int textColor = useBubbleMode ? context.context.getBubbleButtonTextColor() : ColorUtils.fromToArgb(customColorId != ColorId.NONE ? Theme.getColor(customColorId) :Theme.inlineTextColor(isOutBubble), Theme.inlineTextActiveColor(), textColorFactor);
+      final int textColor = useStyledMode ? Color.WHITE : useBubbleMode ? context.context.getBubbleButtonTextColor() : ColorUtils.fromToArgb(customColorId != ColorId.NONE ? Theme.getColor(customColorId) :Theme.inlineTextColor(isOutBubble), Theme.inlineTextActiveColor(), textColorFactor);
 
       int textX = cx + getButtonPadding();
       if (customIconRes != 0) {
@@ -615,7 +634,7 @@ public class TGInlineKeyboard {
       wrapper.draw(c, textX, cy + Screen.dp(12f), textColor, true);
 
       if (type != null) {
-        int iconColor = Theme.inlineIconColor(isOutBubble);
+        int iconColor = useStyledMode ? Color.WHITE : Theme.inlineIconColor(isOutBubble);
         switch (type.getConstructor()) {
           case TdApi.InlineKeyboardButtonTypeSwitchInline.CONSTRUCTOR:
           case TdApi.InlineKeyboardButtonTypeCallbackWithPassword.CONSTRUCTOR:
@@ -1101,9 +1120,20 @@ public class TGInlineKeyboard {
       switch (type.getConstructor()) {
         case TdApi.InlineKeyboardButtonTypeBuy.CONSTRUCTOR:
         case TdApi.InlineKeyboardButtonTypeCopyText.CONSTRUCTOR:
-        case TdApi.InlineKeyboardButtonTypeWebApp.CONSTRUCTOR:
           // TODO
           break;
+
+        case TdApi.InlineKeyboardButtonTypeWebApp.CONSTRUCTOR: {
+          TdApi.Message message = parent.getMessage();
+          long botUserId = message.viaBotUserId != 0 ? message.viaBotUserId : Td.getSenderUserId(message);
+          String url = ((TdApi.InlineKeyboardButtonTypeWebApp) type).url;
+          flags |= FLAG_BLOCKED;
+          UI.post(() -> {
+            flags &= ~FLAG_BLOCKED;
+            context.context.tdlib().ui().openInlineWebApp(context.context.controller(), parent.getChatId(), botUserId, url, parent.getMessageTopicId());
+          }, ANIMATION_DURATION / 2);
+          break;
+        }
 
         case TdApi.InlineKeyboardButtonTypeCallbackWithPassword.CONSTRUCTOR: {
           final TdApi.InlineKeyboardButtonTypeCallbackWithPassword callbackWithPassword = (TdApi.InlineKeyboardButtonTypeCallbackWithPassword) type;
