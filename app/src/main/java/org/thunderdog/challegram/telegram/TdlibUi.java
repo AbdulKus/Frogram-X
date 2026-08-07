@@ -3531,7 +3531,7 @@ public class TdlibUi extends Handler {
 
   private void withMiniAppConfirmation (TdlibDelegate context, long botUserId, Runnable action) {
     post(() -> {
-      if (confirmedMiniAppBots.contains(botUserId)) {
+      if (confirmedMiniAppBots.has(botUserId)) {
         action.run();
         return;
       }
