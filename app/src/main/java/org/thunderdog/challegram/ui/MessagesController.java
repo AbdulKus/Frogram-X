@@ -8256,6 +8256,16 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override
+  public void onOpenWebApp (String buttonText, String url, boolean oneTime) {
+    if (chat != null) {
+      tdlib.ui().openKeyboardWebApp(this, tdlib.chatUserId(chat), buttonText, url);
+      if (oneTime) {
+        onDestroyCommandKeyboard();
+      }
+    }
+  }
+
+  @Override
   public void onRequestPoll (boolean oneTime, boolean forceQuiz, boolean forceRegular) {
     if (chat != null && tdlib.canSendPolls(chat.id)) {
       CreatePollController c = new CreatePollController(context, tdlib);

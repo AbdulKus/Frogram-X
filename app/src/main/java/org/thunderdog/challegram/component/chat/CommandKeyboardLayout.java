@@ -15,6 +15,12 @@
 package org.thunderdog.challegram.component.chat;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.StateListDrawable;
+import android.os.Build;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -27,6 +33,7 @@ import androidx.annotation.Nullable;
 
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.navigation.ViewController;
+import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Keyboard;
@@ -34,6 +41,7 @@ import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.v.EditText;
 import org.thunderdog.challegram.widget.EmojiTextView;
+import org.thunderdog.challegram.widget.CustomEmojiTextView;
 import org.thunderdog.challegram.widget.TextView;
 
 import me.vkryl.android.ViewUtils;
@@ -103,7 +111,8 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
           text.setVisibility(View.VISIBLE);
         }
         text.setTag(c);
-        text.setText(c.text != null ? c.text : "");
+        text.setText(buttonText(c));
+        applyButtonStyle(text, c.style);
 
         j++;
       }
@@ -135,7 +144,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
   private @Nullable ViewController<?> themeProvider;
 
   private TextView genButton () {
-    TextView text = new EmojiTextView(getContext());
+    TextView text = new CustomEmojiTextView(getContext(), themeProvider != null ? themeProvider.tdlib() : null);
     text.setScrollDisabled(true);
     ViewUtils.setBackground(text, Theme.rectSelector(4f, 0f, ColorId.chatKeyboardButton));
     if (themeProvider != null) {
@@ -152,6 +161,55 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
     text.setLayoutParams(new MarginLayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
     Views.setClickable(text);
     return text;
+  }
+
+  private CharSequence buttonText (TdApi.KeyboardButton button) {
+    String text = button.text != null ? button.text : "";
+    if (button.iconCustomEmojiId == 0) {
+      return text;
+    }
+    String placeholder = "⭐";
+    return TD.toCharSequence(new TdApi.FormattedText(placeholder + " " + text, new TdApi.TextEntity[] {
+      new TdApi.TextEntity(0, placeholder.length(), new TdApi.TextEntityTypeCustomEmoji(button.iconCustomEmojiId))
+    }));
+  }
+
+  private void applyButtonStyle (TextView text, TdApi.ButtonStyle style) {
+    int color = buttonStyleColor(style);
+    if (color == 0) {
+      ViewUtils.setBackground(text, Theme.rectSelector(4f, 0f, ColorId.chatKeyboardButton));
+      text.setTextColor(Theme.textAccentColor());
+    } else {
+      ViewUtils.setBackground(text, coloredButtonBackground(color));
+      text.setTextColor(Color.WHITE);
+    }
+  }
+
+  private static int buttonStyleColor (TdApi.ButtonStyle style) {
+    if (style == null) return 0;
+    switch (style.getConstructor()) {
+      case TdApi.ButtonStylePrimary.CONSTRUCTOR: return 0xff229af0;
+      case TdApi.ButtonStyleDanger.CONSTRUCTOR: return 0xffdb4646;
+      case TdApi.ButtonStyleSuccess.CONSTRUCTOR: return 0xff40b135;
+      default: return 0;
+    }
+  }
+
+  private static GradientDrawable coloredButton (int color) {
+    GradientDrawable drawable = new GradientDrawable();
+    drawable.setColor(color);
+    drawable.setCornerRadius(Screen.dp(4f));
+    return drawable;
+  }
+
+  private static android.graphics.drawable.Drawable coloredButtonBackground (int color) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+      return new RippleDrawable(ColorStateList.valueOf(0x33ffffff), coloredButton(color), coloredButton(Color.WHITE));
+    }
+    StateListDrawable result = new StateListDrawable();
+    result.addState(new int[] {android.R.attr.state_pressed}, coloredButton(me.vkryl.core.ColorUtils.fromToArgb(color, Color.BLACK, .15f)));
+    result.addState(new int[0], coloredButton(color));
+    return result;
   }
 
   @Override
@@ -180,6 +238,10 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
       }
       case TdApi.KeyboardButtonTypeRequestPhoneNumber.CONSTRUCTOR: {
         callback.onRequestContact(oneTime);
+        break;
+      }
+      case TdApi.KeyboardButtonTypeWebApp.CONSTRUCTOR: {
+        callback.onOpenWebApp(button.text, ((TdApi.KeyboardButtonTypeWebApp) button.type).url, oneTime);
         break;
       }
     }
@@ -314,6 +376,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
     void onRequestLocation (boolean oneTime);
     void onRequestContact (boolean oneTime);
     void onRequestPoll (boolean oneTime, boolean forceQuiz, boolean forceRegular);
+    void onOpenWebApp (String buttonText, String url, boolean oneTime);
     void onDestroyCommandKeyboard ();
     void onResizeCommandKeyboard (int size);
   }

@@ -33,4 +33,10 @@
   <string name="AllowNotifications">Показывать текст в уведомлениях</string>
   <string name="PasscodeNotificationsInfo">Если включено, при блокировке будет виден текст уведомлений. Кнопки «Ответить» и «Прочитано» настраиваются отдельно.</string>
   <string name="PasscodeNotificationActions">Ответить и прочитать при блокировке</string>
+  <string name="MiniApp">Мини-приложение</string>
+  <string name="MiniAppOpen">Открыть мини-приложение</string>
+  <string name="MiniAppOpenConfirm">Мини-приложение создано сторонним ботом и получит основные данные об аккаунте и чате. Открыть его?</string>
+  <string name="MiniAppClose">Закрыть мини-приложение?</string>
+  <string name="MiniAppCloseAction">Закрыть</string>
+  <string name="MiniAppCloseConfirm">Несохранённые изменения могут быть потеряны.</string>
 </resources>
