@@ -2681,6 +2681,14 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     }
   }
 
+  public void prepareForTopicSwitch () {
+    // Flush both TDLib's read state and the topic-specific scroll anchor before
+    // the loader is rebound to another topic. Otherwise the next opening can
+    // reuse the position that was saved when the topic was first opened.
+    viewMessages(false);
+    saveScrollPosition();
+  }
+
   public void onMissedMessagesHintReceived () {
     loader.setCanLoadBottom();
     onCanLoadMoreBottomChanged();

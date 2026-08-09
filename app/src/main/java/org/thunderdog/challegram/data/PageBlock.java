@@ -531,6 +531,11 @@ public abstract class PageBlock {
         context.process(text, out);
         break;
       }
+      case TdApi.PageBlockSectionHeading.CONSTRUCTOR: {
+        PageBlockRichText text = new PageBlockRichText(parent, (TdApi.PageBlockSectionHeading) block, context.quoteLevel(), openParameters);
+        context.process(text, out);
+        break;
+      }
       case TdApi.PageBlockParagraph.CONSTRUCTOR: {
         PageBlockRichText text = new PageBlockRichText(parent, (TdApi.PageBlockParagraph) block, context.quoteLevel(), openParameters);
         context.process(text, out);
@@ -538,6 +543,16 @@ public abstract class PageBlock {
       }
       case TdApi.PageBlockPreformatted.CONSTRUCTOR: {
         PageBlockRichText text = new PageBlockRichText(parent, (TdApi.PageBlockPreformatted) block, context.quoteLevel(), openParameters);
+        context.process(text, out);
+        break;
+      }
+      case TdApi.PageBlockThinking.CONSTRUCTOR: {
+        PageBlockRichText text = new PageBlockRichText(parent, (TdApi.PageBlockThinking) block, context.quoteLevel(), openParameters);
+        context.process(text, out);
+        break;
+      }
+      case TdApi.PageBlockMathematicalExpression.CONSTRUCTOR: {
+        PageBlockRichText text = new PageBlockRichText(parent, (TdApi.PageBlockMathematicalExpression) block, context.quoteLevel(), openParameters);
         context.process(text, out);
         break;
       }

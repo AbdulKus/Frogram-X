@@ -147,6 +147,17 @@ public class TGMessageText extends TGMessage {
     return text;
   }
 
+  protected final void setGeneratedMessageText (TdApi.FormattedText generatedText) {
+    this.currentMessageText = new TdApi.MessageText(generatedText, null, null);
+    this.pendingMessageText = null;
+    boolean textChanged = setText(generatedText, false);
+    boolean linkPreviewChanged = setLinkPreview(null, null);
+    if (textChanged || linkPreviewChanged) {
+      rebuildAndUpdateContent();
+      invalidateTextMediaReceiver();
+    }
+  }
+
   @Nullable
   public String findUriFragment (TdApi.LinkPreview linkPreview) {
     if (text.entities == null || text.entities.length == 0)

@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
-      - "feature/**"
-      - "fix/**"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -149,3 +150,33 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download signed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Frogram-X-${{ github.sha }}
+          path: artifacts
+
+      - name: Publish Frogram X release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Frogram X build ${{ github.run_number }}
+          body: |
+            Automatic Frogram X build from `${{ github.sha }}`.
+
+            APK and SHA-256 checksums are attached below.
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            artifacts/*.apk
+            artifacts/SHA256SUMS.txt
