@@ -5900,4 +5900,7 @@
   <string name="MiniAppCloseAction">Close</string>
   <string name="MiniAppCloseConfirm">Any unsaved changes may be lost.</string>
 
+  <string name="RichMessage">Rich post</string>
+  <string name="OpenRichMessage">Open formatted post</string>
+
 </resources>

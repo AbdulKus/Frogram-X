@@ -76,14 +76,36 @@ import tgx.td.Td;
 
 public class InstantViewController extends ViewController<InstantViewController.Args> implements Menu, TGLegacyManager.EmojiLoadListener, Text.ClickCallback, View.OnClickListener, View.OnLongClickListener, TGPlayerController.PlayListBuilder {
   public static class Args {
-    public final TdApi.LinkPreview linkPreview;
+    public final @Nullable TdApi.LinkPreview linkPreview;
     public TdApi.WebPageInstantView instantView;
     public String anchorLink;
+    public @Nullable TdApi.RichMessage richMessage;
+    public long richMessageChatId;
+    public long richMessageId;
 
     public Args (TdApi.LinkPreview linkPreview, TdApi.WebPageInstantView instantView, String anchorLink) {
       this.linkPreview = linkPreview;
       this.instantView = instantView;
       this.anchorLink = anchorLink;
+    }
+
+    public static Args forRichMessage (long chatId, long messageId, TdApi.RichMessage richMessage) {
+      Args args = new Args(null, toInstantView(richMessage), null);
+      args.richMessage = richMessage;
+      args.richMessageChatId = chatId;
+      args.richMessageId = messageId;
+      return args;
+    }
+
+    private static TdApi.WebPageInstantView toInstantView (TdApi.RichMessage richMessage) {
+      return new TdApi.WebPageInstantView(
+        richMessage != null && richMessage.blocks != null ? richMessage.blocks : new TdApi.PageBlock[0],
+        0, 2, richMessage != null && richMessage.isRtl, richMessage != null && richMessage.isFull, null
+      );
+    }
+
+    public boolean isRichMessage () {
+      return richMessage != null;
     }
   }
 
@@ -103,7 +125,7 @@ public class InstantViewController extends ViewController<InstantViewController.
 
   @Override
   public void fillMenuItems (int id, HeaderView header, LinearLayout menu) {
-    if (id == R.id.menu_iv) {
+    if (id == R.id.menu_iv && !getArgumentsStrict().isRichMessage()) {
       menu.addView(header.genButton(R.id.menu_btn_forward, R.drawable.baseline_share_arrow_24, getHeaderIconColorId(), this, Screen.dp(52f), ThemeDeprecated.headerSelector(), header), Lang.rtl() ? 0 : -1);
     }
   }
@@ -139,7 +161,7 @@ public class InstantViewController extends ViewController<InstantViewController.
 
   @Override
   public void onMenuItemPressed (int id, View view) {
-    if (id == R.id.menu_btn_forward) {
+    if (id == R.id.menu_btn_forward && !getArgumentsStrict().isRichMessage()) {
       String link = getArgumentsStrict().linkPreview.url;
       ShareController c = new ShareController(context, tdlib);
       ShareController.Args args = new ShareController.Args(link);
@@ -154,11 +176,16 @@ public class InstantViewController extends ViewController<InstantViewController.
 
   @Override
   public CharSequence getName () {
-    return getArgumentsStrict().linkPreview.siteName;
+    Args args = getArgumentsStrict();
+    return args.isRichMessage() ? tdlib.chatTitle(args.richMessageChatId) : args.linkPreview.siteName;
   }
 
   @Override
   public boolean onUrlClick (View view, String url, boolean promptUser, @NonNull TdlibUi.UrlOpenParameters openParameters) {
+    if (getArgumentsStrict().isRichMessage()) {
+      tdlib.ui().openUrl(this, url, openParameters);
+      return true;
+    }
     String instantViewUrl = getUrl();
     boolean needFallback = false;
     Uri fromUri = Strings.wrapHttps(instantViewUrl);
@@ -489,7 +516,30 @@ public class InstantViewController extends ViewController<InstantViewController.
     }
     // recyclerView.setItemAnimator(new CustomItemAnimator(Anim.DECELERATE_INTERPOLATOR, 180l));
 
-    if (!isReplace) {
+    if (!isReplace && args.isRichMessage()) {
+      if (!args.richMessage.isFull) {
+        tdlib.send(new TdApi.GetFullRichMessage(args.richMessageChatId, args.richMessageId), (richMessage, error) -> {
+          if (error != null) {
+            UI.showError(error);
+            return;
+          }
+          runOnUiThreadOptional(() -> {
+            if (isDestroyed()) {
+              return;
+            }
+            args.richMessage = richMessage;
+            args.instantView = Args.toInstantView(richMessage);
+            List<PageBlock> pageBlocks;
+            try {
+              pageBlocks = parsePageBlocks(args.instantView);
+            } catch (PageBlock.UnsupportedPageBlockException ignored) {
+              return;
+            }
+            buildCells(pageBlocks, true);
+          });
+        });
+      }
+    } else if (!isReplace) {
       tdlib.send(new TdApi.GetWebPageInstantView(getUrl(), false), (webPageInstantView, error) -> {
         if (error != null) {
           UI.showError(error);
@@ -515,11 +565,13 @@ public class InstantViewController extends ViewController<InstantViewController.
   }
 
   public String getUrl () {
-    return getArgumentsStrict().linkPreview.url;
+    TdApi.LinkPreview linkPreview = getArgumentsStrict().linkPreview;
+    return linkPreview != null ? linkPreview.url : "";
   }
 
   public String getDisplayUrl () {
-    return getArgumentsStrict().linkPreview.displayUrl;
+    TdApi.LinkPreview linkPreview = getArgumentsStrict().linkPreview;
+    return linkPreview != null ? linkPreview.displayUrl : "";
   }
 
   @Nullable

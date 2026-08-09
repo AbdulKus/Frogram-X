@@ -39,4 +39,6 @@
   <string name="MiniAppClose">Закрыть мини-приложение?</string>
   <string name="MiniAppCloseAction">Закрыть</string>
   <string name="MiniAppCloseConfirm">Несохранённые изменения могут быть потеряны.</string>
+  <string name="RichMessage">Форматированная публикация</string>
+  <string name="OpenRichMessage">Открыть публикацию полностью</string>
 </resources>

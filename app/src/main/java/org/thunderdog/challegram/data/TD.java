@@ -2646,12 +2646,32 @@ public class TD {
         getText(((TdApi.RichTextBold) richText).text, b);
         break;
       }
-      case TdApi.RichTextStrikethrough.CONSTRUCTOR: {
-        getText(((TdApi.RichTextStrikethrough) richText).text, b);
+      case TdApi.RichTextItalic.CONSTRUCTOR: {
+        getText(((TdApi.RichTextItalic) richText).text, b);
         break;
       }
       case TdApi.RichTextUnderline.CONSTRUCTOR: {
         getText(((TdApi.RichTextUnderline) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextStrikethrough.CONSTRUCTOR: {
+        getText(((TdApi.RichTextStrikethrough) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextSpoiler.CONSTRUCTOR: {
+        getText(((TdApi.RichTextSpoiler) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextSubscript.CONSTRUCTOR: {
+        getText(((TdApi.RichTextSubscript) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextSuperscript.CONSTRUCTOR: {
+        getText(((TdApi.RichTextSuperscript) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextMarked.CONSTRUCTOR: {
+        getText(((TdApi.RichTextMarked) richText).text, b);
         break;
       }
       case TdApi.RichTextUrl.CONSTRUCTOR: {
@@ -2666,12 +2686,60 @@ public class TD {
         getText(((TdApi.RichTextEmailAddress) richText).text, b);
         break;
       }
-      case TdApi.RichTextItalic.CONSTRUCTOR: {
-        getText(((TdApi.RichTextItalic) richText).text, b);
+      case TdApi.RichTextPhoneNumber.CONSTRUCTOR: {
+        getText(((TdApi.RichTextPhoneNumber) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextDateTime.CONSTRUCTOR: {
+        getText(((TdApi.RichTextDateTime) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextMention.CONSTRUCTOR: {
+        getText(((TdApi.RichTextMention) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextMentionName.CONSTRUCTOR: {
+        getText(((TdApi.RichTextMentionName) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextHashtag.CONSTRUCTOR: {
+        getText(((TdApi.RichTextHashtag) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextCashtag.CONSTRUCTOR: {
+        getText(((TdApi.RichTextCashtag) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextBankCardNumber.CONSTRUCTOR: {
+        getText(((TdApi.RichTextBankCardNumber) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextBotCommand.CONSTRUCTOR: {
+        getText(((TdApi.RichTextBotCommand) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextAnchorLink.CONSTRUCTOR: {
+        getText(((TdApi.RichTextAnchorLink) richText).text, b);
+        break;
+      }
+      case TdApi.RichTextReferenceLink.CONSTRUCTOR: {
+        getText(((TdApi.RichTextReferenceLink) richText).text, b);
         break;
       }
       case TdApi.RichTextPlain.CONSTRUCTOR: {
         b.append(((TdApi.RichTextPlain) richText).text);
+        break;
+      }
+      case TdApi.RichTextCustomEmoji.CONSTRUCTOR: {
+        b.append(((TdApi.RichTextCustomEmoji) richText).alternativeText);
+        break;
+      }
+      case TdApi.RichTextMathematicalExpression.CONSTRUCTOR: {
+        b.append(((TdApi.RichTextMathematicalExpression) richText).expression);
+        break;
+      }
+      case TdApi.RichTextDiff.CONSTRUCTOR: {
+        getText(((TdApi.RichTextDiff) richText).text, b);
         break;
       }
       case TdApi.RichTexts.CONSTRUCTOR: {
@@ -2681,6 +2749,13 @@ public class TD {
         }
         break;
       }
+      case TdApi.RichTextIcon.CONSTRUCTOR:
+      case TdApi.RichTextReference.CONSTRUCTOR:
+      case TdApi.RichTextAnchor.CONSTRUCTOR:
+        break;
+      default:
+        Td.assertRichText_d57ed958();
+        throw Td.unsupported(richText);
     }
   }
 

@@ -420,22 +420,32 @@ public class FormattedText {
       }
       case TdApi.RichTextCustomEmoji.CONSTRUCTOR: {
         TdApi.RichTextCustomEmoji customEmoji = (TdApi.RichTextCustomEmoji) in;
-        TextEntityCustom custom = new TextEntityCustom(context, context.tdlib(), "", offset[0], offset[0], flags, linkCached ? new TdlibUi.UrlOpenParameters(openParameters).forceInstantView() : openParameters)
+        String alternativeText = StringUtils.isEmpty(customEmoji.alternativeText) ? "\uFFFC" : customEmoji.alternativeText;
+        int start = offset[0];
+        out.append(alternativeText);
+        offset[0] += alternativeText.length();
+        TextEntityCustom custom = new TextEntityCustom(context, context.tdlib(), alternativeText, start, offset[0], flags, linkCached ? new TdlibUi.UrlOpenParameters(openParameters).forceInstantView() : openParameters)
           .setReferenceAnchorName(referenceAnchorName).setCopyLink(copyLink)
           .setEmoji(customEmoji);
         if (linkType != TextEntityCustom.LINK_TYPE_NONE) {
           custom.setLink(linkOffset, linkLength, linkType, link, linkCached);
+          linkLength[0] += alternativeText.length();
         }
         entities.add(custom);
         break;
       }
       case TdApi.RichTextMathematicalExpression.CONSTRUCTOR: {
         TdApi.RichTextMathematicalExpression mathematicalExpression = (TdApi.RichTextMathematicalExpression) in;
-        TextEntityCustom custom = new TextEntityCustom(context, context.tdlib(), "", offset[0], offset[0], flags, linkCached ? new TdlibUi.UrlOpenParameters(openParameters).forceInstantView() : openParameters)
+        String expression = mathematicalExpression.expression != null ? mathematicalExpression.expression : "";
+        int start = offset[0];
+        out.append(expression);
+        offset[0] += expression.length();
+        TextEntityCustom custom = new TextEntityCustom(context, context.tdlib(), expression, start, offset[0], flags | TextEntityCustom.FLAG_MONOSPACE, linkCached ? new TdlibUi.UrlOpenParameters(openParameters).forceInstantView() : openParameters)
           .setReferenceAnchorName(referenceAnchorName).setCopyLink(copyLink)
           .setMathematicalExpression(mathematicalExpression);
         if (linkType != TextEntityCustom.LINK_TYPE_NONE) {
           custom.setLink(linkOffset, linkLength, linkType, link, linkCached);
+          linkLength[0] += expression.length();
         }
         entities.add(custom);
         break;

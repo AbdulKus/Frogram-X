@@ -137,6 +137,13 @@ public class PageBlockRichText extends PageBlock {
     // setPadding(14f);
   }
 
+  public PageBlockRichText (ViewController<?> context, TdApi.PageBlockSectionHeading heading, int quoteLevel, @Nullable TdlibUi.UrlOpenParameters openParameters) {
+    super(context, heading, quoteLevel);
+    setText(new TdApi.RichTextBold(heading.text), getSectionHeadingProvider(heading.size), TextColorSets.InstantView.HEADER, Text.FLAG_ARTICLE, openParameters);
+    this.paddingTop = heading.size <= 2 ? 14f : 10f;
+    this.paddingBottom = heading.size <= 3 ? 8f : 6f;
+  }
+
   public PageBlockRichText (ViewController<?> context, TdApi.PageBlockKicker kicker, int quoteLevel, @Nullable TdlibUi.UrlOpenParameters openParameters) {
     super(context, kicker, quoteLevel);
     this.paddingTop = 16f;
@@ -215,6 +222,18 @@ public class PageBlockRichText extends PageBlock {
   public PageBlockRichText (ViewController<?> context, TdApi.PageBlockPreformatted preformatted, int quoteLevel, @Nullable TdlibUi.UrlOpenParameters openParameters) {
     super(context, preformatted, quoteLevel);
     setText(preformatted.text, getPreformattedProvider(), TextColorSets.InstantView.NORMAL, Text.FLAG_ARTICLE, openParameters);
+    this.backgroundColorId = ColorId.iv_preBlockBackground;
+    this.textHorizontalOffset = TEXT_HORIZONTAL_OFFSET_PRE_BLOCK;
+  }
+
+  public PageBlockRichText (ViewController<?> context, TdApi.PageBlockThinking thinking, int quoteLevel, @Nullable TdlibUi.UrlOpenParameters openParameters) {
+    super(context, thinking, quoteLevel);
+    setText(new TdApi.RichTextItalic(thinking.text), getParagraphProvider(), TextColorSets.InstantView.CAPTION, Text.FLAG_ARTICLE, openParameters);
+  }
+
+  public PageBlockRichText (ViewController<?> context, TdApi.PageBlockMathematicalExpression expression, int quoteLevel, @Nullable TdlibUi.UrlOpenParameters openParameters) {
+    super(context, expression, quoteLevel);
+    setText(new TdApi.RichTextFixed(new TdApi.RichTextPlain(expression.expression)), getPreformattedProvider(), TextColorSets.InstantView.NORMAL, Text.FLAG_ARTICLE, openParameters);
     this.backgroundColorId = ColorId.iv_preBlockBackground;
     this.textHorizontalOffset = TEXT_HORIZONTAL_OFFSET_PRE_BLOCK;
   }
@@ -664,6 +683,7 @@ public class PageBlockRichText extends PageBlock {
   // Page title
 
   private static TextStyleProvider titleProvider, subtitleProvider, authorProvider, footerProvider, paragraphProvider, headerProvider, subheaderProvider, paragraphMonoProvider, listTextProvider, blockQuoteProvider, pullQuoteProvider, captionProvider, creditProvider;
+  private static final TextStyleProvider[] sectionHeadingProviders = new TextStyleProvider[6];
 
   public static TextStyleProvider getTitleProvider () {
     if (titleProvider == null) {
@@ -727,6 +747,17 @@ public class PageBlockRichText extends PageBlock {
       subheaderProvider.setTextSize(TEXT_SIZE_SUBHEADER);
     }
     return subheaderProvider;
+  }
+
+  public static TextStyleProvider getSectionHeadingProvider (int size) {
+    int index = Math.max(1, Math.min(6, size)) - 1;
+    TextStyleProvider provider = sectionHeadingProviders[index];
+    if (provider == null) {
+      provider = new TextStyleProvider(Fonts.newRobotoStorage());
+      provider.setTextSize(new float[] {24f, 22f, 20f, 18f, 17f, 16f}[index]);
+      sectionHeadingProviders[index] = provider;
+    }
+    return provider;
   }
 
   public static TextStyleProvider getParagraphProvider () {

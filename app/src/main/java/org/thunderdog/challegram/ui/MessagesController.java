@@ -4586,6 +4586,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (currentForumTopicId == newForumTopicId && (forumTopic == null || activeForumTopic == forumTopic)) {
       return;
     }
+    manager.prepareForTopicSwitch();
     saveDraft();
     messageTopicId = newForumTopicId != 0 ? new TdApi.MessageTopicForum(newForumTopicId) : null;
     activeForumTopic = forumTopic;

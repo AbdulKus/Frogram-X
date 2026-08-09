@@ -231,12 +231,12 @@ public class TextEntityCustom extends TextEntity {
 
   @Override
   public boolean isCustomEmoji () {
-    return false;
+    return emoji != null;
   }
 
   @Override
   public long getCustomEmojiId () {
-    return 0;
+    return emoji != null ? emoji.customEmojiId : 0;
   }
 
   @Override
@@ -246,7 +246,7 @@ public class TextEntityCustom extends TextEntity {
 
   @Override
   public boolean hasMedia () {
-    return isIcon();
+    return isIcon() || isCustomEmoji();
   }
 
   @Override
