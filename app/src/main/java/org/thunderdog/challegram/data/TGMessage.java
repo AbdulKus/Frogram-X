@@ -8896,6 +8896,46 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     return canBeReacted() && !tdlib.isSelfChat(msg.chatId) && Td.isAvailable(messageAvailableReactions, reactionType);
   }
 
+  private void performQuickReaction (View sourceView, TdApi.ReactionType reactionType, TGReaction reactionObj) {
+    boolean hasReaction = messageReactions.hasReaction(reactionType);
+    if (Config.DISABLE_ANONYMOUS_NON_OWNER_REACTIONS && !hasReaction && tdlib.isAnonymousAdminNonCreator(msg.chatId)) {
+      showContentHint(sourceView, null, R.string.error_ANONYMOUS_REACTIONS_DISABLED);
+    } else if (!Config.PROTECT_ANONYMOUS_REACTIONS || hasReaction || !canGetAddedReactions() || messagesController().callNonAnonymousProtection(getId() + reactionObj.hashCode(), null)) {
+      if (messageReactions.toggleReaction(reactionType, false, false, handler(sourceView, null, () -> {}))) {
+        scheduleSetReactionAnimation(new NextReactionAnimation(reactionObj, NextReactionAnimation.TYPE_QUICK));
+      }
+    }
+  }
+
+  public boolean performDoubleTapQuickReaction () {
+    if (!Settings.instance().isQuickReactionDoubleTapEnabled()) {
+      return false;
+    }
+    String[] quickReactions = Settings.instance().getQuickReactions(tdlib);
+    if (quickReactions.length == 0) {
+      return false;
+    }
+    TdApi.ReactionType reactionType = TD.toReactionType(quickReactions[0]);
+    TGReaction reactionObj = tdlib.getReaction(reactionType);
+    if (reactionObj == null) {
+      return false;
+    }
+    Runnable applyReaction = () -> {
+      if (!isDestroyed() && canSendReaction(reactionType)) {
+        View currentView = findCurrentView();
+        if (currentView != null) {
+          performQuickReaction(currentView, reactionType, reactionObj);
+        }
+      }
+    };
+    if (messageAvailableReactions == null) {
+      loadAvailableReactions(applyReaction);
+    } else {
+      applyReaction.run();
+    }
+    return true;
+  }
+
   private void computeQuickButtons () {
     if (!UI.inUiThread()) {
       tdlib.ui().post(this::computeQuickButtons);
@@ -8935,7 +8975,8 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     }
 
     final String[] quickReactions = Settings.instance().getQuickReactions(tdlib);
-    for (int a = 0; a < quickReactions.length; a++) {
+    final boolean doubleTapOnly = Settings.instance().isQuickReactionDoubleTapEnabled() && quickReactions.length == 1;
+    for (int a = 0; !doubleTapOnly && a < quickReactions.length; a++) {
       final String reactionString = quickReactions[a];
       TdApi.ReactionType reactionType = TD.toReactionType(reactionString);
       final boolean canReact = canSendReaction(reactionType);
@@ -8945,16 +8986,8 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
         reactionDrawable.setComplexReceiver(currentComplexReceiver);
 
         final boolean isOdd = a % 2 == 1;
-        final SwipeQuickAction quickReaction = new SwipeQuickAction(reactionObj.getTitle(), reactionDrawable, () -> {
-          boolean hasReaction = messageReactions.hasReaction(reactionType);
-          if (Config.DISABLE_ANONYMOUS_NON_OWNER_REACTIONS && !hasReaction && tdlib.isAnonymousAdminNonCreator(msg.chatId)) {
-            showContentHint(findCurrentView(), null, R.string.error_ANONYMOUS_REACTIONS_DISABLED);
-          } else if (!Config.PROTECT_ANONYMOUS_REACTIONS || hasReaction || !canGetAddedReactions() || messagesController().callNonAnonymousProtection(getId() + reactionObj.hashCode(), null)) {
-            if (messageReactions.toggleReaction(reactionType, false, false, handler(findCurrentView(), null, () -> {}))) {
-              scheduleSetReactionAnimation(new NextReactionAnimation(reactionObj, NextReactionAnimation.TYPE_QUICK));
-            }
-          }
-        }, false, true);
+        final SwipeQuickAction quickReaction = new SwipeQuickAction(reactionObj.getTitle(), reactionDrawable,
+          () -> performQuickReaction(findCurrentView(), reactionType, reactionObj), false, true);
 
         if (isOdd) {
           rightQuickDefaultPosition += 1;

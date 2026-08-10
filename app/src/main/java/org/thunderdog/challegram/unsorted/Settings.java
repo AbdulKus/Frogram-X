@@ -357,6 +357,7 @@ public class Settings {
 
   private static final String KEY_QUICK_REACTION = "quick_reaction";
   private static final String KEY_QUICK_REACTIONS = "quick_reactions";
+  private static final String KEY_QUICK_REACTION_DOUBLE_TAP = "quick_reaction_double_tap";
   private static final String KEY_BIG_REACTIONS_IN_CHANNELS = "big_reactions_in_channels";
   private static final String KEY_BIG_REACTIONS_IN_CHATS = "big_reactions_in_chats";
 
@@ -6870,6 +6871,14 @@ public class Settings {
       }
     }
     return quickReactions;
+  }
+
+  public void setQuickReactionDoubleTapEnabled (boolean enabled) {
+    putBoolean(KEY_QUICK_REACTION_DOUBLE_TAP, enabled);
+  }
+
+  public boolean isQuickReactionDoubleTapEnabled () {
+    return getBoolean(KEY_QUICK_REACTION_DOUBLE_TAP, false);
   }
 
   public void setBigReactionsInChannels (boolean inChannels) {

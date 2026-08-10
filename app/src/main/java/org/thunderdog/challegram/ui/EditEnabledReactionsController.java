@@ -194,6 +194,11 @@ public class EditEnabledReactionsController extends EditBaseController<EditEnabl
           if (view != null) {
             view.setRadioEnabled(!quickReactions.isEmpty(), isUpdate);
           }
+        } else if (viewId == R.id.btn_quick_reaction_double_tap) {
+          TogglerView view = v.getToggler();
+          if (view != null) {
+            view.setRadioEnabled(!quickReactions.isEmpty() && Settings.instance().isQuickReactionDoubleTapEnabled(), isUpdate);
+          }
         }
       }
 
@@ -320,8 +325,10 @@ public class EditEnabledReactionsController extends EditBaseController<EditEnabl
       items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
     } else if (type == TYPE_QUICK_REACTION) {
       items.add(toggleItem = new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_quick_reaction_enabled, 0, R.string.QuickReactionEnable, isToggleSelected()));
+      items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+      items.add(new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_quick_reaction_double_tap, 0, R.string.QuickReactionDoubleTap));
       items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
-      items.add(new ListItem(ListItem.TYPE_DESCRIPTION, 0, 0, Lang.getMarkdownString(this, R.string.QuickReactionEnableDesc), false));
+      items.add(new ListItem(ListItem.TYPE_DESCRIPTION, 0, 0, Lang.getMarkdownString(this, R.string.QuickReactionDoubleTapDesc), false));
       items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
     }
 
@@ -455,11 +462,26 @@ public class EditEnabledReactionsController extends EditBaseController<EditEnabl
         quickReactions.add(tdlib.defaultEmojiReaction());
       } else {
         quickReactions.clear();
+        Settings.instance().setQuickReactionDoubleTapEnabled(false);
       }
       toggleItem.setSelected(isToggleSelected());
       updateQuickReactionsSettings();
       adapter.updateAllValuedSettingsById(R.id.btn_enabledReactionsCheckboxGroup);
       adapter.updateValuedSettingById(R.id.btn_quick_reaction_enabled);
+      adapter.updateValuedSettingById(R.id.btn_quick_reaction_double_tap);
+    }
+
+    if (viewId == R.id.btn_quick_reaction_double_tap) {
+      if (quickReactions.isEmpty()) {
+        quickReactions.add(tdlib.defaultEmojiReaction());
+        toggleItem.setSelected(true);
+        updateQuickReactionsSettings();
+        adapter.updateAllValuedSettingsById(R.id.btn_enabledReactionsCheckboxGroup);
+        adapter.updateValuedSettingById(R.id.btn_quick_reaction_enabled);
+      }
+      Settings settings = Settings.instance();
+      settings.setQuickReactionDoubleTapEnabled(!settings.isQuickReactionDoubleTapEnabled());
+      adapter.updateValuedSettingById(R.id.btn_quick_reaction_double_tap);
     }
 
     if (v instanceof ReactionCheckboxSettingsView) {
@@ -518,10 +540,15 @@ public class EditEnabledReactionsController extends EditBaseController<EditEnabl
             }
             updateQuickReactionsSettings();
 
+            if (quickReactions.isEmpty()) {
+              Settings.instance().setQuickReactionDoubleTapEnabled(false);
+            }
+
             toggleItem.setSelected(isToggleSelected());
 
             adapter.updateAllValuedSettingsById(R.id.btn_enabledReactionsCheckboxGroup);
             adapter.updateValuedSettingById(R.id.btn_quick_reaction_enabled);
+            adapter.updateValuedSettingById(R.id.btn_quick_reaction_double_tap);
             break;
           }
         }

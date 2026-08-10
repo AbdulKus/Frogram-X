@@ -4797,7 +4797,6 @@ public class MessagesController extends ViewController<MessagesController.Argume
             ((ForumTopicIconModifier) item.getDrawModifier()).setPinned(item.getIntValue() == newDefaultForumTopicId);
           }
         }
-        topicsAdapter.notifyDataSetChanged();
         updateTopicBar(true);
       } else if (id == R.id.btn_editTopic) {
         promptEditForumTopic(forumTopic, topicsAdapter);

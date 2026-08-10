@@ -3381,10 +3381,12 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     if (chat == null) {
       return HIGHLIGHT_MODE_NONE;
     }
-    if (topicId != null && topicId.getConstructor() == TdApi.MessageTopicForum.CONSTRUCTOR) {
-      return canGoUnread(chat, null, forumTopic) ? HIGHLIGHT_MODE_UNREAD : HIGHLIGHT_MODE_NONE;
-    }
-    boolean canGoUnread = canGoUnread(chat, threadInfo, forumTopic);
+    boolean isForumTopic = topicId != null && topicId.getConstructor() == TdApi.MessageTopicForum.CONSTRUCTOR;
+    // A pinned forum topic is opened before its ForumTopic object is loaded. In that case,
+    // falling back to chat-wide unread state both ignores the topic and skips its saved anchor.
+    boolean canGoUnread = isForumTopic ?
+      forumTopic != null && canGoUnread(chat, null, forumTopic) :
+      canGoUnread(chat, threadInfo, forumTopic);
     Settings.SavedMessageId messageId = Settings.instance().getScrollMessageId(accountId, chat.id,
       topicId
     );

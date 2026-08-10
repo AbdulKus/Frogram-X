@@ -175,6 +175,7 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
 
   @Override
   public void performDestroy () {
+    cancelPendingMessageClick();
     avatarReceiver.destroy();
     avatarsReceiver.performDestroy();
     giveawayAvatarsReceiver.performDestroy();
@@ -288,6 +289,9 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   public void setMessage (TGMessage message) {
+    if (this.msg != message) {
+      cancelPendingMessageClick();
+    }
     int desiredHeight = message.getHeight();
     int currentHeight = getCurrentHeight();
 
@@ -509,6 +513,7 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   public void onDetachedFromRecyclerView () {
+    cancelPendingMessageClick();
     if (isAttached) {
       isAttached = false;
       avatarReceiver.detach();
@@ -536,6 +541,67 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   private float touchX, touchY;
+  private Runnable pendingMessageClick;
+  private long pendingMessageClickTime;
+  private long pendingMessageClickId;
+  private float pendingMessageClickX, pendingMessageClickY;
+
+  private void cancelPendingMessageClick () {
+    if (pendingMessageClick != null) {
+      removeCallbacks(pendingMessageClick);
+      pendingMessageClick = null;
+    }
+    pendingMessageClickTime = 0;
+    pendingMessageClickId = 0;
+  }
+
+  private boolean handleMessageTap (float x, float y, long eventTime) {
+    if (msg == null || !Settings.instance().isQuickReactionDoubleTapEnabled() || Settings.instance().getQuickReactions(msg.tdlib()).length == 0) {
+      if (onMessageClick(x, y)) {
+        ViewUtils.onClick(this);
+        return true;
+      }
+      return false;
+    }
+
+    int doubleTapSlop = ViewConfiguration.get(getContext()).getScaledDoubleTapSlop();
+    float dx = x - pendingMessageClickX;
+    float dy = y - pendingMessageClickY;
+    boolean isDoubleTap = pendingMessageClick != null && pendingMessageClickId == msg.getId() &&
+      eventTime - pendingMessageClickTime <= ViewConfiguration.getDoubleTapTimeout() &&
+      dx * dx + dy * dy <= doubleTapSlop * doubleTapSlop;
+    if (isDoubleTap) {
+      cancelPendingMessageClick();
+      if (msg.performDoubleTapQuickReaction()) {
+        ViewUtils.onClick(this);
+        return true;
+      }
+      return false;
+    }
+
+    if (pendingMessageClick != null) {
+      Runnable previousClick = pendingMessageClick;
+      cancelPendingMessageClick();
+      previousClick.run();
+      return true;
+    }
+
+    TGMessage tappedMessage = msg;
+    pendingMessageClickTime = eventTime;
+    pendingMessageClickId = msg.getId();
+    pendingMessageClickX = x;
+    pendingMessageClickY = y;
+    pendingMessageClick = () -> {
+      pendingMessageClick = null;
+      pendingMessageClickTime = 0;
+      pendingMessageClickId = 0;
+      if (msg == tappedMessage && onMessageClick(x, y)) {
+        ViewUtils.onClick(this);
+      }
+    };
+    postDelayed(pendingMessageClick, ViewConfiguration.getDoubleTapTimeout());
+    return true;
+  }
 
   private static void selectMessage (MessagesController m, TGMessage msg, float touchX, float touchY) {
     long messageId = msg.findMessageIdUnder(touchX, touchY);
@@ -1622,10 +1688,7 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
         }
         if ((flags & FLAG_CAUGHT_CLICK) != 0) {
           flags &= ~FLAG_CAUGHT_CLICK;
-          if (onMessageClick(e.getX(), e.getY())) {
-            ViewUtils.onClick(this);
-            return true;
-          }
+          return handleMessageTap(e.getX(), e.getY(), e.getEventTime());
         }
         return false;
       }

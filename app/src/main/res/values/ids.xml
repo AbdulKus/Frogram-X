@@ -1125,6 +1125,7 @@
 
   <item type="id" name="btn_enabledReactionsCheckboxGroup" />
   <item type="id" name="btn_quick_reaction_enabled" />
+  <item type="id" name="btn_quick_reaction_double_tap" />
 
   <item type="id" name="icon_additionalPassword" />
   <item type="id" name="icon_email" />
