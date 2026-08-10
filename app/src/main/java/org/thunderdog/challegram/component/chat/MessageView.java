@@ -88,6 +88,8 @@ import tgx.td.ChatId;
 import tgx.td.Td;
 
 public class MessageView extends SparseDrawableView implements Destroyable, DrawableProvider, MessagesManager.MessageProvider {
+  private static final long MESSAGE_DOUBLE_TAP_TIMEOUT = ViewConfiguration.getDoubleTapTimeout() * 4L / 5L;
+
   private static final int FLAG_USE_COMMON_RECEIVER = 1;
   private static final int FLAG_CAUGHT_CLICK = 1 << 1;
   private static final int FLAG_CAUGHT_MESSAGE_TOUCH = 1 << 2;
@@ -568,7 +570,7 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
     float dx = x - pendingMessageClickX;
     float dy = y - pendingMessageClickY;
     boolean isDoubleTap = pendingMessageClick != null && pendingMessageClickId == msg.getId() &&
-      eventTime - pendingMessageClickTime <= ViewConfiguration.getDoubleTapTimeout() &&
+      eventTime - pendingMessageClickTime <= MESSAGE_DOUBLE_TAP_TIMEOUT &&
       dx * dx + dy * dy <= doubleTapSlop * doubleTapSlop;
     if (isDoubleTap) {
       cancelPendingMessageClick();
@@ -599,7 +601,7 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
         ViewUtils.onClick(this);
       }
     };
-    postDelayed(pendingMessageClick, ViewConfiguration.getDoubleTapTimeout());
+    postDelayed(pendingMessageClick, MESSAGE_DOUBLE_TAP_TIMEOUT);
     return true;
   }
 
