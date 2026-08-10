@@ -538,6 +538,10 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   public void destroy (ViewController<?> context) {
+    if (isFocused) {
+      flushReadAndScrollState();
+      isFocused = false;
+    }
     resetScroll();
     returnToMessageIds = null;
     highlightMode = 0;
@@ -2516,11 +2520,16 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       if (Log.isEnabled(Log.TAG_MESSAGES_LOADER)) {
         Log.i(Log.TAG_MESSAGES_LOADER, "MessagesManager isFocused -> %b", isFocused);
       }
-      this.isFocused = isFocused;
       if (isFocused) {
+        this.isFocused = true;
         onFocus();
       } else {
+        // Flush while the viewport still accepts view requests. Both
+        // allowViewRequest() and saveScrollPosition() reject an unfocused
+        // controller, so changing the flag first discarded the final topic
+        // read boundary and scroll anchor.
         onBlur();
+        this.isFocused = false;
       }
     }
   }
@@ -2560,6 +2569,19 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   private void onBlur () {
+    flushReadAndScrollState();
+  }
+
+  private void flushReadAndScrollState () {
+    // The viewport batches ViewMessages calls. Force one final pass before it
+    // is recycled, then explicitly submit every message still visible. The
+    // second call is intentional: a message may no longer be marked "recent"
+    // after an earlier asynchronous request, but TDLib still needs the final
+    // forum-topic read boundary when the chat is closed immediately after it.
+    viewMessages(false);
+    if (messageViewer != null && canRead()) {
+      loader.viewport().viewMessages(false, true, null);
+    }
     saveScrollPosition();
   }
 
@@ -2682,11 +2704,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   public void prepareForTopicSwitch () {
-    // Flush both TDLib's read state and the topic-specific scroll anchor before
-    // the loader is rebound to another topic. Otherwise the next opening can
-    // reuse the position that was saved when the topic was first opened.
-    viewMessages(false);
-    saveScrollPosition();
+    flushReadAndScrollState();
   }
 
   public void onMissedMessagesHintReceived () {
