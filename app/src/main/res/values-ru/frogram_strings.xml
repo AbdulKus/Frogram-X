@@ -41,4 +41,6 @@
   <string name="MiniAppCloseConfirm">Несохранённые изменения могут быть потеряны.</string>
   <string name="RichMessage">Форматированная публикация</string>
   <string name="OpenRichMessage">Открыть публикацию полностью</string>
+  <string name="QuickReactionDoubleTap">Реакция по двойному нажатию</string>
+  <string name="QuickReactionDoubleTapDesc">Дважды нажмите на сообщение, чтобы поставить первую выбранную ниже реакцию. Если выбрана одна реакция, реакции по свайпу отключаются. В некоторых группах и каналах отдельные реакции могут быть недоступны.</string>
 </resources>

@@ -2064,7 +2064,24 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
   @Override
   public void onActivityResult (int requestCode, int resultCode, Intent data) {
     if (resultCode == Activity.RESULT_OK && (requestCode == Intents.ACTIVITY_RESULT_RINGTONE || requestCode == Intents.ACTIVITY_RESULT_RINGTONE_NOTIFICATION)) {
-      final Uri originalUri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+      if (data == null) {
+        return;
+      }
+      Uri originalUri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+      if (originalUri == null && data.getData() != null) {
+        // Some vendor ringtone pickers delegate to DocumentsUI and return the selected
+        // audio file as Intent.data instead of EXTRA_RINGTONE_PICKED_URI.
+        originalUri = data.getData();
+      }
+      if (originalUri == null && data.getClipData() != null && data.getClipData().getItemCount() > 0) {
+        originalUri = data.getClipData().getItemAt(0).getUri();
+      }
+      if (originalUri == null) {
+        originalUri = data.getParcelableExtra(Intent.EXTRA_STREAM);
+      }
+      if (originalUri == null && !data.hasExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)) {
+        return;
+      }
 
       String ringtoneUri;
       String name;
