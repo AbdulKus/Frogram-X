@@ -457,6 +457,10 @@ public class U {
   }
 
   public static void startForeground (Service service, int notificationId, Notification notification) {
+    startForeground(service, notificationId, notification, false);
+  }
+
+  public static void startForeground (Service service, int notificationId, Notification notification, boolean useCamera) {
     if (notification == null)
       throw new IllegalArgumentException();
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -470,6 +474,9 @@ public class U {
           int knownType = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL;
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             knownType |= android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+          }
+          if (useCamera) {
+            knownType |= android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
           }
           knownType |= android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
           service.startForeground(notificationId, notification, knownType);

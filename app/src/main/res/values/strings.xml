@@ -1801,7 +1801,7 @@
   <string name="VoipUnknown">Call answered</string>
   <string name="VoipBusy">Line Busy</string>
   <string name="VoipDisconnect">Disconnected</string>
-  <string name="VoipBranding">Telegram Call</string>
+  <string name="VoipBranding">Frogram X Call</string>
   <string name="CallBrandingIncoming">Incoming Telegram Call</string>
   <string name="OnMobileNetwork">On Mobile Network</string>
   <string name="OnRoaming">While Roaming</string>
@@ -2643,7 +2643,7 @@
   <string name="RecoveryCodeResent">The verification code has been resent to your email.</string>
   <string name="RecoveryCodeSentEmailUnknown">We\'ve sent you a 6-digit recovery code. Please check your email and enter it here.</string>
   <string name="RestoreEmailTroubleUnknown">Having trouble accessing your email?</string>
-  <string name="VoipInCallBranding">Telegram Call</string>
+  <string name="VoipInCallBranding">Frogram X Call</string>
   <string name="PhoneCall">Phone Call</string>
   <string name="SetAsCurrent">Set as current</string>
   <string name="ArchiveStickerSet">Archive sticker set %1$s? You can restore it later in Settings &gt; Stickers &gt; Archived.</string>

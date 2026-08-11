@@ -25,6 +25,7 @@ import java.io.File;
 public class CallConfiguration {
   public final TdApi.CallStateReady state;
   public final boolean isOutgoing;
+  public final boolean isVideo;
 
   public final @NonNull String persistentStateFilePath;
   public final @Nullable String logFilePath;
@@ -48,6 +49,7 @@ public class CallConfiguration {
   public CallConfiguration (
     @NonNull TdApi.CallStateReady state,
     boolean isOutgoing,
+    boolean isVideo,
     @NonNull File persistentStateFile,
     @Nullable File logFile,
     @Nullable File statsLogFile,
@@ -78,6 +80,7 @@ public class CallConfiguration {
       this.state = state;
     }
     this.isOutgoing = isOutgoing;
+    this.isVideo = isVideo;
 
     this.persistentStateFilePath = persistentStateFile.getAbsolutePath();
     this.logFilePath = logFile != null ? logFile.getAbsolutePath() : null;

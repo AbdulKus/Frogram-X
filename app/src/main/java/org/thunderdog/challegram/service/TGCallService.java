@@ -78,10 +78,13 @@ import org.thunderdog.challegram.voip.NetworkStats;
 import org.thunderdog.challegram.voip.Socks5Proxy;
 import org.thunderdog.challegram.voip.VoIP;
 import org.thunderdog.challegram.voip.VoIPInstance;
+import org.thunderdog.challegram.voip.annotation.AudioState;
 import org.thunderdog.challegram.voip.annotation.CallNetworkType;
 import org.thunderdog.challegram.voip.annotation.CallState;
+import org.thunderdog.challegram.voip.annotation.VideoState;
 import org.thunderdog.challegram.voip.gui.CallSettings;
 import org.thunderdog.challegram.voip.gui.VoIPFeedbackActivity;
+import org.webrtc.VideoSink;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
@@ -98,6 +101,10 @@ public class TGCallService extends Service implements
   TdlibCache.CallStateChangeListener,
   AudioManager.OnAudioFocusChangeListener,
   SensorEventListener, UI.StateListener {
+  public interface VideoStateListener {
+    void onVideoStateChanged (boolean supported, boolean localVideoEnabled, @VideoState int remoteVideoState, boolean frontCamera);
+  }
+
   @Override
   public IBinder onBind (Intent intent) {
     return null;
@@ -179,6 +186,8 @@ public class TGCallService extends Service implements
   private SoundPoolMap soundPoolMap;
   private @Nullable VoIPInstance tgcalls;
   private @Nullable PrivateCallListener callListener;
+  private @Nullable VideoStateListener videoStateListener;
+  private @VideoState int remoteVideoState = VideoState.INACTIVE;
   private PowerManager.WakeLock cpuWakelock;
   private BluetoothAdapter btAdapter;
 
@@ -268,6 +277,77 @@ public class TGCallService extends Service implements
     if (tgcalls != null) {
       tgcalls.setAudioOutputGainControlEnabled(audioGainControlEnabled);
       tgcalls.setEchoCancellationStrength(echoCancellationStrength);
+    }
+  }
+
+  public void setVideoStateListener (@Nullable VideoStateListener listener) {
+    videoStateListener = listener;
+    dispatchVideoState();
+  }
+
+  private void dispatchVideoState () {
+    VideoStateListener listener = videoStateListener;
+    if (listener != null) {
+      listener.onVideoStateChanged(
+        tgcalls != null && tgcalls.supportsVideo(),
+        tgcalls != null && tgcalls.isVideoEnabled(),
+        remoteVideoState,
+        tgcalls == null || tgcalls.isFrontCamera()
+      );
+    }
+  }
+
+  public boolean supportsVideo () {
+    return tgcalls != null && tgcalls.supportsVideo();
+  }
+
+  public boolean isLocalVideoEnabled () {
+    return tgcalls != null && tgcalls.isVideoEnabled();
+  }
+
+  public boolean isFrontCamera () {
+    return tgcalls == null || tgcalls.isFrontCamera();
+  }
+
+  public @VideoState int getRemoteVideoState () {
+    return remoteVideoState;
+  }
+
+  public boolean hasActiveVideo () {
+    return isLocalVideoEnabled() || remoteVideoState == VideoState.ACTIVE || remoteVideoState == VideoState.PAUSED;
+  }
+
+  public void setVideoEnabled (boolean enabled) {
+    if (tgcalls == null || !tgcalls.supportsVideo()) {
+      return;
+    }
+    tgcalls.setVideoEnabled(enabled);
+    if (enabled) {
+      CallSettings settings = getCallSettings();
+      if (settings != null && !settings.isSpeakerModeEnabled()) {
+        settings.setSpeakerMode(CallSettings.SPEAKER_MODE_SPEAKER);
+      }
+    }
+    updateVideoForegroundType();
+    dispatchVideoState();
+  }
+
+  public void setVideoPaused (boolean paused) {
+    if (tgcalls != null && tgcalls.isVideoEnabled()) {
+      tgcalls.setVideoPaused(paused);
+    }
+  }
+
+  public void switchCamera () {
+    if (tgcalls != null && tgcalls.isVideoEnabled()) {
+      tgcalls.switchCamera();
+      dispatchVideoState();
+    }
+  }
+
+  public void setVideoSinks (@Nullable VideoSink localSink, @Nullable VideoSink remoteSink) {
+    if (tgcalls != null && tgcalls.supportsVideo()) {
+      tgcalls.setVideoSinks(localSink, remoteSink);
     }
   }
 
@@ -777,6 +857,17 @@ public class TGCallService extends Service implements
 
   private Notification ongoingCallNotification;
 
+  private void updateVideoForegroundType () {
+    if (ongoingCallNotification != null) {
+      U.startForeground(
+        this,
+        TdlibNotificationManager.ID_ONGOING_CALL_NOTIFICATION,
+        ongoingCallNotification,
+        isLocalVideoEnabled()
+      );
+    }
+  }
+
   private static final @DrawableRes int CALL_ICON_RES = R.drawable.baseline_phone_24_white;
 
   private void showNotification () {
@@ -848,7 +939,7 @@ public class TGCallService extends Service implements
     } else {
       ongoingCallNotification = builder.getNotification();
     }
-    U.startForeground(this, TdlibNotificationManager.ID_ONGOING_CALL_NOTIFICATION, ongoingCallNotification);
+    U.startForeground(this, TdlibNotificationManager.ID_ONGOING_CALL_NOTIFICATION, ongoingCallNotification, isLocalVideoEnabled());
   }
 
   // Sound
@@ -1322,8 +1413,11 @@ public class TGCallService extends Service implements
         tdlib = tgcalls.tdlib();
       }
       lastDebugLog = tgcalls.collectDebugLog();
+      tgcalls.setVideoSinks(null, null);
       tgcalls.performDestroy();
       tgcalls = null;
+      remoteVideoState = VideoState.INACTIVE;
+      dispatchVideoState();
     }
     if (callListener != null && tdlib != null && call != null) {
       tdlib.listeners().unsubscribeFromCallUpdates(call.id, callListener);
@@ -1389,6 +1483,12 @@ public class TGCallService extends Service implements
       public void onSignallingDataEmitted (byte[] data) {
         tdlib.client().send(new TdApi.SendCallSignalingData(call.id, data), tdlib.silentHandler());
       }
+
+      @Override
+      public void onRemoteMediaStateChanged (VoIPInstance context, @AudioState int audioState, @VideoState int videoState) {
+        remoteVideoState = videoState;
+        UI.post(TGCallService.this::dispatchVideoState);
+      }
     };
 
     VoIPInstance tgcallsTemp;
@@ -1419,6 +1519,14 @@ public class TGCallService extends Service implements
       };
       tdlib.listeners().subscribeToCallUpdates(call.id, callListener);
       this.tgcalls = tgcalls;
+      if (tgcalls.isVideoEnabled()) {
+        CallSettings settings = getCallSettings();
+        if (settings != null && !settings.isSpeakerModeEnabled()) {
+          settings.setSpeakerMode(CallSettings.SPEAKER_MODE_SPEAKER);
+        }
+      }
+      updateVideoForegroundType();
+      UI.post(this::dispatchVideoState);
     } else {
       hangUp();
     }

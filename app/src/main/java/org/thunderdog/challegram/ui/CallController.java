@@ -14,18 +14,22 @@
  */
 package org.thunderdog.challegram.ui;
 
+import android.app.PictureInPictureParams;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Canvas;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.SystemClock;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.TypedValue;
+import android.util.Rational;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -66,10 +70,13 @@ import org.thunderdog.challegram.util.RateLimiter;
 import org.thunderdog.challegram.util.text.TextColorSetOverride;
 import org.thunderdog.challegram.util.text.TextColorSets;
 import org.thunderdog.challegram.voip.gui.CallSettings;
+import org.thunderdog.challegram.voip.annotation.VideoState;
 import org.thunderdog.challegram.widget.AvatarView;
 import org.thunderdog.challegram.widget.EmojiTextView;
 import org.thunderdog.challegram.widget.TextView;
 import org.thunderdog.challegram.widget.voip.CallControlsLayout;
+import org.webrtc.RendererCommon;
+import org.webrtc.SurfaceViewRenderer;
 
 import me.vkryl.android.AnimatorUtils;
 import me.vkryl.android.ScrimUtil;
@@ -82,7 +89,7 @@ import me.vkryl.core.ColorUtils;
 import me.vkryl.core.MathUtils;
 import me.vkryl.core.StringUtils;
 
-public class CallController extends ViewController<CallController.Arguments> implements TdlibCache.UserDataChangeListener, TdlibCache.CallStateChangeListener, View.OnClickListener, FactorAnimator.Target, Runnable, CallControlsLayout.CallControlCallback, Screen.StatusBarHeightChangeListener {
+public class CallController extends ViewController<CallController.Arguments> implements TdlibCache.UserDataChangeListener, TdlibCache.CallStateChangeListener, View.OnClickListener, FactorAnimator.Target, Runnable, CallControlsLayout.CallControlCallback, Screen.StatusBarHeightChangeListener, TGCallService.VideoStateListener {
   private static final boolean DEBUG_FADE_BRANDING = true;
 
   private static class ButtonView extends View implements FactorAnimator.Target {
@@ -212,6 +219,10 @@ public class CallController extends ViewController<CallController.Arguments> imp
   }
 
   private AvatarView avatarView;
+  private FrameLayoutFix contentView;
+  private SurfaceViewRenderer remoteVideoView, localVideoView;
+  private FrameLayoutFix localVideoWrap;
+  private TextView remoteVideoStatusView;
   private TextView nameView, stateView;
   private EmojiStatusHelper emojiStatusHelper;
   private float nameTextWidth;
@@ -272,7 +283,13 @@ public class CallController extends ViewController<CallController.Arguments> imp
   private CallControlsLayout callControlsLayout;
 
   private FrameLayoutFix buttonWrap;
-  private ButtonView muteButtonView, speakerButtonView;
+  private ButtonView muteButtonView, speakerButtonView, videoButtonView, switchCameraButtonView;
+  private @Nullable TGCallService boundVideoService;
+  private boolean videoSupported;
+  private boolean localVideoEnabled;
+  private boolean frontCamera = true;
+  private @VideoState int remoteVideoState = VideoState.INACTIVE;
+  private boolean inPictureInPicture;
 
   private float lastHeaderFactor;
 
@@ -336,7 +353,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
 
   @Override
   protected View onCreateView (final Context context) {
-    final FrameLayoutFix contentView = new FrameLayoutFix(context) {
+    this.contentView = new FrameLayoutFix(context) {
       @Override
       protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
@@ -349,6 +366,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
         updateEmojiPosition();
       }
     };
+    final FrameLayoutFix contentView = this.contentView;
     ViewSupport.setThemedBackground(contentView, ColorId.headerBackground, this);
 
     avatarView = new AvatarView(context) {
@@ -393,6 +411,49 @@ public class CallController extends ViewController<CallController.Arguments> imp
     avatarView.setUser(tdlib, user, false);
     avatarView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     contentView.addView(avatarView);
+
+    remoteVideoView = new SurfaceViewRenderer(context);
+    remoteVideoView.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+    remoteVideoView.setEnableHardwareScaler(true);
+    remoteVideoView.init(null, null);
+    remoteVideoView.setVisibility(View.GONE);
+    remoteVideoView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    contentView.addView(remoteVideoView);
+
+    remoteVideoStatusView = new TextView(context);
+    remoteVideoStatusView.setText(Lang.getString(R.string.RemoteCameraOff));
+    remoteVideoStatusView.setTextColor(0xffffffff);
+    remoteVideoStatusView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f);
+    remoteVideoStatusView.setGravity(Gravity.CENTER);
+    remoteVideoStatusView.setPadding(Screen.dp(16f), Screen.dp(9f), Screen.dp(16f), Screen.dp(9f));
+    GradientDrawable remoteVideoStatusBackground = new GradientDrawable();
+    remoteVideoStatusBackground.setColor(0x99000000);
+    remoteVideoStatusBackground.setCornerRadius(Screen.dp(20f));
+    ViewUtils.setBackground(remoteVideoStatusView, remoteVideoStatusBackground);
+    remoteVideoStatusView.setVisibility(View.GONE);
+    remoteVideoStatusView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+    contentView.addView(remoteVideoStatusView);
+
+    localVideoWrap = new FrameLayoutFix(context);
+    GradientDrawable localVideoBackground = new GradientDrawable();
+    localVideoBackground.setColor(0xff101715);
+    localVideoBackground.setCornerRadius(Screen.dp(14f));
+    ViewUtils.setBackground(localVideoWrap, localVideoBackground);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+      localVideoWrap.setClipToOutline(true);
+      localVideoWrap.setElevation(Screen.dp(8f));
+    }
+    localVideoWrap.setVisibility(View.GONE);
+
+    localVideoView = new SurfaceViewRenderer(context);
+    localVideoView.setZOrderMediaOverlay(true);
+    localVideoView.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+    localVideoView.setEnableHardwareScaler(true);
+    localVideoView.init(null, null);
+    localVideoView.setMirror(true);
+    localVideoView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    localVideoWrap.addView(localVideoView);
+    contentView.addView(localVideoWrap);
 
     FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
@@ -607,24 +668,47 @@ public class CallController extends ViewController<CallController.Arguments> imp
     muteButtonView.setOnClickListener(this);
     muteButtonView.setIcon(R.drawable.baseline_mic_24);
     muteButtonView.setNeedCross(true);
-    muteButtonView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(72f), Screen.dp(72f), Gravity.LEFT | Gravity.BOTTOM));
+    muteButtonView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(64f), Screen.dp(72f), Gravity.LEFT | Gravity.BOTTOM));
+
+    FrameLayoutFix.LayoutParams videoButtonParams = FrameLayoutFix.newParams(Screen.dp(64f), Screen.dp(72f), Gravity.LEFT | Gravity.BOTTOM);
+    videoButtonParams.leftMargin = Screen.dp(64f);
+    videoButtonView = new ButtonView(context);
+    videoButtonView.setId(R.id.btn_call_video);
+    videoButtonView.setOnClickListener(this);
+    videoButtonView.setIcon(R.drawable.baseline_videocam_24);
+    videoButtonView.setNeedCross(true);
+    videoButtonView.setContentDescription(Lang.getString(R.string.TurnCameraOn));
+    videoButtonView.setVisibility(View.GONE);
+    videoButtonView.setLayoutParams(videoButtonParams);
 
     ButtonView messageButtonView = new ButtonView(context);
     messageButtonView.setId(R.id.btn_openChat);
     messageButtonView.setOnClickListener(this);
     messageButtonView.setIcon(R.drawable.baseline_chat_bubble_24);
-    messageButtonView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(72f), Screen.dp(72f), Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM));
+    messageButtonView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(64f), Screen.dp(72f), Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM));
+
+    FrameLayoutFix.LayoutParams switchCameraParams = FrameLayoutFix.newParams(Screen.dp(64f), Screen.dp(72f), Gravity.RIGHT | Gravity.BOTTOM);
+    switchCameraParams.rightMargin = Screen.dp(64f);
+    switchCameraButtonView = new ButtonView(context);
+    switchCameraButtonView.setId(R.id.btn_call_switch_camera);
+    switchCameraButtonView.setOnClickListener(this);
+    switchCameraButtonView.setIcon(R.drawable.baseline_camera_front_24);
+    switchCameraButtonView.setContentDescription(Lang.getString(R.string.SwitchCamera));
+    switchCameraButtonView.setVisibility(View.GONE);
+    switchCameraButtonView.setLayoutParams(switchCameraParams);
 
     speakerButtonView = new ButtonView(context);
     speakerButtonView.setId(R.id.btn_speaker);
     speakerButtonView.setOnClickListener(this);
     speakerButtonView.setIcon(R.drawable.baseline_volume_up_24);
-    speakerButtonView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(72f), Screen.dp(72f), Gravity.RIGHT | Gravity.BOTTOM));
+    speakerButtonView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(64f), Screen.dp(72f), Gravity.RIGHT | Gravity.BOTTOM));
 
     buttonWrap = new FrameLayoutFix(context);
     buttonWrap.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(76f), Gravity.BOTTOM));
     buttonWrap.addView(muteButtonView);
+    buttonWrap.addView(videoButtonView);
     buttonWrap.addView(messageButtonView);
+    buttonWrap.addView(switchCameraButtonView);
     buttonWrap.addView(speakerButtonView);
     Views.setPaddingBottom(buttonWrap, extraBottomInset);
     Drawable drawable = ScrimUtil.makeCubicGradientScrimDrawable(0xff000000, 2, Gravity.BOTTOM, false);
@@ -656,6 +740,8 @@ public class CallController extends ViewController<CallController.Arguments> imp
       speakerButtonView.setIsActive(callSettings.isSpeakerModeEnabled(), false);
     }
 
+    bindVideoService();
+
     return contentView;
   }
 
@@ -678,6 +764,145 @@ public class CallController extends ViewController<CallController.Arguments> imp
       this.emojiViewHint.setText(Lang.getString(R.string.CallEmojiHint, TD.getUserSingleName(call.userId, user)));
   }
 
+  private void bindVideoService () {
+    TGCallService service = TGCallService.currentInstance();
+    if (service != null && !service.compareCall(tdlib, call.id)) {
+      service = null;
+    }
+    if (boundVideoService != service) {
+      if (boundVideoService != null) {
+        boundVideoService.setVideoStateListener(null);
+        boundVideoService.setVideoSinks(null, null);
+      }
+      boundVideoService = service;
+      if (service != null) {
+        service.setVideoStateListener(this);
+      }
+    }
+    if (service != null && localVideoView != null && remoteVideoView != null) {
+      service.setVideoSinks(localVideoView, remoteVideoView);
+      onVideoStateChanged(service.supportsVideo(), service.isLocalVideoEnabled(), service.getRemoteVideoState(), service.isFrontCamera());
+    } else {
+      updateVideoUi();
+    }
+  }
+
+  @Override
+  public void onVideoStateChanged (boolean supported, boolean localVideoEnabled, @VideoState int remoteVideoState, boolean frontCamera) {
+    tdlib.ui().post(() -> {
+      if (isDestroyed()) {
+        return;
+      }
+      this.videoSupported = supported;
+      this.localVideoEnabled = localVideoEnabled;
+      this.remoteVideoState = remoteVideoState;
+      this.frontCamera = frontCamera;
+      updateVideoUi();
+    });
+  }
+
+  private void updateVideoUi () {
+    if (remoteVideoView == null || localVideoWrap == null || videoButtonView == null) {
+      return;
+    }
+    boolean remoteVideoVisible = remoteVideoState != VideoState.INACTIVE;
+    boolean anyVideoVisible = remoteVideoVisible || localVideoEnabled;
+
+    remoteVideoView.setVisibility(remoteVideoVisible ? View.VISIBLE : View.GONE);
+    remoteVideoStatusView.setVisibility(remoteVideoState == VideoState.PAUSED ? View.VISIBLE : View.GONE);
+    localVideoWrap.setVisibility(localVideoEnabled ? View.VISIBLE : View.GONE);
+    avatarView.setVisibility(anyVideoVisible ? View.GONE : View.VISIBLE);
+    localVideoView.setMirror(frontCamera);
+
+    if (localVideoEnabled) {
+      FrameLayoutFix.LayoutParams localParams;
+      if (remoteVideoVisible) {
+        localParams = FrameLayoutFix.newParams(Screen.dp(112f), Screen.dp(168f), Gravity.RIGHT | Gravity.TOP);
+        localParams.topMargin = Math.max(Screen.getStatusBarHeight() + Screen.dp(12f), Screen.dp(36f));
+        localParams.rightMargin = Screen.dp(12f);
+      } else {
+        localParams = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+      }
+      localVideoWrap.setLayoutParams(localParams);
+    }
+
+    boolean showVideoControls = videoSupported || call.isVideo;
+    videoButtonView.setVisibility(showVideoControls && !inPictureInPicture ? View.VISIBLE : View.GONE);
+    videoButtonView.setIsActive(!localVideoEnabled, isFocused());
+    videoButtonView.setContentDescription(Lang.getString(localVideoEnabled ? R.string.TurnCameraOff : R.string.TurnCameraOn));
+    switchCameraButtonView.setVisibility(localVideoEnabled && !inPictureInPicture ? View.VISIBLE : View.GONE);
+    applyPictureInPictureUi();
+  }
+
+  private void applyPictureInPictureUi () {
+    if (buttonWrap == null) {
+      return;
+    }
+    int visibility = inPictureInPicture ? View.GONE : View.VISIBLE;
+    buttonWrap.setVisibility(visibility);
+    callControlsLayout.setVisibility(visibility);
+    nameView.setVisibility(visibility);
+    stateView.setVisibility(visibility);
+    brandWrap.setVisibility(visibility);
+    emojiViewSmall.setVisibility(visibility);
+    emojiViewBig.setVisibility(visibility);
+    emojiViewHint.setVisibility(visibility);
+    if (!inPictureInPicture) {
+      updateControlsAlpha();
+    }
+  }
+
+  public boolean enterPictureInPictureIfPossible () {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return false;
+    }
+    bindVideoService();
+    if (boundVideoService == null || !boundVideoService.hasActiveVideo() || context().isInPictureInPictureMode()) {
+      return false;
+    }
+    try {
+      PictureInPictureParams params = new PictureInPictureParams.Builder()
+        .setAspectRatio(new Rational(9, 16))
+        .build();
+      return context().enterPictureInPictureMode(params);
+    } catch (Throwable t) {
+      Log.w(Log.TAG_VOIP, "Unable to enter picture-in-picture mode", t);
+      return false;
+    }
+  }
+
+  public void onPictureInPictureModeChanged (boolean inPictureInPicture) {
+    this.inPictureInPicture = inPictureInPicture;
+    if (boundVideoService != null) {
+      boundVideoService.setVideoPaused(false);
+    }
+    updateVideoUi();
+  }
+
+  private void setVideoEnabledWithPermission () {
+    bindVideoService();
+    if (boundVideoService == null) {
+      return;
+    }
+    if (boundVideoService.isLocalVideoEnabled()) {
+      boundVideoService.setVideoEnabled(false);
+      return;
+    }
+    boolean requested = context().permissions().requestAccessCameraPermission(granted -> {
+      if (granted) {
+        bindVideoService();
+        if (boundVideoService != null) {
+          boundVideoService.setVideoEnabled(true);
+        }
+      } else {
+        openMissingCameraPermissionAlert();
+      }
+    });
+    if (!requested) {
+      boundVideoService.setVideoEnabled(true);
+    }
+  }
+
   @Override
   public void onCallAccept (TdApi.Call call) {
     tdlib.context().calls().acceptCall(context(), tdlib, call.id);
@@ -690,7 +915,11 @@ public class CallController extends ViewController<CallController.Arguments> imp
 
   @Override
   public void onCallRestart (TdApi.Call call) {
-    tdlib.context().calls().makeCall(this, call.userId, null);
+    if (call.isVideo) {
+      tdlib.context().calls().makeVideoCall(this, call.userId, null);
+    } else {
+      tdlib.context().calls().makeCall(this, call.userId, null);
+    }
   }
 
   public boolean compareUserId (long userId) {
@@ -705,6 +934,10 @@ public class CallController extends ViewController<CallController.Arguments> imp
   @Override
   public void onPrepareToShow () {
     super.onPrepareToShow();
+    bindVideoService();
+    if (boundVideoService != null) {
+      boundVideoService.setVideoPaused(false);
+    }
     if (!UI.isTablet()) {
       context().setOrientation(BaseActivity.getAndroidOrientationPortrait());
     }
@@ -713,6 +946,9 @@ public class CallController extends ViewController<CallController.Arguments> imp
   @Override
   public void onCleanAfterHide () {
     super.onCleanAfterHide();
+    if (boundVideoService != null && !inPictureInPicture) {
+      boundVideoService.setVideoPaused(true);
+    }
     if (!UI.isTablet()) {
       context().setOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
     }
@@ -738,6 +974,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
   @Override
   public void run () {
     if (!isDestroyed()) {
+      bindVideoService();
       updateCallState();
       if (isLooping) {
         UI.post(this, tdlib.context().calls().getTimeTillNextCallDurationUpdate(tdlib, call.id));
@@ -828,6 +1065,17 @@ public class CallController extends ViewController<CallController.Arguments> imp
       }
     } else if (viewId == R.id.btn_openChat) {
       tdlib.ui().openPrivateChat(this, call.userId, null);
+    } else if (viewId == R.id.btn_call_video) {
+      if (!TD.isFinished(call)) {
+        setVideoEnabledWithPermission();
+      }
+    } else if (viewId == R.id.btn_call_switch_camera) {
+      if (!TD.isFinished(call)) {
+        bindVideoService();
+        if (boundVideoService != null) {
+          boundVideoService.switchCamera();
+        }
+      }
     } else if (viewId == R.id.btn_speaker) {
       if (!TD.isFinished(call)) {
         if (callSettings == null) {
@@ -949,6 +1197,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
   private long callDuration;
 
   private void updateCallState () {
+    bindVideoService();
     updateLoop();
     String str;
     callDuration = tdlib.context().calls().getCallDuration(tdlib, call.id);
@@ -979,6 +1228,10 @@ public class CallController extends ViewController<CallController.Arguments> imp
 
   @Override
   protected void onFocusStateChanged () {
+    bindVideoService();
+    if (boundVideoService != null) {
+      boundVideoService.setVideoPaused(!isFocused() && !inPictureInPicture);
+    }
     updateFlashing();
   }
 
@@ -1141,6 +1394,10 @@ public class CallController extends ViewController<CallController.Arguments> imp
   @Override
   public void onFocus () {
     super.onFocus();
+    bindVideoService();
+    if (boundVideoService != null) {
+      boundVideoService.setVideoPaused(false);
+    }
     if (!oneShot) {
       destroyStackItemByIdExcludingLast(R.id.controller_call);
       ViewController<?> c = previousStackItem();
@@ -1169,11 +1426,23 @@ public class CallController extends ViewController<CallController.Arguments> imp
     updateCall(call);
     tdlib.cache().subscribeToCallUpdates(call.id, this);
     tdlib.context().calls().acknowledgeCurrentCall(call.id);
+    bindVideoService();
     updateCallState();
   }
 
   @Override
   public void destroy () {
+    if (boundVideoService != null) {
+      boundVideoService.setVideoStateListener(null);
+      boundVideoService.setVideoSinks(null, null);
+      boundVideoService = null;
+    }
+    if (localVideoView != null) {
+      localVideoView.release();
+    }
+    if (remoteVideoView != null) {
+      remoteVideoView.release();
+    }
     super.destroy();
     Screen.removeStatusBarHeightListener(this);
     tdlib.cache().unsubscribeFromCallUpdates(call.id, this);

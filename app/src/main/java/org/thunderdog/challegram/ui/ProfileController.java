@@ -486,7 +486,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       manageChat();
     } else if (id == R.id.menu_btn_call) {
       if (userFull != null) {
-        tdlib.context().calls().makeCall(this, user.id, userFull);
+        tdlib.context().calls().makeCall(this, user.id, userFull, true);
       }
       /*case R.id.menu_btn_edit: {
         if (supergroupFull != null) {
