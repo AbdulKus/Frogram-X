@@ -1191,6 +1191,7 @@
   <item type="id" name="btn_phone_copy" />
   <item type="id" name="btn_phone_share" />
   <item type="id" name="btn_phone_call" />
+  <item type="id" name="btn_video_call" />
   <item type="id" name="btn_telegram_call" />
   <item type="id" name="btn_username_copy" />
   <item type="id" name="btn_username_edit" />
@@ -1361,6 +1362,8 @@
   <item type="id" name="right_addNewAdmins" />-->
 
   <item type="id" name="btn_camera_switch" />
+  <item type="id" name="btn_call_video" />
+  <item type="id" name="btn_call_switch_camera" />
   <item type="id" name="btn_camera_flash" />
 
   <item type="id" name="paint_mode_path" />

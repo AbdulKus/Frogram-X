@@ -14,7 +14,9 @@
  */
 package org.thunderdog.challegram.voip;
 
+import android.Manifest;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
@@ -382,9 +384,14 @@ public class VoIP {
     final boolean preferSystemNoiseSuppressor = VoIPServerConfig.getBoolean("use_system_ns", true);
 
     // These do not change during the call
+    final boolean startWithVideo = call.isVideo && (
+      Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+      ContextUtils.getApplicationContext().checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    );
     final CallConfiguration configuration = new CallConfiguration(
       stateReady,
       call.isOutgoing,
+      startWithVideo,
 
       persistentStateFile,
       logFiles != null ? logFiles.logFile : null,

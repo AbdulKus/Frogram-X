@@ -34,6 +34,7 @@
 #include <tgcalls/v2/InstanceV2ReferenceImpl.h>
 
 #include <tgcalls/VideoCaptureInterface.h>
+#include <tgcalls/StaticThreads.h>
 #include <platform/android/AndroidInterface.h>
 #include <platform/android/AndroidContext.h>
 
@@ -405,6 +406,11 @@ public:
 struct TgCallsContext {
   std::unique_ptr<tgcalls::Instance> tgcalls;
   std::shared_ptr<JniWrapper> javaController;
+  std::shared_ptr<tgcalls::VideoCaptureInterface> videoCapture;
+  std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>> localVideoSink;
+  std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>> remoteVideoSink;
+  bool videoEnabled = false;
+  bool frontCamera = true;
 };
 
 jbyteArray toJavaByteArray (JNIEnv *env, const std::vector<uint8_t> &data) {
@@ -464,6 +470,7 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
   env->ReleaseByteArrayElements(jEncryptionKey, (jbyte *) jEncryptionKeyData, JNI_ABORT);
 
   bool isOutgoingCall = configuration.getBoolean("isOutgoing") == JNI_TRUE;
+  bool isVideoCall = configuration.getBoolean("isVideo") == JNI_TRUE;
 
   // tgcalls::Endpoint
 
@@ -579,6 +586,16 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
 
   std::shared_ptr<JniWrapper> javaController = std::make_shared<JniWrapper>(env, thiz, tgcalls::javaTgCallsController);
 
+  auto videoPlatformContext = std::make_shared<tgcalls::AndroidContext>(env);
+  std::shared_ptr<tgcalls::VideoCaptureInterface> videoCapture =
+    tgcalls::VideoCaptureInterface::Create(
+      tgcalls::StaticThreads::getThreads(),
+      "front",
+      false,
+      videoPlatformContext
+    );
+  videoCapture->setState(isVideoCall ? tgcalls::VideoState::Active : tgcalls::VideoState::Inactive);
+
   tgcalls::Descriptor descriptor = {
     .version = version,
     .config = tgcalls::Config {
@@ -612,7 +629,7 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
       std::move(encryptionKey),
       isOutgoingCall
     ),
-    .videoCapture = nullptr,
+    .videoCapture = isVideoCall ? videoCapture : nullptr,
     .stateUpdated = [javaController](tgcalls::State state) {
       javaController->runSafely([javaController, state](JNIEnv *env) {
         jint javaState = toJavaCallState(env, state);
@@ -667,6 +684,8 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
 
   auto *context = new TgCallsContext;
   context->javaController = javaController;
+  context->videoCapture = videoCapture;
+  context->videoEnabled = isVideoCall;
   context->tgcalls = tgcalls::Meta::Create(version, std::move(descriptor));
   context->tgcalls->setNetworkType(networkType);
   context->tgcalls->setAudioOutputGainControlEnabled(audioOutputGainControlEnabled);
@@ -747,6 +766,80 @@ JNI_OBJECT_FUNC(void, voip_TgCallsController, updateAudioOutputGainControlEnable
     bool isEnabled = jEnabled == JNI_TRUE;
     context->tgcalls->setAudioOutputGainControlEnabled(isEnabled);
   }
+}
+
+JNI_OBJECT_FUNC(jboolean, voip_TgCallsController, nativeSupportsVideo, jlong ptr) {
+  auto context = jni::jlong_to_ptr<TgCallsContext *>(ptr);
+  return context != nullptr && context->tgcalls != nullptr && context->tgcalls->supportsVideo()
+    ? JNI_TRUE
+    : JNI_FALSE;
+}
+
+JNI_OBJECT_FUNC(void, voip_TgCallsController, nativeSetVideoEnabled, jlong ptr, jboolean jEnabled) {
+  auto context = jni::jlong_to_ptr<TgCallsContext *>(ptr);
+  if (context == nullptr || context->tgcalls == nullptr || context->videoCapture == nullptr) {
+    return;
+  }
+  bool enabled = jEnabled == JNI_TRUE;
+  if (context->videoEnabled == enabled) {
+    return;
+  }
+  context->videoEnabled = enabled;
+  if (enabled) {
+    context->videoCapture->setState(tgcalls::VideoState::Active);
+    context->tgcalls->setVideoCapture(context->videoCapture);
+  } else {
+    context->tgcalls->setVideoCapture(nullptr);
+    context->videoCapture->setState(tgcalls::VideoState::Inactive);
+  }
+}
+
+JNI_OBJECT_FUNC(void, voip_TgCallsController, nativeSetVideoPaused, jlong ptr, jboolean jPaused) {
+  auto context = jni::jlong_to_ptr<TgCallsContext *>(ptr);
+  if (context == nullptr || context->videoCapture == nullptr || !context->videoEnabled) {
+    return;
+  }
+  context->videoCapture->setState(
+    jPaused == JNI_TRUE ? tgcalls::VideoState::Paused : tgcalls::VideoState::Active
+  );
+}
+
+JNI_OBJECT_FUNC(void, voip_TgCallsController, nativeSwitchCamera, jlong ptr) {
+  auto context = jni::jlong_to_ptr<TgCallsContext *>(ptr);
+  if (context == nullptr || context->videoCapture == nullptr) {
+    return;
+  }
+  context->frontCamera = !context->frontCamera;
+  context->videoCapture->switchToDevice(context->frontCamera ? "front" : "back", false);
+  context->videoCapture->setState(
+    context->videoEnabled ? tgcalls::VideoState::Active : tgcalls::VideoState::Inactive
+  );
+}
+
+JNI_OBJECT_FUNC(void, voip_TgCallsController, nativeSetLocalVideoOutput, jlong ptr, jobject jSink) {
+  auto context = jni::jlong_to_ptr<TgCallsContext *>(ptr);
+  if (context == nullptr || context->videoCapture == nullptr) {
+    return;
+  }
+  context->localVideoSink = jSink != nullptr
+    ? std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>>(
+        webrtc::JavaToNativeVideoSink(env, jSink)
+      )
+    : nullptr;
+  context->videoCapture->setOutput(context->localVideoSink);
+}
+
+JNI_OBJECT_FUNC(void, voip_TgCallsController, nativeSetRemoteVideoOutput, jlong ptr, jobject jSink) {
+  auto context = jni::jlong_to_ptr<TgCallsContext *>(ptr);
+  if (context == nullptr || context->tgcalls == nullptr) {
+    return;
+  }
+  context->remoteVideoSink = jSink != nullptr
+    ? std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>>(
+        webrtc::JavaToNativeVideoSink(env, jSink)
+      )
+    : nullptr;
+  context->tgcalls->setIncomingVideoOutput(context->remoteVideoSink);
 }
 
 JNI_OBJECT_FUNC(void, voip_TgCallsController, fetchNetworkStats, jlong ptr, jobject jOutStats) {

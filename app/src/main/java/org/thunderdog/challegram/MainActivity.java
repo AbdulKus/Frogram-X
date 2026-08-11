@@ -15,6 +15,7 @@
 package org.thunderdog.challegram;
 
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -1529,6 +1530,24 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
         }, true, true);
       }, 2000);
     }*/
+  }
+
+  @Override
+  protected void onUserLeaveHint () {
+    ViewController<?> current = navigation != null ? navigation.getCurrentStackItem() : null;
+    if (current instanceof CallController && ((CallController) current).enterPictureInPictureIfPossible()) {
+      return;
+    }
+    super.onUserLeaveHint();
+  }
+
+  @Override
+  public void onPictureInPictureModeChanged (boolean isInPictureInPictureMode, Configuration newConfig) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+    ViewController<?> current = navigation != null ? navigation.getCurrentStackItem() : null;
+    if (current instanceof CallController) {
+      ((CallController) current).onPictureInPictureModeChanged(isInPictureInPictureMode);
+    }
   }
 
   @Override

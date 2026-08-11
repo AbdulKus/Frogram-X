@@ -316,7 +316,11 @@ debugCall id:long debug:string = Ok;
   }
 
   public void makeCallDelayed (final ViewController<?> context, final long userId, @Nullable final TdApi.UserFullInfo userFull, final boolean needPrompt) {
-    UI.post(() -> makeCall(context, userId, userFull, needPrompt), 180l);
+    makeCallDelayed(context, userId, userFull, needPrompt, false);
+  }
+
+  private void makeCallDelayed (final ViewController<?> context, final long userId, @Nullable final TdApi.UserFullInfo userFull, final boolean needPrompt, final boolean isVideo) {
+    UI.post(() -> makeCall(context, userId, userFull, needPrompt, isVideo), 180l);
   }
 
   public boolean hasActiveCall () {
@@ -339,16 +343,24 @@ debugCall id:long debug:string = Ok;
   }
 
   public void makeCall (final ViewController<?> context,final long userId, @Nullable TdApi.UserFullInfo userFull) {
-    makeCall(context, userId, userFull, Settings.instance().needOutboundCallsPrompt());
+    makeCall(context, userId, userFull, Settings.instance().needOutboundCallsPrompt(), false);
   }
 
   public void makeCall (final ViewController<?> context, final long userId, @Nullable TdApi.UserFullInfo userFull, final boolean needPrompt) {
+    makeCall(context, userId, userFull, needPrompt, false);
+  }
+
+  public void makeVideoCall (final ViewController<?> context, final long userId, @Nullable TdApi.UserFullInfo userFull) {
+    makeCall(context, userId, userFull, false, true);
+  }
+
+  private void makeCall (final ViewController<?> context, final long userId, @Nullable TdApi.UserFullInfo userFull, final boolean needPrompt, final boolean isVideo) {
     if (userId == 0) {
       return;
     }
     if (Looper.myLooper() != Looper.getMainLooper()) {
       final TdApi.UserFullInfo userFullFinal = userFull;
-      UI.post(() -> makeCall(context, userId, userFullFinal, needPrompt));
+      UI.post(() -> makeCall(context, userId, userFullFinal, needPrompt, isVideo));
       return;
     }
     if (userFull == null) {
@@ -382,7 +394,7 @@ debugCall id:long debug:string = Ok;
           hangUp(pendingCallTdlib, pendingCall.id, () -> {
             if (!signal[0]) {
               signal[0] = true;
-              makeCall(context, userId, userFullFinal, false);
+              makeCall(context, userId, userFullFinal, false, isVideo);
             }
           });
           UI.post(() -> {
@@ -426,27 +438,55 @@ debugCall id:long debug:string = Ok;
         if (error != null) {
           UI.showError(error);
         } else {
-          makeCall(context, userId, remoteUserFull, needPrompt);
+          makeCall(context, userId, remoteUserFull, needPrompt, isVideo);
         }
       });
       return;
     }
     if (needPrompt) {
       final TdApi.UserFullInfo userFullFinal = userFull;
-      context.showOptions(Lang.getStringBold(R.string.CallX, context.tdlib().cache().userName(userId)), new int[]{R.id.btn_phone_call, R.id.btn_cancel}, new String[]{Lang.getString(R.string.Call), Lang.getString(R.string.Cancel)}, null, new int[]{R.drawable.baseline_call_24, R.drawable.baseline_cancel_24}, (itemView, id) -> {
+      final boolean canVideoCall = userFull.supportsVideoCalls;
+      context.showOptions(
+        Lang.getStringBold(R.string.CallX, context.tdlib().cache().userName(userId)),
+        canVideoCall ? new int[]{R.id.btn_phone_call, R.id.btn_video_call, R.id.btn_cancel} : new int[]{R.id.btn_phone_call, R.id.btn_cancel},
+        canVideoCall ? new String[]{Lang.getString(R.string.AudioCall), Lang.getString(R.string.VideoCall), Lang.getString(R.string.Cancel)} : new String[]{Lang.getString(R.string.Call), Lang.getString(R.string.Cancel)},
+        null,
+        canVideoCall ? new int[]{R.drawable.baseline_call_24, R.drawable.baseline_videocam_24, R.drawable.baseline_cancel_24} : new int[]{R.drawable.baseline_call_24, R.drawable.baseline_cancel_24},
+        (itemView, id) -> {
         if (id == R.id.btn_phone_call) {
-          makeCallDelayed(context, userId, userFullFinal, false);
+          makeCallDelayed(context, userId, userFullFinal, false, false);
+        } else if (id == R.id.btn_video_call) {
+          makeCallDelayed(context, userId, userFullFinal, false, true);
         }
         return true;
       });
       // UI.getCurrentStackItem(context);
       return;
     }
+    if (isVideo && !userFull.supportsVideoCalls) {
+      UI.showToast(R.string.VideoCallUnavailable, Toast.LENGTH_SHORT);
+      return;
+    }
+    if (isVideo) {
+      final TdApi.UserFullInfo resolvedUserFull = userFull;
+      BaseActivity activity = UI.getUiContext();
+      if (activity != null && activity.permissions().requestRecordVideoPermissions(granted -> {
+        if (granted) {
+          makeCall(context, userId, resolvedUserFull, false, true);
+        } else if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+          showNeedMicAlert(false);
+        } else {
+          context.openMissingCameraPermissionAlert();
+        }
+      })) {
+        return;
+      }
+    }
     if (!checkRecordPermissions(context.context(), context.tdlib(), null, userId, null)) {
       return;
     }
     context.context().closeAllMedia(false);
-    context.tdlib().send(new TdApi.CreateCall(userId, VoIP.getProtocol(), false), (callId, error) -> {
+    context.tdlib().send(new TdApi.CreateCall(userId, VoIP.getProtocol(), isVideo), (callId, error) -> {
       if (error != null) {
         Log.e(Log.TAG_VOIP, "Failed to create call: %s", TD.toErrorString(error));
         UI.showError(error);
@@ -487,12 +527,28 @@ debugCall id:long debug:string = Ok;
 
   public void acceptCall (Context context, Tdlib tdlib, final int callId) {
     if (checkConnection(context, tdlib)) {
-      if (!checkRecordPermissions(context, tdlib, tdlib.cache().getCall(callId), 0, null)) {
+      TdApi.Call pendingCall = tdlib.cache().getCall(callId);
+      if (!checkRecordPermissions(context, tdlib, pendingCall, 0, null)) {
         return;
       }
-      Log.v(Log.TAG_VOIP, "#%d: AcceptCall requested", callId);
-      tdlib.client().send(new TdApi.AcceptCall(callId, VoIP.getProtocol()), object -> Log.v(Log.TAG_VOIP, "#%d: AcceptCall completed: %s", callId, object));
+      BaseActivity activity = UI.getUiContext();
+      if (pendingCall != null && pendingCall.isVideo && activity != null &&
+          activity.permissions().requestAccessCameraPermission(granted -> {
+            if (granted) {
+              acceptCall(context, tdlib, callId);
+            } else {
+              sendAcceptCall(tdlib, callId);
+            }
+          })) {
+        return;
+      }
+      sendAcceptCall(tdlib, callId);
     }
+  }
+
+  private void sendAcceptCall (Tdlib tdlib, int callId) {
+    Log.v(Log.TAG_VOIP, "#%d: AcceptCall requested", callId);
+    tdlib.client().send(new TdApi.AcceptCall(callId, VoIP.getProtocol()), object -> Log.v(Log.TAG_VOIP, "#%d: AcceptCall completed: %s", callId, object));
   }
 
   public void hangUpCurrentCall () {
@@ -529,7 +585,7 @@ debugCall id:long debug:string = Ok;
     }
     int duration = getCallDuration(tdlib, callId);
     Log.v(Log.TAG_VOIP, "#%d: DiscardCall, isDisconnect: %b, connectionId: %d, duration: %d", callId, isDisconnect, connectionId, duration);
-    tdlib.client().send(new TdApi.DiscardCall(callId, isDisconnect, null, Math.max(0, duration), false, connectionId), object -> {
+    tdlib.client().send(new TdApi.DiscardCall(callId, isDisconnect, null, Math.max(0, duration), call.isVideo, connectionId), object -> {
       Log.v(Log.TAG_VOIP, "#%d: DiscardCall completed: %s", callId, object);
     });
   }

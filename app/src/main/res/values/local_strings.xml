@@ -11,4 +11,12 @@
 
   <string name="EmulatorDetectorReport_title">False-positive emulator detection warning on %1$s \`%2$s\`</string>
   <string name="EmulatorDetectorReport_text">Hello. I use **Frogram X** on a real device, but it says I am running on an emulator.\n\n**My real device details:**\n\nName: %1$s \`%2$s\`\nProduct: \`%3$s\`\nDevice: \`%4$s\`\nHardware: \`%5$s\`\n\n**The app version I am using:**\n\n%6$s\n\n**Emulator detection result:** `%7$s`\n\nPlease take a look if this warning can be resolved for my device.\nThank you!</string>
+
+  <string name="AudioCall">Audio call</string>
+  <string name="VideoCall">Video call</string>
+  <string name="VideoCallUnavailable">Video calls aren\'t supported by this user or device</string>
+  <string name="TurnCameraOn">Turn camera on</string>
+  <string name="TurnCameraOff">Turn camera off</string>
+  <string name="SwitchCamera">Switch camera</string>
+  <string name="RemoteCameraOff">Camera is off</string>
 </resources>

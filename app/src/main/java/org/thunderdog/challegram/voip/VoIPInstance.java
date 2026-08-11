@@ -23,6 +23,7 @@ import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.voip.annotation.CallNetworkType;
 import org.thunderdog.challegram.voip.annotation.CallState;
+import org.webrtc.VideoSink;
 
 import me.vkryl.core.lambda.Destroyable;
 
@@ -109,6 +110,26 @@ public abstract class VoIPInstance implements Destroyable {
   }
 
   protected abstract void handleNetworkTypeChange (@CallNetworkType int type);
+
+  public boolean supportsVideo () {
+    return false;
+  }
+
+  public boolean isVideoEnabled () {
+    return false;
+  }
+
+  public boolean isFrontCamera () {
+    return true;
+  }
+
+  public void setVideoEnabled (boolean enabled) { }
+
+  public void setVideoPaused (boolean paused) { }
+
+  public void switchCamera () { }
+
+  public void setVideoSinks (VideoSink localSink, VideoSink remoteSink) { }
 
   // Getters
 

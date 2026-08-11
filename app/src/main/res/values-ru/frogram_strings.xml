@@ -43,4 +43,11 @@
   <string name="OpenRichMessage">Открыть публикацию полностью</string>
   <string name="QuickReactionDoubleTap">Реакция по двойному нажатию</string>
   <string name="QuickReactionDoubleTapDesc">Дважды нажмите на сообщение, чтобы поставить первую выбранную ниже реакцию. Если выбрана одна реакция, реакции по свайпу отключаются. В некоторых группах и каналах отдельные реакции могут быть недоступны.</string>
+  <string name="AudioCall">Аудиозвонок</string>
+  <string name="VideoCall">Видеозвонок</string>
+  <string name="VideoCallUnavailable">Видеозвонки недоступны для этого пользователя или устройства</string>
+  <string name="TurnCameraOn">Включить камеру</string>
+  <string name="TurnCameraOff">Выключить камеру</string>
+  <string name="SwitchCamera">Переключить камеру</string>
+  <string name="RemoteCameraOff">Камера выключена</string>
 </resources>

@@ -23,16 +23,20 @@ import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.voip.annotation.AudioState;
 import org.thunderdog.challegram.voip.annotation.CallNetworkType;
 import org.thunderdog.challegram.voip.annotation.VideoState;
+import org.webrtc.VideoSink;
 
 @SuppressWarnings("JavaJniMissingFunction")
 public class TgCallsController extends VoIPInstance {
   private final String version;
   private long nativePtr;
+  private boolean videoEnabled;
+  private boolean frontCamera = true;
   public TgCallsController (@NonNull Tdlib tdlib, @NonNull TdApi.Call call, @NonNull CallConfiguration configuration, @NonNull CallOptions options, @NonNull ConnectionStateListener stateListener, String version) {
     super(tdlib, call, configuration, options, stateListener);
     if (configuration.state.encryptionKey.length != 256)
       throw new IllegalArgumentException(Integer.toString(configuration.state.encryptionKey.length));
     this.version = version;
+    this.videoEnabled = configuration.isVideo;
     this.nativePtr = newInstance(version, configuration, options);
   }
 
@@ -60,6 +64,12 @@ public class TgCallsController extends VoIPInstance {
   private native void updateMicrophoneDisabled (long ptr, boolean isDisabled);
   private native void updateEchoCancellationStrength (long ptr, int strength);
   private native void updateAudioOutputGainControlEnabled (long ptr, boolean isEnabled);
+  private native boolean nativeSupportsVideo (long ptr);
+  private native void nativeSetVideoEnabled (long ptr, boolean enabled);
+  private native void nativeSetVideoPaused (long ptr, boolean paused);
+  private native void nativeSwitchCamera (long ptr);
+  private native void nativeSetLocalVideoOutput (long ptr, @Nullable VideoSink sink);
+  private native void nativeSetRemoteVideoOutput (long ptr, @Nullable VideoSink sink);
   private native void destroyInstance (long ptr);
 
   @Override
@@ -95,6 +105,46 @@ public class TgCallsController extends VoIPInstance {
   @Override
   protected void handleNetworkTypeChange (@CallNetworkType int type) {
     updateNetworkType(nativePtr(), type);
+  }
+
+  @Override
+  public boolean supportsVideo () {
+    return nativePtr != 0 && nativeSupportsVideo(nativePtr());
+  }
+
+  @Override
+  public boolean isVideoEnabled () {
+    return videoEnabled;
+  }
+
+  @Override
+  public boolean isFrontCamera () {
+    return frontCamera;
+  }
+
+  @Override
+  public void setVideoEnabled (boolean enabled) {
+    if (videoEnabled != enabled) {
+      videoEnabled = enabled;
+      nativeSetVideoEnabled(nativePtr(), enabled);
+    }
+  }
+
+  @Override
+  public void setVideoPaused (boolean paused) {
+    nativeSetVideoPaused(nativePtr(), paused);
+  }
+
+  @Override
+  public void switchCamera () {
+    frontCamera = !frontCamera;
+    nativeSwitchCamera(nativePtr());
+  }
+
+  @Override
+  public void setVideoSinks (@Nullable VideoSink localSink, @Nullable VideoSink remoteSink) {
+    nativeSetLocalVideoOutput(nativePtr(), localSink);
+    nativeSetRemoteVideoOutput(nativePtr(), remoteSink);
   }
 
   @Override
