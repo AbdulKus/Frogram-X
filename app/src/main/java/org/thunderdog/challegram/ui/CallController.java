@@ -292,6 +292,13 @@ public class CallController extends ViewController<CallController.Arguments> imp
   private @VideoState int remoteVideoState = VideoState.INACTIVE;
   private boolean inPictureInPicture;
   private boolean localPreviewVisible;
+  private float localPreviewTouchX, localPreviewTouchY;
+  private float localPreviewStartTranslationX, localPreviewStartTranslationY;
+  private boolean localPreviewDragging;
+
+  private static final float LOCAL_PREVIEW_WIDTH_DP = 108f;
+  private static final float LOCAL_PREVIEW_HEIGHT_DP = 162f;
+  private static final float LOCAL_PREVIEW_EDGE_MARGIN_DP = 12f;
 
   private float lastHeaderFactor;
 
@@ -353,6 +360,9 @@ public class CallController extends ViewController<CallController.Arguments> imp
     if (callControlsLayout != null) {
       Views.setPaddingBottom(callControlsLayout, extraBottomInset);
     }
+    if (localVideoWrap != null && localPreviewVisible) {
+      localVideoWrap.post(this::clampLocalPreviewPosition);
+    }
   }
 
   @Override
@@ -376,6 +386,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
       protected void onLayout (boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         updateEmojiPosition();
+        clampLocalPreviewPosition();
       }
     };
     final FrameLayoutFix contentView = this.contentView;
@@ -465,6 +476,9 @@ public class CallController extends ViewController<CallController.Arguments> imp
     localVideoView.setMirror(true);
     localVideoView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     localVideoWrap.addView(localVideoView);
+    localVideoWrap.setClickable(true);
+    localVideoWrap.setOnTouchListener(this::onLocalPreviewTouch);
+    localVideoView.setOnTouchListener(this::onLocalPreviewTouch);
     contentView.addView(localVideoWrap);
 
     FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -736,6 +750,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     callControlsLayout.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     contentView.addView(callControlsLayout);
     callControlsLayout.setCall(tdlib, call, false);
+    localVideoWrap.bringToFront();
 
     // Data
 
@@ -819,23 +834,21 @@ public class CallController extends ViewController<CallController.Arguments> imp
     }
     boolean remoteVideoVisible = remoteVideoState != VideoState.INACTIVE;
     boolean showLocalPreview = localVideoEnabled && !inPictureInPicture;
-    boolean anyVideoVisible = remoteVideoVisible || showLocalPreview;
 
     remoteVideoView.setVisibility(remoteVideoVisible ? View.VISIBLE : View.GONE);
     remoteVideoStatusView.setVisibility(remoteVideoState == VideoState.PAUSED ? View.VISIBLE : View.GONE);
     setLocalPreviewVisible(showLocalPreview);
-    avatarView.setVisibility(anyVideoVisible ? View.GONE : View.VISIBLE);
+    avatarView.setVisibility(remoteVideoVisible ? View.GONE : View.VISIBLE);
     localVideoView.setMirror(frontCamera);
 
     if (localVideoEnabled) {
-      FrameLayoutFix.LayoutParams localParams;
-      if (remoteVideoVisible) {
-        localParams = FrameLayoutFix.newParams(Screen.dp(112f), Screen.dp(168f), Gravity.RIGHT | Gravity.TOP);
-        localParams.topMargin = Math.max(Screen.getStatusBarHeight() + Screen.dp(12f), Screen.dp(36f));
-        localParams.rightMargin = Screen.dp(12f);
-      } else {
-        localParams = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-      }
+      FrameLayoutFix.LayoutParams localParams = FrameLayoutFix.newParams(
+        Screen.dp(LOCAL_PREVIEW_WIDTH_DP),
+        Screen.dp(LOCAL_PREVIEW_HEIGHT_DP),
+        Gravity.RIGHT | Gravity.BOTTOM
+      );
+      localParams.rightMargin = Screen.dp(LOCAL_PREVIEW_EDGE_MARGIN_DP);
+      localParams.bottomMargin = Screen.dp(88f) + extraBottomInset;
       localVideoWrap.setLayoutParams(localParams);
     }
 
@@ -845,6 +858,101 @@ public class CallController extends ViewController<CallController.Arguments> imp
     videoButtonView.setContentDescription(Lang.getString(localVideoEnabled ? R.string.TurnCameraOff : R.string.TurnCameraOn));
     switchCameraButtonView.setVisibility(localVideoEnabled && !inPictureInPicture ? View.VISIBLE : View.GONE);
     applyPictureInPictureUi();
+  }
+
+  private boolean onLocalPreviewTouch (View view, MotionEvent event) {
+    if (inPictureInPicture || !localVideoEnabled) {
+      return false;
+    }
+    switch (event.getActionMasked()) {
+      case MotionEvent.ACTION_DOWN: {
+        localPreviewTouchX = event.getRawX();
+        localPreviewTouchY = event.getRawY();
+        localPreviewStartTranslationX = localVideoWrap.getTranslationX();
+        localPreviewStartTranslationY = localVideoWrap.getTranslationY();
+        localPreviewDragging = false;
+        localVideoWrap.animate().cancel();
+        localVideoWrap.setAlpha(1f);
+        localVideoWrap.setScaleX(1f);
+        localVideoWrap.setScaleY(1f);
+        return true;
+      }
+      case MotionEvent.ACTION_MOVE: {
+        float deltaX = event.getRawX() - localPreviewTouchX;
+        float deltaY = event.getRawY() - localPreviewTouchY;
+        if (!localPreviewDragging && Math.hypot(deltaX, deltaY) >= Screen.dp(4f)) {
+          localPreviewDragging = true;
+        }
+        if (localPreviewDragging) {
+          setLocalPreviewTranslation(localPreviewStartTranslationX + deltaX, localPreviewStartTranslationY + deltaY);
+        }
+        return true;
+      }
+      case MotionEvent.ACTION_UP: {
+        if (localPreviewDragging) {
+          snapLocalPreviewToEdge();
+        } else {
+          view.performClick();
+        }
+        localPreviewDragging = false;
+        return true;
+      }
+      case MotionEvent.ACTION_CANCEL: {
+        snapLocalPreviewToEdge();
+        localPreviewDragging = false;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private void setLocalPreviewTranslation (float translationX, float translationY) {
+    if (contentView == null || localVideoWrap == null || contentView.getWidth() == 0 || contentView.getHeight() == 0) {
+      return;
+    }
+    int edgeMargin = Screen.dp(LOCAL_PREVIEW_EDGE_MARGIN_DP);
+    int topMargin = Math.max(Screen.getStatusBarHeight() + edgeMargin, edgeMargin);
+    int bottomMargin = extraBottomInset + edgeMargin;
+    float minX = edgeMargin - localVideoWrap.getLeft();
+    float maxX = contentView.getWidth() - edgeMargin - localVideoWrap.getRight();
+    float minY = topMargin - localVideoWrap.getTop();
+    float maxY = contentView.getHeight() - bottomMargin - localVideoWrap.getBottom();
+    localVideoWrap.setTranslationX(clampPreviewTranslation(translationX, minX, maxX));
+    localVideoWrap.setTranslationY(clampPreviewTranslation(translationY, minY, maxY));
+  }
+
+  private static float clampPreviewTranslation (float value, float min, float max) {
+    if (max < min) {
+      return (min + max) * .5f;
+    }
+    return Math.max(min, Math.min(max, value));
+  }
+
+  private void clampLocalPreviewPosition () {
+    if (localVideoWrap == null || !localPreviewVisible) {
+      return;
+    }
+    setLocalPreviewTranslation(localVideoWrap.getTranslationX(), localVideoWrap.getTranslationY());
+  }
+
+  private void snapLocalPreviewToEdge () {
+    if (contentView == null || localVideoWrap == null || contentView.getWidth() == 0) {
+      return;
+    }
+    int edgeMargin = Screen.dp(LOCAL_PREVIEW_EDGE_MARGIN_DP);
+    float minX = edgeMargin - localVideoWrap.getLeft();
+    float maxX = contentView.getWidth() - edgeMargin - localVideoWrap.getRight();
+    float targetX = Math.abs(localVideoWrap.getTranslationX() - minX) <= Math.abs(localVideoWrap.getTranslationX() - maxX) ? minX : maxX;
+    setLocalPreviewTranslation(localVideoWrap.getTranslationX(), localVideoWrap.getTranslationY());
+    localVideoWrap.animate().cancel();
+    localVideoWrap.setAlpha(1f);
+    localVideoWrap.setScaleX(1f);
+    localVideoWrap.setScaleY(1f);
+    localVideoWrap.animate()
+      .translationX(targetX)
+      .setDuration(180l)
+      .setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR)
+      .start();
   }
 
   private void setLocalPreviewVisible (boolean visible) {
@@ -917,7 +1025,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     }
     try {
       PictureInPictureParams params = new PictureInPictureParams.Builder()
-        .setAspectRatio(new Rational(9, 16))
+        .setAspectRatio(new Rational(3, 4))
         .build();
       return context().enterPictureInPictureMode(params);
     } catch (Throwable t) {
@@ -1129,20 +1237,16 @@ public class CallController extends ViewController<CallController.Arguments> imp
       if (!TD.isFinished(call)) {
         switchCameraButtonView.animate().cancel();
         switchCameraButtonView.animate()
-          .rotationBy(180f)
-          .setDuration(260l)
-          .setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR)
-          .start();
-        localVideoWrap.animate().cancel();
-        localVideoWrap.animate()
-          .scaleX(.97f)
-          .scaleY(.97f)
-          .setDuration(120l)
-          .withEndAction(() -> localVideoWrap.animate()
+          .alpha(.65f)
+          .scaleX(.82f)
+          .scaleY(.82f)
+          .setDuration(80l)
+          .withEndAction(() -> switchCameraButtonView.animate()
+            .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
-            .setDuration(160l)
-            .setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR)
+            .setDuration(140l)
+            .setInterpolator(new OvershootInterpolator(1.4f))
             .start())
           .start();
         bindVideoService();
