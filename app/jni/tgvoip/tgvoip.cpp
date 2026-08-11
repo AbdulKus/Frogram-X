@@ -470,6 +470,7 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
   env->ReleaseByteArrayElements(jEncryptionKey, (jbyte *) jEncryptionKeyData, JNI_ABORT);
 
   bool isOutgoingCall = configuration.getBoolean("isOutgoing") == JNI_TRUE;
+  bool isVideoCall = configuration.getBoolean("isVideo") == JNI_TRUE;
 
   // tgcalls::Endpoint
 
@@ -632,9 +633,10 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
       std::move(encryptionKey),
       isOutgoingCall
     ),
-    // Attach the camera only after Java has installed the EGL-backed sinks.
-    // Starting capture inside Meta::Create raced the first direct video call.
-    .videoCapture = nullptr,
+    // Direct video sessions must be created with a capture source attached so
+    // tgcalls can build the correct media graph. The source stays inactive
+    // until Java installs the EGL-backed sinks.
+    .videoCapture = isVideoCall ? videoCapture : nullptr,
     .stateUpdated = [javaController](tgcalls::State state) {
       javaController->runSafely([javaController, state](JNIEnv *env) {
         jint javaState = toJavaCallState(env, state);

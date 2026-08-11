@@ -1026,7 +1026,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     }
     try {
       PictureInPictureParams params = new PictureInPictureParams.Builder()
-        .setAspectRatio(new Rational(16, 9))
+        .setAspectRatio(new Rational(5, 6))
         .build();
       return context().enterPictureInPictureMode(params);
     } catch (Throwable t) {
