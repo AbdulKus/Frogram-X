@@ -187,6 +187,7 @@ public class TGCallService extends Service implements
   private @Nullable VoIPInstance tgcalls;
   private @Nullable PrivateCallListener callListener;
   private @Nullable VideoStateListener videoStateListener;
+  private @Nullable VideoSink localVideoSink, remoteVideoSink;
   private @VideoState int remoteVideoState = VideoState.INACTIVE;
   private PowerManager.WakeLock cpuWakelock;
   private BluetoothAdapter btAdapter;
@@ -346,8 +347,13 @@ public class TGCallService extends Service implements
   }
 
   public void setVideoSinks (@Nullable VideoSink localSink, @Nullable VideoSink remoteSink) {
+    if (localVideoSink == localSink && remoteVideoSink == remoteSink) {
+      return;
+    }
+    localVideoSink = localSink;
+    remoteVideoSink = remoteSink;
     if (tgcalls != null && tgcalls.supportsVideo()) {
-      tgcalls.setVideoSinks(localSink, remoteSink);
+      tgcalls.setVideoSinks(localVideoSink, remoteVideoSink);
     }
   }
 
@@ -1519,6 +1525,9 @@ public class TGCallService extends Service implements
       };
       tdlib.listeners().subscribeToCallUpdates(call.id, callListener);
       this.tgcalls = tgcalls;
+      if (tgcalls.supportsVideo()) {
+        tgcalls.setVideoSinks(localVideoSink, remoteVideoSink);
+      }
       if (tgcalls.isVideoEnabled()) {
         CallSettings settings = getCallSettings();
         if (settings != null && !settings.isSpeakerModeEnabled()) {

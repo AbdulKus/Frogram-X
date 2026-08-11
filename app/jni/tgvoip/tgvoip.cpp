@@ -594,7 +594,11 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
       false,
       videoPlatformContext
     );
-  videoCapture->setState(isVideoCall ? tgcalls::VideoState::Active : tgcalls::VideoState::Inactive);
+  if (videoCapture != nullptr) {
+    // Camera frames must not reach tgcalls while its media graph is still
+    // being constructed. That race affected direct video-call answering.
+    videoCapture->setState(tgcalls::VideoState::Inactive);
+  }
 
   tgcalls::Descriptor descriptor = {
     .version = version,
@@ -687,10 +691,17 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
   context->videoCapture = videoCapture;
   context->videoEnabled = isVideoCall;
   context->tgcalls = tgcalls::Meta::Create(version, std::move(descriptor));
+  if (context->tgcalls == nullptr) {
+    delete context;
+    return 0;
+  }
   context->tgcalls->setNetworkType(networkType);
   context->tgcalls->setAudioOutputGainControlEnabled(audioOutputGainControlEnabled);
   context->tgcalls->setEchoCancellationStrength(echoCancellationStrength);
   context->tgcalls->setMuteMicrophone(muteMicrophone);
+  if (isVideoCall && context->videoCapture != nullptr) {
+    context->videoCapture->setState(tgcalls::VideoState::Active);
+  }
 
   return jni::ptr_to_jlong(context);
 }
