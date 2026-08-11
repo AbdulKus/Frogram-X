@@ -69,8 +69,9 @@ import org.thunderdog.challegram.util.EmojiStatusHelper;
 import org.thunderdog.challegram.util.RateLimiter;
 import org.thunderdog.challegram.util.text.TextColorSetOverride;
 import org.thunderdog.challegram.util.text.TextColorSets;
-import org.thunderdog.challegram.voip.gui.CallSettings;
+import org.thunderdog.challegram.voip.VoIPEglContext;
 import org.thunderdog.challegram.voip.annotation.VideoState;
+import org.thunderdog.challegram.voip.gui.CallSettings;
 import org.thunderdog.challegram.widget.AvatarView;
 import org.thunderdog.challegram.widget.EmojiTextView;
 import org.thunderdog.challegram.widget.TextView;
@@ -290,6 +291,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
   private boolean frontCamera = true;
   private @VideoState int remoteVideoState = VideoState.INACTIVE;
   private boolean inPictureInPicture;
+  private boolean localPreviewVisible;
 
   private float lastHeaderFactor;
 
@@ -339,8 +341,18 @@ public class CallController extends ViewController<CallController.Arguments> imp
   @Override
   protected void onBottomInsetChanged (int extraBottomInset, int extraBottomInsetWithoutIme, boolean isImeInset) {
     super.onBottomInsetChanged(extraBottomInset, extraBottomInsetWithoutIme, isImeInset);
-    Views.setPaddingBottom(buttonWrap, extraBottomInset);
-    Views.setPaddingBottom(callControlsLayout, extraBottomInset);
+    if (buttonWrap != null) {
+      ViewGroup.LayoutParams params = buttonWrap.getLayoutParams();
+      int height = Screen.dp(76f) + extraBottomInset;
+      if (params.height != height) {
+        params.height = height;
+        buttonWrap.setLayoutParams(params);
+      }
+      Views.setPaddingBottom(buttonWrap, extraBottomInset);
+    }
+    if (callControlsLayout != null) {
+      Views.setPaddingBottom(callControlsLayout, extraBottomInset);
+    }
   }
 
   @Override
@@ -415,7 +427,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     remoteVideoView = new SurfaceViewRenderer(context);
     remoteVideoView.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
     remoteVideoView.setEnableHardwareScaler(true);
-    remoteVideoView.init(null, null);
+    remoteVideoView.init(VoIPEglContext.getSharedContext(), null);
     remoteVideoView.setVisibility(View.GONE);
     remoteVideoView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     contentView.addView(remoteVideoView);
@@ -449,7 +461,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     localVideoView.setZOrderMediaOverlay(true);
     localVideoView.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
     localVideoView.setEnableHardwareScaler(true);
-    localVideoView.init(null, null);
+    localVideoView.init(VoIPEglContext.getSharedContext(), null);
     localVideoView.setMirror(true);
     localVideoView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     localVideoWrap.addView(localVideoView);
@@ -704,7 +716,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     speakerButtonView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(64f), Screen.dp(72f), Gravity.RIGHT | Gravity.BOTTOM));
 
     buttonWrap = new FrameLayoutFix(context);
-    buttonWrap.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(76f), Gravity.BOTTOM));
+    buttonWrap.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(76f) + extraBottomInset, Gravity.BOTTOM));
     buttonWrap.addView(muteButtonView);
     buttonWrap.addView(videoButtonView);
     buttonWrap.addView(messageButtonView);
@@ -780,7 +792,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
       }
     }
     if (service != null && localVideoView != null && remoteVideoView != null) {
-      service.setVideoSinks(localVideoView, remoteVideoView);
+      service.setVideoSinks(inPictureInPicture ? null : localVideoView, remoteVideoView);
       onVideoStateChanged(service.supportsVideo(), service.isLocalVideoEnabled(), service.getRemoteVideoState(), service.isFrontCamera());
     } else {
       updateVideoUi();
@@ -806,11 +818,12 @@ public class CallController extends ViewController<CallController.Arguments> imp
       return;
     }
     boolean remoteVideoVisible = remoteVideoState != VideoState.INACTIVE;
-    boolean anyVideoVisible = remoteVideoVisible || localVideoEnabled;
+    boolean showLocalPreview = localVideoEnabled && !inPictureInPicture;
+    boolean anyVideoVisible = remoteVideoVisible || showLocalPreview;
 
     remoteVideoView.setVisibility(remoteVideoVisible ? View.VISIBLE : View.GONE);
     remoteVideoStatusView.setVisibility(remoteVideoState == VideoState.PAUSED ? View.VISIBLE : View.GONE);
-    localVideoWrap.setVisibility(localVideoEnabled ? View.VISIBLE : View.GONE);
+    setLocalPreviewVisible(showLocalPreview);
     avatarView.setVisibility(anyVideoVisible ? View.GONE : View.VISIBLE);
     localVideoView.setMirror(frontCamera);
 
@@ -832,6 +845,48 @@ public class CallController extends ViewController<CallController.Arguments> imp
     videoButtonView.setContentDescription(Lang.getString(localVideoEnabled ? R.string.TurnCameraOff : R.string.TurnCameraOn));
     switchCameraButtonView.setVisibility(localVideoEnabled && !inPictureInPicture ? View.VISIBLE : View.GONE);
     applyPictureInPictureUi();
+  }
+
+  private void setLocalPreviewVisible (boolean visible) {
+    if (localPreviewVisible == visible) {
+      return;
+    }
+    localPreviewVisible = visible;
+    localVideoWrap.animate().cancel();
+    if (visible) {
+      localVideoWrap.setVisibility(View.VISIBLE);
+      localVideoWrap.setAlpha(0f);
+      localVideoWrap.setScaleX(.96f);
+      localVideoWrap.setScaleY(.96f);
+      localVideoWrap.animate()
+        .alpha(1f)
+        .scaleX(1f)
+        .scaleY(1f)
+        .setDuration(220l)
+        .setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR)
+        .start();
+    } else if (inPictureInPicture || !isFocused()) {
+      localVideoWrap.setAlpha(1f);
+      localVideoWrap.setScaleX(1f);
+      localVideoWrap.setScaleY(1f);
+      localVideoWrap.setVisibility(View.GONE);
+    } else {
+      localVideoWrap.animate()
+        .alpha(0f)
+        .scaleX(.96f)
+        .scaleY(.96f)
+        .setDuration(150l)
+        .setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR)
+        .withEndAction(() -> {
+          if (!localPreviewVisible) {
+            localVideoWrap.setVisibility(View.GONE);
+            localVideoWrap.setAlpha(1f);
+            localVideoWrap.setScaleX(1f);
+            localVideoWrap.setScaleY(1f);
+          }
+        })
+        .start();
+    }
   }
 
   private void applyPictureInPictureUi () {
@@ -875,6 +930,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     this.inPictureInPicture = inPictureInPicture;
     if (boundVideoService != null) {
       boundVideoService.setVideoPaused(false);
+      boundVideoService.setVideoSinks(inPictureInPicture ? null : localVideoView, remoteVideoView);
     }
     updateVideoUi();
   }
@@ -1071,6 +1127,24 @@ public class CallController extends ViewController<CallController.Arguments> imp
       }
     } else if (viewId == R.id.btn_call_switch_camera) {
       if (!TD.isFinished(call)) {
+        switchCameraButtonView.animate().cancel();
+        switchCameraButtonView.animate()
+          .rotationBy(180f)
+          .setDuration(260l)
+          .setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR)
+          .start();
+        localVideoWrap.animate().cancel();
+        localVideoWrap.animate()
+          .scaleX(.97f)
+          .scaleY(.97f)
+          .setDuration(120l)
+          .withEndAction(() -> localVideoWrap.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(160l)
+            .setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR)
+            .start())
+          .start();
         bindVideoService();
         if (boundVideoService != null) {
           boundVideoService.switchCamera();
@@ -1365,7 +1439,8 @@ public class CallController extends ViewController<CallController.Arguments> imp
     final int viewHeightSmall = emojiViewSmall.getMeasuredHeight();
 
     final int startLeft = parentWidth - viewWidthSmall;
-    final int startTop = Screen.dp(42f) - emojiViewSmall.getPaddingTop();
+    final int startMargin = Math.max(Screen.dp(18f) + Screen.getStatusBarHeight(), Screen.dp(42f));
+    final int startTop = startMargin - emojiViewSmall.getPaddingTop();
 
     final int fromCenterX = startLeft + viewWidthSmall / 2;
     final int fromCenterY = startTop + viewHeightSmall / 2;

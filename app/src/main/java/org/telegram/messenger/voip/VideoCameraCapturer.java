@@ -11,6 +11,7 @@ import android.content.Context;
 import androidx.annotation.Keep;
 
 import org.thunderdog.challegram.Log;
+import org.thunderdog.challegram.voip.VoIPEglContext;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
 import org.webrtc.CameraEnumerator;
@@ -101,7 +102,7 @@ public final class VideoCameraCapturer {
       return;
     }
 
-    surfaceTextureHelper = SurfaceTextureHelper.create("FrogramVideoCamera", null);
+    surfaceTextureHelper = SurfaceTextureHelper.create("FrogramVideoCamera", VoIPEglContext.getSharedContext());
     if (surfaceTextureHelper == null) {
       Log.e(Log.TAG_VOIP, "Video camera initialization failed: EGL surface is unavailable");
       capturer.dispose();
