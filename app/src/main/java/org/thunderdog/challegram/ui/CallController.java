@@ -1010,6 +1010,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     emojiViewSmall.setVisibility(visibility);
     emojiViewBig.setVisibility(visibility);
     emojiViewHint.setVisibility(visibility);
+    remoteVideoView.setScalingType(inPictureInPicture ? RendererCommon.ScalingType.SCALE_ASPECT_FIT : RendererCommon.ScalingType.SCALE_ASPECT_FILL);
     if (!inPictureInPicture) {
       updateControlsAlpha();
     }
@@ -1025,7 +1026,7 @@ public class CallController extends ViewController<CallController.Arguments> imp
     }
     try {
       PictureInPictureParams params = new PictureInPictureParams.Builder()
-        .setAspectRatio(new Rational(3, 4))
+        .setAspectRatio(new Rational(16, 9))
         .build();
       return context().enterPictureInPictureMode(params);
     } catch (Throwable t) {
@@ -1068,8 +1069,8 @@ public class CallController extends ViewController<CallController.Arguments> imp
   }
 
   @Override
-  public void onCallAccept (TdApi.Call call) {
-    tdlib.context().calls().acceptCall(context(), tdlib, call.id);
+  public void onCallAccept (TdApi.Call call, boolean withVideo) {
+    tdlib.context().calls().acceptCall(context(), tdlib, call.id, withVideo);
   }
 
   @Override
@@ -1379,15 +1380,17 @@ public class CallController extends ViewController<CallController.Arguments> imp
     updateLoop();
     String str;
     callDuration = tdlib.context().calls().getCallDuration(tdlib, call.id);
-    if (previousCallState != null && call.state.getConstructor() == TdApi.CallStateHangingUp.CONSTRUCTOR) {
+    if (!call.isOutgoing && call.isVideo && call.state.getConstructor() == TdApi.CallStatePending.CONSTRUCTOR) {
+      str = Lang.getString(R.string.IncomingVideoCall);
+    } else if (previousCallState != null && call.state.getConstructor() == TdApi.CallStateHangingUp.CONSTRUCTOR) {
       str = TD.getCallState2(call, previousCallState, callDuration, false);
     } else {
       str = TD.getCallState(call, callDuration, false);
-      if (!call.isOutgoing && call.state.getConstructor() == TdApi.CallStatePending.CONSTRUCTOR && tdlib.context().isMultiUser()) {
-        String longName = tdlib.accountLongName();
-        if (longName != null) {
-          str = str + "\n" + Lang.getString(R.string.VoipAnsweringAsAccount, longName);
-        }
+    }
+    if (!call.isOutgoing && call.state.getConstructor() == TdApi.CallStatePending.CONSTRUCTOR && tdlib.context().isMultiUser()) {
+      String longName = tdlib.accountLongName();
+      if (longName != null) {
+        str = str + "\n" + Lang.getString(R.string.VoipAnsweringAsAccount, longName);
       }
     }
     stateView.setText(str.toUpperCase());

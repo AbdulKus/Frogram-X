@@ -470,7 +470,6 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
   env->ReleaseByteArrayElements(jEncryptionKey, (jbyte *) jEncryptionKeyData, JNI_ABORT);
 
   bool isOutgoingCall = configuration.getBoolean("isOutgoing") == JNI_TRUE;
-  bool isVideoCall = configuration.getBoolean("isVideo") == JNI_TRUE;
 
   // tgcalls::Endpoint
 
@@ -633,7 +632,9 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
       std::move(encryptionKey),
       isOutgoingCall
     ),
-    .videoCapture = isVideoCall ? videoCapture : nullptr,
+    // Attach the camera only after Java has installed the EGL-backed sinks.
+    // Starting capture inside Meta::Create raced the first direct video call.
+    .videoCapture = nullptr,
     .stateUpdated = [javaController](tgcalls::State state) {
       javaController->runSafely([javaController, state](JNIEnv *env) {
         jint javaState = toJavaCallState(env, state);
@@ -689,7 +690,7 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
   auto *context = new TgCallsContext;
   context->javaController = javaController;
   context->videoCapture = videoCapture;
-  context->videoEnabled = isVideoCall;
+  context->videoEnabled = false;
   context->tgcalls = tgcalls::Meta::Create(version, std::move(descriptor));
   if (context->tgcalls == nullptr) {
     delete context;
@@ -699,10 +700,6 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
   context->tgcalls->setAudioOutputGainControlEnabled(audioOutputGainControlEnabled);
   context->tgcalls->setEchoCancellationStrength(echoCancellationStrength);
   context->tgcalls->setMuteMicrophone(muteMicrophone);
-  if (isVideoCall && context->videoCapture != nullptr) {
-    context->videoCapture->setState(tgcalls::VideoState::Active);
-  }
-
   return jni::ptr_to_jlong(context);
 }
 
@@ -797,8 +794,8 @@ JNI_OBJECT_FUNC(void, voip_TgCallsController, nativeSetVideoEnabled, jlong ptr, 
   }
   context->videoEnabled = enabled;
   if (enabled) {
-    context->videoCapture->setState(tgcalls::VideoState::Active);
     context->tgcalls->setVideoCapture(context->videoCapture);
+    context->videoCapture->setState(tgcalls::VideoState::Active);
   } else {
     context->tgcalls->setVideoCapture(nullptr);
     context->videoCapture->setState(tgcalls::VideoState::Inactive);

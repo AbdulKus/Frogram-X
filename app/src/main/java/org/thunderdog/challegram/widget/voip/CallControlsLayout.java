@@ -27,6 +27,7 @@ import androidx.annotation.Nullable;
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.R;
 import org.thunderdog.challegram.component.preview.FlingDetector;
+import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.tool.Screen;
@@ -44,9 +45,11 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
   private static final float CALL_BUTTON_SIZE = 70.5f;
   private static final float CALL_BUTTON_MARGIN = 24f;
   private static final float CALL_BUTTON_BOTTOM_MARGIN = 70.5f;
+  private static final float AUDIO_ANSWER_BUTTON_SIZE = 58f;
+  private static final float AUDIO_ANSWER_BUTTON_BOTTOM_MARGIN = CALL_BUTTON_BOTTOM_MARGIN + CALL_BUTTON_SIZE + 18f;
 
   public interface CallControlCallback {
-    void onCallAccept (TdApi.Call call);
+    void onCallAccept (TdApi.Call call, boolean withVideo);
     void onCallDecline (TdApi.Call call, boolean isHangUp);
     void onCallRestart (TdApi.Call call);
     void onCallClose (TdApi.Call call);
@@ -75,6 +78,7 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
 
   private SlideHintView slideHintView;
   private CircleButton acceptButton;
+  private CircleButton audioAcceptButton;
   private CircleButton declineButton;
   private CircleButton closeButton;
   private FlingDetector flingDetector;
@@ -139,6 +143,22 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
     declineButton.setLayoutParams(params);
     declineButton.setOnClickListener(this);
     addView(declineButton);
+
+    params = FrameLayoutFix.newParams(
+      Screen.dp(AUDIO_ANSWER_BUTTON_SIZE) + buttonPadding * 2,
+      Screen.dp(AUDIO_ANSWER_BUTTON_SIZE) + buttonPadding * 2,
+      Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL
+    );
+    params.bottomMargin = Screen.dp(AUDIO_ANSWER_BUTTON_BOTTOM_MARGIN);
+
+    audioAcceptButton = new CircleButton(context);
+    audioAcceptButton.init(R.drawable.baseline_call_24, AUDIO_ANSWER_BUTTON_SIZE, CALL_BUTTON_PADDING, ColorId.circleButtonPositive, ColorId.circleButtonPositiveIcon);
+    audioAcceptButton.setBottomText(Lang.getString(R.string.AnswerWithoutVideo));
+    audioAcceptButton.setContentDescription(Lang.getString(R.string.AnswerWithoutVideo));
+    audioAcceptButton.setLayoutParams(params);
+    audioAcceptButton.setIsHidden(true, false);
+    audioAcceptButton.setOnClickListener(this);
+    addView(audioAcceptButton);
   }
 
   public void setCallback (@Nullable CallControlCallback callback) {
@@ -162,6 +182,11 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
     final boolean acceptVisible;
     final boolean declineVisible;
     final boolean closeVisible;
+    final boolean incomingVideoCall = isIncomingVideoCall();
+
+    acceptButton.setIcon(incomingVideoCall ? R.drawable.baseline_videocam_24 : R.drawable.baseline_phone_36);
+    acceptButton.setBottomText(incomingVideoCall ? Lang.getString(R.string.AnswerWithVideo) : null);
+    acceptButton.setContentDescription(Lang.getString(incomingVideoCall ? R.string.AnswerWithVideo : R.string.AnswerCall));
 
     switch (call.state.getConstructor()) {
       case TdApi.CallStatePending.CONSTRUCTOR: {
@@ -245,6 +270,7 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
 
     declineButton.setIsHidden(!declineVisible, animated);
     acceptButton.setIsHidden(!acceptVisible, animated);
+    audioAcceptButton.setIsHidden(!incomingVideoCall, animated);
 
     setCloseVisible(closeVisible, animated);
 
@@ -259,6 +285,10 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
     if (callback == null || call == null) {
       return;
     }
+    if (v == audioAcceptButton) {
+      callback.onCallAccept(call, false);
+      return;
+    }
     final int viewId = v.getId();
     if (viewId == R.id.btn_acceptOrHangCall) {
       switch (call.state.getConstructor()) {
@@ -270,7 +300,7 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
           if (call.isOutgoing) {
             callback.onCallDecline(call, false);
           } else {
-            callback.onCallAccept(call);
+            callback.onCallAccept(call, true);
           }
           break;
         default:
@@ -308,6 +338,17 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
 
   @Override
   public boolean onInterceptTouchEvent (MotionEvent ev) {
+    if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
+      audioAnswerTouch = isIncomingVideoCall() &&
+        ev.getX() >= audioAcceptButton.getLeft() && ev.getX() <= audioAcceptButton.getRight() &&
+        ev.getY() >= audioAcceptButton.getTop() && ev.getY() <= audioAcceptButton.getBottom();
+    }
+    if (audioAnswerTouch) {
+      if (ev.getActionMasked() == MotionEvent.ACTION_UP || ev.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+        audioAnswerTouch = false;
+      }
+      return false;
+    }
     return inSlideMode;
   }
 
@@ -323,6 +364,11 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
 
   private float startX;
   private int slideMode;
+  private boolean audioAnswerTouch;
+
+  private boolean isIncomingVideoCall () {
+    return call != null && call.isVideo && !call.isOutgoing && call.state.getConstructor() == TdApi.CallStatePending.CONSTRUCTOR;
+  }
 
   private void setSlideMode (int mode, boolean animated) {
     setSlideMode(mode, false, SLIDE_MODE_NONE, animated);
@@ -335,6 +381,7 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
       getParent().requestDisallowInterceptTouchEvent(mode != SLIDE_MODE_NONE);
       declineButton.setIsDragging(mode == SLIDE_MODE_DECLINE);
       acceptButton.setIsDragging(mode == SLIDE_MODE_ACCEPT);
+      audioAcceptButton.setIsHidden(mode != SLIDE_MODE_NONE || !isIncomingVideoCall(), animated);
 
       boolean needReturnButtons = true;
       if (oldSlideMode != SLIDE_MODE_NONE) {
@@ -343,7 +390,7 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
           setTransform(1f, forceSlideMode - 1, animated);
           if (callback != null && call != null) {
             if (forceSlideMode == SLIDE_MODE_ACCEPT) {
-              callback.onCallAccept(call);
+              callback.onCallAccept(call, true);
             } else if (forceSlideMode == SLIDE_MODE_DECLINE) {
               callback.onCallDecline(call, false);
             }
@@ -354,7 +401,7 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
           setTransform(1f, oldSlideMode - 1, animated);
           if (callback != null && call != null) {
             if (oldSlideMode == SLIDE_MODE_ACCEPT) {
-              callback.onCallAccept(call);
+              callback.onCallAccept(call, true);
             } else if (oldSlideMode == SLIDE_MODE_DECLINE) {
               callback.onCallDecline(call, false);
             }
