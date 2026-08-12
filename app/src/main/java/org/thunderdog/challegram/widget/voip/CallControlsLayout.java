@@ -153,7 +153,6 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
 
     audioAcceptButton = new CircleButton(context);
     audioAcceptButton.init(R.drawable.baseline_call_24, AUDIO_ANSWER_BUTTON_SIZE, CALL_BUTTON_PADDING, ColorId.circleButtonPositive, ColorId.circleButtonPositiveIcon);
-    audioAcceptButton.setBottomText(Lang.getString(R.string.AnswerWithoutVideo));
     audioAcceptButton.setContentDescription(Lang.getString(R.string.AnswerWithoutVideo));
     audioAcceptButton.setLayoutParams(params);
     audioAcceptButton.setIsHidden(true, false);
@@ -185,7 +184,7 @@ public class CallControlsLayout extends FrameLayoutFix implements View.OnClickLi
     final boolean incomingVideoCall = isIncomingVideoCall();
 
     acceptButton.setIcon(incomingVideoCall ? R.drawable.baseline_videocam_24 : R.drawable.baseline_phone_36);
-    acceptButton.setBottomText(incomingVideoCall ? Lang.getString(R.string.AnswerWithVideo) : null);
+    acceptButton.setBottomText(null);
     acceptButton.setContentDescription(Lang.getString(incomingVideoCall ? R.string.AnswerWithVideo : R.string.AnswerCall));
 
     switch (call.state.getConstructor()) {

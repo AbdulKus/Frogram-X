@@ -409,6 +409,7 @@ struct TgCallsContext {
   std::shared_ptr<tgcalls::VideoCaptureInterface> videoCapture;
   std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>> localVideoSink;
   std::shared_ptr<rtc::VideoSinkInterface<webrtc::VideoFrame>> remoteVideoSink;
+  bool videoCaptureAttached = false;
   bool videoEnabled = false;
   bool frontCamera = true;
 };
@@ -692,6 +693,7 @@ JNI_OBJECT_FUNC(jlong, voip_TgCallsController, newInstance,
   auto *context = new TgCallsContext;
   context->javaController = javaController;
   context->videoCapture = videoCapture;
+  context->videoCaptureAttached = isVideoCall && videoCapture != nullptr;
   context->videoEnabled = false;
   context->tgcalls = tgcalls::Meta::Create(version, std::move(descriptor));
   if (context->tgcalls == nullptr) {
@@ -796,10 +798,16 @@ JNI_OBJECT_FUNC(void, voip_TgCallsController, nativeSetVideoEnabled, jlong ptr, 
   }
   context->videoEnabled = enabled;
   if (enabled) {
-    context->tgcalls->setVideoCapture(context->videoCapture);
+    if (!context->videoCaptureAttached) {
+      context->tgcalls->setVideoCapture(context->videoCapture);
+      context->videoCaptureAttached = true;
+    }
     context->videoCapture->setState(tgcalls::VideoState::Active);
   } else {
-    context->tgcalls->setVideoCapture(nullptr);
+    if (context->videoCaptureAttached) {
+      context->tgcalls->setVideoCapture(nullptr);
+      context->videoCaptureAttached = false;
+    }
     context->videoCapture->setState(tgcalls::VideoState::Inactive);
   }
 }
