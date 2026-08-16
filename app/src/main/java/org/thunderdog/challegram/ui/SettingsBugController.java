@@ -435,8 +435,75 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
     }
   }
 
+  private String getPushRegistrationSummary () {
+    if (tdlib == null) {
+      return "Unavailable";
+    }
+    int total = 0;
+    int registered = 0;
+    for (TdlibAccount account : tdlib.context()) {
+      int mode = account.tdlibInstanceMode();
+      if (mode == Tdlib.Mode.NORMAL || mode == Tdlib.Mode.DEBUG) {
+        total++;
+        if (account.isDeviceRegistered()) {
+          registered++;
+        }
+      }
+    }
+    return total == 0 ? "No authorized accounts" : registered + "/" + total + " registered";
+  }
+
+  private String getPushTokenStateSummary () {
+    if (tdlib == null) {
+      return "Unavailable";
+    }
+    switch (tdlib.context().getTokenState()) {
+      case TdlibManager.TokenState.ERROR:
+        return "ERROR" + (!StringUtils.isEmpty(tdlib.context().getTokenError()) ? ": " + tdlib.context().getTokenError() : "");
+      case TdlibManager.TokenState.INITIALIZING:
+        return "INITIALIZING";
+      case TdlibManager.TokenState.OK: {
+        TdApi.DeviceToken token = tdlib.context().getToken();
+        return "OK (" + (token != null ? token.getClass().getSimpleName() : "null") + ")";
+      }
+      case TdlibManager.TokenState.NONE:
+      default:
+        return "NONE";
+    }
+  }
+
+  private String buildPushDiagnosticsReport () {
+    tgx.bridge.PushDiagnostics.initialize(context);
+    Settings settings = Settings.instance();
+    StringBuilder b = new StringBuilder();
+    b.append("Frogram X push diagnostics\n");
+    b.append("App: ").append(BuildConfig.VERSION_NAME).append(" (").append(BuildConfig.VERSION_CODE).append(")\n");
+    b.append("Package: ").append(context.getPackageName()).append('\n');
+    b.append("Token state: ").append(getPushTokenStateSummary()).append('\n');
+    b.append("TDLib registration: ").append(getPushRegistrationSummary()).append('\n');
+    b.append("Packages received: ").append(settings.getPushMessageStats()).append('\n');
+
+    long receivedTime = settings.getLastReceivedPushMessageReceivedTime();
+    b.append("Last push received: ");
+    b.append(receivedTime != 0 ? Lang.getTimestamp(receivedTime, TimeUnit.MILLISECONDS) : "No data");
+    b.append('\n');
+
+    long sentTime = settings.getLastReceivedPushMessageSentTime();
+    if (receivedTime != 0 && sentTime != 0) {
+      b.append("Last push delay: ").append(receivedTime - sentTime).append(" ms\n");
+    }
+    b.append("Last push TTL: ").append(settings.getLastReceivedPushMessageTtl()).append('\n');
+    b.append("Push service: ").append(TdlibNotificationUtils.getDeviceTokenRetriever().name).append('\n');
+    b.append("App fingerprint: ").append(U.getApkFingerprint("SHA1")).append("\n\n");
+    b.append(tgx.bridge.PushDiagnostics.report());
+    return b.toString();
+  }
+
   @Override
   protected void onCreateView (Context context, CustomRecyclerView recyclerView) {
+    if (section == Section.PUSH) {
+      tgx.bridge.PushDiagnostics.initialize(context);
+    }
     checkLogSize(false);
     checkLogSize(true);
 
@@ -525,6 +592,11 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
           view.setData(!StringUtils.isEmpty(configuration) ? configuration : "Unavailable");
         } else if (itemId == R.id.btn_secret_appFingerprint) {
           view.setData(U.getApkFingerprint("SHA1"));
+        } else if (itemId == R.id.btn_secret_pushRegistration) {
+          view.setData(getPushRegistrationSummary());
+        } else if (itemId == R.id.btn_secret_pushDiagnostics) {
+          tgx.bridge.PushDiagnostics.initialize(context);
+          view.setData(tgx.bridge.PushDiagnostics.summary());
         } else if (itemId == R.id.btn_secret_pushStats) {
           view.setData(Settings.instance().getPushMessageStats());
         } else if (itemId == R.id.btn_secret_pushDate) {
@@ -723,6 +795,8 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
         }
         items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_secret_pushToken, 0, "Token", false));
         items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+        items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_secret_pushRegistration, 0, "TDLib registration", false));
+        items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
         items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_secret_pushStats, 0, "Packages received", false));
         items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
         items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_secret_pushDate, 0, "Last received on", false));
@@ -734,7 +808,19 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
         items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_secret_pushConfig, 0, "Configuration", false));
         items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
         items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_secret_appFingerprint, 0, "App fingerprint", false));
+        items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+        items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_secret_pushDiagnostics, 0, "Diagnostic history", false));
         items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
+
+        items.add(new ListItem(ListItem.TYPE_HEADER, 0, 0, "Diagnostics", false));
+        items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
+        items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_secret_pushRetry, 0, "Check & re-register push", false));
+        items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+        items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_secret_pushCopy, 0, "Copy full diagnostics", false));
+        items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+        items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_secret_pushClear, 0, "Clear diagnostic history", false));
+        items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
+        items.add(new ListItem(ListItem.TYPE_DESCRIPTION, 0, 0, "History is stored locally. Message payloads and full push tokens are not saved.", false));
         break;
       }
       case Section.EXPERIMENTS: {
@@ -1044,6 +1130,8 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
   public void onTokenStateChanged (int newState, @Nullable String error, @Nullable Throwable fullError) {
     runOnUiThreadOptional(() -> {
       adapter.updateValuedSettingById(R.id.btn_secret_pushToken);
+      adapter.updateValuedSettingById(R.id.btn_secret_pushRegistration);
+      adapter.updateValuedSettingById(R.id.btn_secret_pushDiagnostics);
     });
   }
 
@@ -1054,6 +1142,8 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
       adapter.updateValuedSettingById(R.id.btn_secret_pushDate);
       adapter.updateValuedSettingById(R.id.btn_secret_pushDuration);
       adapter.updateValuedSettingById(R.id.btn_secret_pushTtl);
+      adapter.updateValuedSettingById(R.id.btn_secret_pushRegistration);
+      adapter.updateValuedSettingById(R.id.btn_secret_pushDiagnostics);
     });
   }
 
@@ -1201,6 +1291,25 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
       UI.copyText(U.getApkFingerprint("SHA1"), R.string.CopiedText);
     } else if (viewId == R.id.btn_secret_pushStats) {
       UI.copyText(Settings.instance().getPushMessageStats(), R.string.CopiedText);
+    } else if (viewId == R.id.btn_secret_pushDiagnostics || viewId == R.id.btn_secret_pushCopy) {
+      UI.copyText(buildPushDiagnosticsReport(), R.string.CopiedText);
+    } else if (viewId == R.id.btn_secret_pushRetry) {
+      tgx.bridge.PushDiagnostics.initialize(context);
+      tgx.bridge.PushDiagnostics.record("manual_reregister", "requested from Push Services");
+      adapter.updateValuedSettingById(R.id.btn_secret_pushDiagnostics);
+      tdlib.context().forceReregisterDeviceToken(success -> runOnUiThreadOptional(() -> {
+        if (adapter != null) {
+          adapter.updateValuedSettingById(R.id.btn_secret_pushToken);
+          adapter.updateValuedSettingById(R.id.btn_secret_pushRegistration);
+          adapter.updateValuedSettingById(R.id.btn_secret_pushDiagnostics);
+        }
+        UI.showToast(success ? "Push re-registration completed" : "Push re-registration failed. See diagnostics.", Toast.LENGTH_SHORT);
+      }));
+    } else if (viewId == R.id.btn_secret_pushClear) {
+      tgx.bridge.PushDiagnostics.initialize(context);
+      tgx.bridge.PushDiagnostics.clear();
+      adapter.updateValuedSettingById(R.id.btn_secret_pushDiagnostics);
+      UI.showToast("Push diagnostic history cleared", Toast.LENGTH_SHORT);
     } else if (viewId == R.id.btn_secret_tgcalls || viewId == R.id.btn_secret_tgcallsOptions) {
       SettingsWrapBuilder builder = new SettingsWrapBuilder(viewId);
       List<ListItem> items = new ArrayList<>();

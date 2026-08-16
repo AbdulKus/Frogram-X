@@ -1657,6 +1657,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
       this.tokenState = newState;
       this.tokenError = error;
       this.tokenFullError = fullError;
+      tgx.bridge.PushDiagnostics.record("token_state", "state=" + newState + (!StringUtils.isEmpty(error) ? ", error=" + error : ""));
       for (TdlibAccount account : accountsQueue(loggedOutFilter())) {
         if (account.launch(false)) {
           account.tdlib().checkConnectionParams();
@@ -1709,6 +1710,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     if (!Td.equalsTo(this.token, token)) {
       Settings.instance().setDeviceToken(token);
       this.token = token;
+      tgx.bridge.PushDiagnostics.record("token_changed", "type=" + (token != null ? token.getClass().getSimpleName() : "null"));
       setTokenState(TokenState.OK);
       dispatchDeviceToken(token);
     }
@@ -1718,6 +1720,26 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
 
   public void checkDeviceToken () {
     checkDeviceToken(null);
+  }
+
+  public synchronized void forceReregisterDeviceToken (@Nullable RunnableBool after) {
+    tgx.bridge.PushDiagnostics.record("manual_reregister", "resetting local device registration");
+    for (TdlibAccount account : this) {
+      final @Tdlib.Mode int mode = account.tdlibInstanceMode();
+      if (mode == Tdlib.Mode.NORMAL || mode == Tdlib.Mode.DEBUG) {
+        setDeviceRegistered(account.id, false);
+      }
+    }
+    this.token = null;
+    this.tokenState = TokenState.NONE;
+    this.tokenError = null;
+    this.tokenFullError = null;
+    checkDeviceToken(3, success -> {
+      tgx.bridge.PushDiagnostics.record("manual_reregister_result", success ? "success" : "failed");
+      if (after != null) {
+        after.runWithBool(success);
+      }
+    });
   }
 
   public void checkDeviceToken (@Nullable RunnableBool after) {

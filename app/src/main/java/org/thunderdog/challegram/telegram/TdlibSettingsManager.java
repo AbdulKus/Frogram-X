@@ -644,6 +644,7 @@ public class TdlibSettingsManager implements CleanupStartupDelegate {
       pmc.remove(key(DEVICE_OTHER_UID_KEY, accountId));
     }
     pmc.apply();
+    tgx.bridge.PushDiagnostics.record("tdlib_device_registered", "accountId=" + accountId + ", userKnown=" + (userId != 0));
   }
 
   public static boolean checkRegisteredDeviceToken (int accountId, long userId, TdApi.DeviceToken token, long[] otherUserIds, boolean skipOtherUserIdsCheck) {
@@ -662,6 +663,7 @@ public class TdlibSettingsManager implements CleanupStartupDelegate {
       .remove(key(DEVICE_OTHER_UID_KEY, accountId))
       .remove(key(DEVICE_TDLIB_VERSION2_KEY, accountId))
       .apply();
+    tgx.bridge.PushDiagnostics.record("tdlib_device_unregistered", "accountId=" + accountId);
   }
 
   private long nextLocalChatId () {
