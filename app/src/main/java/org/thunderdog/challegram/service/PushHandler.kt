@@ -7,15 +7,17 @@ import org.thunderdog.challegram.TDLib
 import org.thunderdog.challegram.telegram.TdlibManager
 import org.thunderdog.challegram.tool.UI
 import org.thunderdog.challegram.unsorted.Settings
+import tgx.bridge.PushDiagnostics
 import tgx.bridge.PushManager
 import tgx.td.stringify
 
 class PushHandler : PushManager {
   override fun onNewToken(service: Service, token: TdApi.DeviceToken) {
     UI.initApp(service.applicationContext)
-    log("onNewToken %s, sending to all accounts", token)
+    log("onNewToken type=%s, sending to all accounts", token.javaClass.simpleName)
     TdlibManager.instance().runWithWakeLock { manager ->
       manager.setDeviceToken(token)
+      PushDiagnostics.record("token_sent_to_tdlib_manager", "type=${token.javaClass.simpleName}")
     }
   }
 
@@ -23,6 +25,7 @@ class PushHandler : PushManager {
     UI.initApp(service.applicationContext)
     val pushId = Settings.instance().newPushId()
 
+    PushDiagnostics.record(service, "push_processor_start", "pushId=$pushId, ttl=$ttl")
     val payload = stringify(message)
 
     val pushProcessor = PushProcessor(service)
