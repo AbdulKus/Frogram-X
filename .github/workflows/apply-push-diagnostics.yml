@@ -1,0 +1,42 @@
+name: Apply push diagnostics UI patch
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-push-diagnostics.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Patch hidden Push Services diagnostics
+        run: |
+          set -euo pipefail
+          python3 .github/apply_push_diagnostics.py
+          git diff --check
+          grep -q 'btn_secret_pushRetry' app/src/main/java/org/thunderdog/challegram/ui/SettingsBugController.java
+          grep -q 'forceReregisterDeviceToken' app/src/main/java/org/thunderdog/challegram/telegram/TdlibManager.java
+
+      - name: Commit patch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/apply_push_diagnostics.py
+          git add \
+            app/src/main/java/org/thunderdog/challegram/telegram/TdlibManager.java \
+            app/src/main/java/org/thunderdog/challegram/telegram/TdlibSettingsManager.java \
+            app/src/main/java/org/thunderdog/challegram/ui/SettingsBugController.java \
+            app/src/main/res/values/ids.xml
+          git commit -m "Add Push Services diagnostic controls [skip ci]"
+          git push origin HEAD:main
