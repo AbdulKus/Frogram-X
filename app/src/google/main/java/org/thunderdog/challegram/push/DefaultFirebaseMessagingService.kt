@@ -6,6 +6,7 @@ import org.thunderdog.challegram.TDLib
 import org.thunderdog.challegram.telegram.TdlibAccount
 import org.thunderdog.challegram.telegram.TdlibManager
 import org.thunderdog.challegram.tool.UI
+import tgx.bridge.PushDiagnostics
 import tgx.bridge.PushManagerBridge
 
 abstract class DefaultFirebaseMessagingService : FirebaseMessagingService() {
@@ -18,6 +19,7 @@ abstract class DefaultFirebaseMessagingService : FirebaseMessagingService() {
   }
 
   override fun onDeletedMessages() {
+    PushDiagnostics.record(this, "fcm_deleted_messages", "FCM deleted pending messages; requesting full sync")
     UI.initApp(applicationContext)
     TDLib.Tag.notifications("onDeletedMessages: performing sync for all accounts")
     TdlibManager.makeSync(applicationContext, TdlibAccount.NO_ID, TdlibManager.SYNC_CAUSE_DELETED_MESSAGES, 0, !TdlibManager.inUiThread(), 0)
