@@ -53,7 +53,7 @@ public final class AppUpdateDialog implements AppUpdater.Listener {
     content.setPadding(Screen.dp(24), Screen.dp(8), Screen.dp(24), 0);
     TextView notes = new TextView(activity);
     notes.setTextSize(15);
-    notes.setTextColor(Theme.textColor());
+    notes.setTextColor(Theme.textAccentColor());
     notes.setLinkTextColor(Theme.progressColor());
     notes.setLineSpacing(Screen.dp(3), 1);
     notes.setMovementMethod(LinkMovementMethod.getInstance());
