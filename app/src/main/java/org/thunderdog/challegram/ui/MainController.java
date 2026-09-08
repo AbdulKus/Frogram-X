@@ -373,8 +373,8 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     checkMargins();
 
     context().appUpdater().addListener(this);
-    if (context().appUpdater().state() == AppUpdater.State.READY_TO_INSTALL) {
-      onAppUpdateAvailable(context().appUpdater().flowType() == AppUpdater.FlowType.TELEGRAM_CHANNEL, true);
+    if (context().appUpdater().state() == AppUpdater.State.AVAILABLE || context().appUpdater().state() == AppUpdater.State.READY_TO_INSTALL) {
+      onAppUpdateAvailable(true, true);
     }
   }
 
@@ -1066,6 +1066,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   private SnackBar updateSnackBar;
 
   private void onAppUpdateAvailable (boolean isApk, boolean immediate) {
+    if (!context().appUpdater().shouldShowUpdateNotice()) return;
     if (updateSnackBar == null) {
       updateSnackBar = new SnackBar(context);
       Views.setPaddingBottom(updateSnackBar, extraBottomInsetWithoutIme);
@@ -1102,16 +1103,18 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
         }
       });
       updateSnackBar.addThemeListeners(this);
-      updateSnackBar.setText(Lang.getString(R.string.AppUpdateReady));
       mainWrap.addView(updateSnackBar);
     }
-    updateSnackBar.setAction(Lang.getString(isApk ? R.string.AppUpdateInstall : R.string.AppUpdateRestart), context().appUpdater()::installUpdate, !isApk);
+    boolean ready = context().appUpdater().state() == AppUpdater.State.READY_TO_INSTALL;
+    updateSnackBar.setText(Lang.getString(ready ? R.string.FrogramUpdateReady : R.string.FrogramUpdateAvailable));
+    updateSnackBar.setAction(Lang.getString(ready ? R.string.FrogramUpdateInstall : R.string.FrogramWhatsNew),
+      ready ? context().appUpdater()::installUpdate : context().appUpdater()::showUpdateDetails, true);
     updateSnackBar.showSnackBar(!immediate && isFocused());
   }
 
   @Override
   public void onAppUpdateStateChanged (int state, int oldState, boolean isApk) {
-    if (state == AppUpdater.State.READY_TO_INSTALL) {
+    if ((state == AppUpdater.State.AVAILABLE || state == AppUpdater.State.READY_TO_INSTALL) && context().appUpdater().shouldShowUpdateNotice()) {
       onAppUpdateAvailable(isApk, false);
     } else if (updateSnackBar != null) {
       updateSnackBar.dismissSnackBar(isFocused());

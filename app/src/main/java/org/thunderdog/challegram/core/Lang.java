@@ -265,7 +265,16 @@ public class Lang {
         resId != R.string.DoubleBottomNotificationsGeneric && resId != R.string.DoubleBottomNotificationsAll &&
         resId != R.string.DoubleBottomGenericNotification && resId != R.string.DoubleBottomChangeHiddenPasscode &&
         resId != R.string.DoubleBottomUnsupportedPasscode && resId != R.string.PasscodeNotificationsInfo &&
-        resId != R.string.PasscodeNotificationActions) {
+        resId != R.string.PasscodeNotificationActions &&
+        resId != R.string.FrogramUpdates && resId != R.string.FrogramAutoCheckUpdates &&
+        resId != R.string.FrogramInstalledVersion && resId != R.string.FrogramUpdateAvailable &&
+        resId != R.string.FrogramWhatsNew && resId != R.string.FrogramUpdateDownload &&
+        resId != R.string.FrogramUpdateInstall && resId != R.string.FrogramUpdateLater &&
+        resId != R.string.FrogramUpdateReady && resId != R.string.FrogramUpdateVerifying &&
+        resId != R.string.FrogramUpToDate && resId != R.string.FrogramNoReleaseNotes &&
+        resId != R.string.FrogramUpdateCheckFailed && resId != R.string.FrogramUpdateDownloadFailed &&
+        resId != R.string.FrogramUpdateInvalidFile && resId != R.string.FrogramUpdateSignatureMismatch &&
+        resId != R.string.FrogramUpdateInstallFailed) {
       return null;
     }
     Context context = UI.getAppContext();

@@ -19,15 +19,36 @@ permissions:
 env:
   APP_ID: org.frogram.messenger
   APP_NAME: Frogram X
-  APP_DOWNLOAD_URL: https://github.com/${{ github.repository }}/actions
+  APP_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases
   APP_SOURCES_URL: https://github.com/${{ github.repository }}
   TGX_BUILD_FLAVORS: latest
   TGX_BUILD_ABIS: arm64-v8a
   TERM: xterm
 
 jobs:
+  update-tests:
+    name: Update metadata tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Test APK manifest and release selection
+        run: |
+          python3 -B -m unittest discover -s tests/updates -p 'test_*.py'
+          curl --fail --silent --show-error --location --retry 3 \
+            https://repo.maven.apache.org/maven2/org/json/json/20250517/json-20250517.jar -o "$RUNNER_TEMP/json.jar"
+          echo "3ea61b2a06e31edf1c91134fe9106b0ebb16628be169f3db75bc7a2b06b45796  $RUNNER_TEMP/json.jar" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/update-tests"
+          javac -cp "$RUNNER_TEMP/json.jar" -d "$RUNNER_TEMP/update-tests" \
+            app/src/main/java/org/thunderdog/challegram/util/GitHubRelease.java tests/updates/GitHubReleaseTest.java
+          java -cp "$RUNNER_TEMP/json.jar:$RUNNER_TEMP/update-tests" GitHubReleaseTest
+
   build:
     name: Latest ARM64 APK
+    needs: update-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 180
 
@@ -91,7 +112,11 @@ jobs:
               exit 1
             fi
           else
-            echo "::warning::Signing secrets are missing. This run will use an ephemeral development key."
+            if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+              echo "::error::Release updates require the existing permanent signing key. Configure all ANDROID_KEYSTORE/KEY secrets."
+              exit 1
+            fi
+            echo "::warning::Signing secrets are missing. This pull request will use an ephemeral development key."
             ANDROID_KEYSTORE_PASSWORD=android
             ANDROID_KEY_ALIAS=frogramx
             ANDROID_KEY_PASSWORD=android
@@ -183,6 +208,9 @@ jobs:
             echo "app.experimental=false"
             echo "app.google_services=$GOOGLE_SERVICES_ENABLED"
             echo "app.file=Frogram-X"
+            # Every workflow build gets an increasing Android versionCode.
+            BASE_APP_VERSION="$(sed -n 's/^version.app=//p' version.properties)"
+            echo "app.version=$((BASE_APP_VERSION + GITHUB_RUN_NUMBER))"
           } >> local.properties
 
       - name: Guard releasable build Firebase state
@@ -207,6 +235,7 @@ jobs:
           find app/build/outputs/apk -type f -name '*.apk' -exec cp '{}' artifacts/ ';'
           test -n "$(find artifacts -maxdepth 1 -type f -name '*.apk' -print -quit)"
           (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
+          python3 scripts/create-update-manifest.py --build-number "$GITHUB_RUN_NUMBER" --commit "$GITHUB_SHA"
 
       - name: Upload Frogram X APK
         uses: actions/upload-artifact@v4
@@ -235,13 +264,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Frogram X build ${{ github.run_number }}
-          body: |
-            Automatic Frogram X build from `${{ github.sha }}`.
-
-            APK and SHA-256 checksums are attached below.
+          name: Frogram X · ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          draft: true
           generate_release_notes: true
-          make_latest: true
           files: |
             artifacts/*.apk
             artifacts/SHA256SUMS.txt
+            artifacts/update.json
+
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "build-$GITHUB_RUN_NUMBER" --draft=false --latest

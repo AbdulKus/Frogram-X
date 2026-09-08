@@ -1076,6 +1076,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   @Override
   public void onPause () {
+    if (appUpdater != null) appUpdater.onPause();
     blockFocus();
     setActivityState(UI.State.PAUSED);
     if (camera != null) {
@@ -1173,7 +1174,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
         getWindow().setFlags(0, WindowManager.LayoutParams.FLAG_SECURE);
       }
     }*/
-    appUpdater.checkForUpdates();
+    appUpdater.onResume();
     runEmulatorChecks();
   }
 
@@ -1201,6 +1202,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   @Override
   public void onDestroy () {
+    if (appUpdater != null) appUpdater.destroy();
     try {
       super.onDestroy();
     } catch (Throwable t) {
