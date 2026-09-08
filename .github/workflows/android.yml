@@ -231,9 +231,15 @@ jobs:
 
       - name: Collect APK and checksum
         run: |
+          set -euo pipefail
           mkdir -p artifacts
-          find app/build/outputs/apk -type f -name '*.apk' -exec cp '{}' artifacts/ ';'
-          test -n "$(find artifacts -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          APK_DIR="app/build/outputs/apk/latest/arm64/release"
+          mapfile -t APKS < <(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' -print)
+          if [[ "${#APKS[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one Latest ARM64 release APK, found ${#APKS[@]}."
+            exit 1
+          fi
+          cp "${APKS[0]}" artifacts/
           (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
           python3 scripts/create-update-manifest.py --build-number "$GITHUB_RUN_NUMBER" --commit "$GITHUB_SHA"
 
