@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="FrogramUpdates">Обновления</string>
+  <string name="FrogramAutoCheckUpdates">Автоматически проверять обновления</string>
+  <string name="FrogramInstalledVersion">Установленная версия</string>
+  <string name="FrogramUpdateAvailable">Доступно обновление</string>
+  <string name="FrogramWhatsNew">Что нового</string>
+  <string name="FrogramUpdateDownload">Скачать</string>
+  <string name="FrogramUpdateInstall">Установить</string>
+  <string name="FrogramUpdateLater">Позже</string>
+  <string name="FrogramUpdateReady">Обновление готово к установке</string>
+  <string name="FrogramUpdateVerifying">Проверка файла…</string>
+  <string name="FrogramUpToDate">Установлена последняя версия</string>
+  <string name="FrogramNoReleaseNotes">Изменения не указаны</string>
+  <string name="FrogramUpdateCheckFailed">Не удалось проверить обновления</string>
+  <string name="FrogramUpdateDownloadFailed">Не удалось скачать. Попробуйте ещё раз.</string>
+  <string name="FrogramUpdateInvalidFile">Файл не прошёл проверку. Скачайте заново.</string>
+  <string name="FrogramUpdateSignatureMismatch">APK подписан другим ключом</string>
+  <string name="FrogramUpdateInstallFailed">Не удалось открыть установщик</string>
+</resources>

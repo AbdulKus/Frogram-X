@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="FrogramUpdates">Updates</string>
+  <string name="FrogramAutoCheckUpdates">Automatically check for updates</string>
+  <string name="FrogramInstalledVersion">Installed version</string>
+  <string name="FrogramUpdateAvailable">Update available</string>
+  <string name="FrogramWhatsNew">What’s new</string>
+  <string name="FrogramUpdateDownload">Download</string>
+  <string name="FrogramUpdateInstall">Install</string>
+  <string name="FrogramUpdateLater">Later</string>
+  <string name="FrogramUpdateReady">Update ready to install</string>
+  <string name="FrogramUpdateVerifying">Verifying file…</string>
+  <string name="FrogramUpToDate">You’re up to date</string>
+  <string name="FrogramNoReleaseNotes">No release notes</string>
+  <string name="FrogramUpdateCheckFailed">Couldn’t check for updates</string>
+  <string name="FrogramUpdateDownloadFailed">Download failed. Try again.</string>
+  <string name="FrogramUpdateInvalidFile">File verification failed. Download again.</string>
+  <string name="FrogramUpdateSignatureMismatch">The APK was signed with a different key</string>
+  <string name="FrogramUpdateInstallFailed">Couldn’t open the installer</string>
+</resources>
