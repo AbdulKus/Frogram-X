@@ -233,10 +233,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          APK_DIR="app/build/outputs/apk/latest/arm64/release"
-          mapfile -t APKS < <(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' -print)
+          mapfile -t APKS < <(find app/build/outputs/apk -type f -name '*.apk' -print)
           if [[ "${#APKS[@]}" -ne 1 ]]; then
-            echo "::error::Expected exactly one Latest ARM64 release APK, found ${#APKS[@]}."
+            echo "::error::Expected exactly one APK from assembleLatestArm64Release, found ${#APKS[@]}."
+            printf '%s\n' "${APKS[@]}"
             exit 1
           fi
           cp "${APKS[0]}" artifacts/
