@@ -1,0 +1,48 @@
+name: One-shot selection tap fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-selection-tap-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Apply selection-mode tap fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/main/java/org/thunderdog/challegram/component/chat/MessageView.java')
+          text = path.read_text()
+          old = '''  private boolean handleMessageTap (float x, float y, long eventTime) {
+              if (msg == null || !Settings.instance().isQuickReactionDoubleTapEnabled() || Settings.instance().getQuickReactions(msg.tdlib()).length == 0) {'''
+          new = '''  private boolean handleMessageTap (float x, float y, long eventTime) {
+              boolean inSelectMode = msg != null && msg.messagesController().inSelectMode();
+              if (inSelectMode) {
+                cancelPendingMessageClick();
+              }
+              if (msg == null || inSelectMode || !Settings.instance().isQuickReactionDoubleTapEnabled() || Settings.instance().getQuickReactions(msg.tdlib()).length == 0) {'''
+          if old not in text:
+              raise SystemExit('Expected handleMessageTap block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          rm .github/workflows/one-shot-selection-tap-fix.yml
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/src/main/java/org/thunderdog/challegram/component/chat/MessageView.java .github/workflows/one-shot-selection-tap-fix.yml
+          git commit -m "Fix instant taps in message selection mode"
+          git push origin HEAD:main
