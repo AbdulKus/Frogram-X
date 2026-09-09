@@ -558,7 +558,11 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   private boolean handleMessageTap (float x, float y, long eventTime) {
-    if (msg == null || !Settings.instance().isQuickReactionDoubleTapEnabled() || Settings.instance().getQuickReactions(msg.tdlib()).length == 0) {
+    boolean inSelectMode = msg != null && msg.messagesController().inSelectMode();
+    if (inSelectMode) {
+      cancelPendingMessageClick();
+    }
+    if (msg == null || inSelectMode || !Settings.instance().isQuickReactionDoubleTapEnabled() || Settings.instance().getQuickReactions(msg.tdlib()).length == 0) {
       if (onMessageClick(x, y)) {
         ViewUtils.onClick(this);
         return true;
