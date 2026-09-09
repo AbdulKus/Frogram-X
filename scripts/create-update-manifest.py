@@ -10,10 +10,12 @@ from pathlib import Path
 
 def parse_badging(text):
     package = re.search(r"^package: (.+)$", text, re.MULTILINE)
-    sdk = re.search(r"^sdkVersion:'(\d+)'", text, re.MULTILINE)
+    # aapt2 from Build Tools 37 reports minSdkVersion; older tools use sdkVersion.
+    sdk = re.search(r"^(?:minSdkVersion|sdkVersion):'(\d+)'", text, re.MULTILINE)
     native = re.search(r"^native-code: (.+)$", text, re.MULTILINE)
     if not package or not sdk or not native:
-        raise ValueError("APK must declare a package, minimum SDK and native ABIs")
+        missing = [name for name, value in (("package", package), ("minimum SDK", sdk), ("native ABIs", native)) if not value]
+        raise ValueError("APK badging is missing: " + ", ".join(missing))
     fields = dict(re.findall(r"(\w+)='([^']*)'", package[1]))
     if fields.get("name") != "org.frogram.messenger":
         raise ValueError("Unexpected APK package")
@@ -31,7 +33,10 @@ def build_manifest(artifacts, aapt, build_number, commit):
               "commit": commit, "artifacts": []}
     for apk in sorted(artifacts.glob("*.apk")):
         badging = subprocess.check_output([str(aapt), "dump", "badging", str(apk)], text=True)
-        metadata = parse_badging(badging)
+        try:
+            metadata = parse_badging(badging)
+        except ValueError as error:
+            raise ValueError(f"{apk.name}: {error}") from error
         with apk.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         result["artifacts"].append({"name": apk.name, "size": apk.stat().st_size, "sha256": digest, **metadata})

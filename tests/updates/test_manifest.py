@@ -24,6 +24,16 @@ class ManifestTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.parse_badging(BADGING.replace("org.frogram.messenger", "org.thunderdog.challegram"))
 
+    def test_build_tools_37_min_sdk(self):
+        # Actual aapt2 37 output uses minSdkVersion, not sdkVersion.
+        result = module.parse_badging(BADGING.replace("sdkVersion:", "minSdkVersion:") + "targetSdkVersion:'37'\n")
+        self.assertEqual(result["min_sdk"], 24)
+        self.assertEqual(result["abis"], ["arm64-v8a"])
+
+    def test_target_sdk_does_not_replace_minimum_sdk(self):
+        with self.assertRaisesRegex(ValueError, "minimum SDK"):
+            module.parse_badging(BADGING.replace("sdkVersion:'24'", "targetSdkVersion:'37'"))
+
     def test_old_version(self):
         with self.assertRaises(ValueError):
             module.parse_badging(BADGING.replace("1879302", "1796302"))

@@ -230,6 +230,7 @@ jobs:
         run: ./gradlew assembleLatestArm64Release --stacktrace --no-daemon
 
       - name: Collect APK and checksum
+        id: collect_apk
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -241,6 +242,10 @@ jobs:
           fi
           cp "${APKS[0]}" artifacts/
           (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
+
+      - name: Generate update manifest
+        id: update_manifest
+        run: |
           python3 scripts/create-update-manifest.py --build-number "$GITHUB_RUN_NUMBER" --commit "$GITHUB_SHA"
 
       - name: Upload Frogram X APK
@@ -250,6 +255,15 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Preserve APK if metadata generation fails
+        if: failure() && steps.collect_apk.outcome == 'success' && steps.update_manifest.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Frogram-X-recovery-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 7
 
   release:
     name: Publish GitHub Release
