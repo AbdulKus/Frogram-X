@@ -772,7 +772,7 @@ public class RecordAudioVideoController implements
       MessagesController chat = (MessagesController) c;
       View anchor = chat.getFloatingRecordAnchor();
       View view = anchor != null ? anchor : chat.getBottomWrap();
-      int[] position = Views.getLocationInWindow(view);
+      int[] position = Views.getLocationInWindow(view).clone();
       int[] rootPosition = Views.getLocationInWindow(rootLayout);
       float x = anchor != null ? position[0] - rootPosition[0] + view.getWidth() / 2f -
         voiceVideoButtonView.getLeft() - voiceVideoButtonView.getWidth() / 2f : 0f;

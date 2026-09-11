@@ -66,8 +66,10 @@ public final class ChatGlassDrawable extends Drawable {
     if (wallpaper.getWidth() > 0 && wallpaper.getHeight() > 0) {
       // Two small reusable surfaces at most, about 1/64 of the panel's pixels.
       // The existing native blur works on every supported Android version.
-      int width = Math.max(8, (int) Math.ceil(panel.width() / 8f));
-      int height = Math.max(8, (int) Math.ceil(panel.height() / 8f));
+      // Native fastBlur accepts at most 160 * 160 pixels, including on tablets.
+      float scale = Math.max(8f, Math.max(panel.width(), panel.height()) / 160f);
+      int width = Math.max(8, Math.min(160, (int) Math.ceil(panel.width() / scale)));
+      int height = Math.max(8, Math.min(160, (int) Math.ceil(panel.height() / scale)));
       if (sample == null || sample.getWidth() != width || sample.getHeight() != height) {
         release();
         sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
