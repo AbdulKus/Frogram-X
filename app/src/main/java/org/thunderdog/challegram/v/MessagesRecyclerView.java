@@ -58,6 +58,27 @@ public class MessagesRecyclerView extends RecyclerView implements FactorAnimator
     }
   }
 
+  public void setOverlayPadding (int top, int bottom) {
+    if (getPaddingTop() == top && getPaddingBottom() == bottom) return;
+    // getHeight() and the attached children still describe the same laid-out frame.
+    // getMeasuredHeight() may already be smaller while the keyboard is opening.
+    int edge = getHeight() - getPaddingBottom();
+    int anchorPosition = NO_POSITION, anchorOffset = 0;
+    for (int i = 0; i < getChildCount(); i++) {
+      View child = getChildAt(i);
+      int position = getChildAdapterPosition(child);
+      if (position != NO_POSITION && child.getBottom() > getPaddingTop() && child.getTop() < edge &&
+          (anchorPosition == NO_POSITION || position < anchorPosition)) {
+        anchorPosition = position;
+        anchorOffset = edge - child.getBottom();
+      }
+    }
+    setPadding(getPaddingLeft(), top, getPaddingRight(), bottom);
+    if (anchorPosition != NO_POSITION && getLayoutManager() instanceof LinearLayoutManager) {
+      ((LinearLayoutManager) getLayoutManager()).scrollToPositionWithOffset(anchorPosition, anchorOffset);
+    }
+  }
+
   private MessagesManager manager;
   private CustomTouchHelper touchHelper;
   private MessagesTouchHelperCallback callback;

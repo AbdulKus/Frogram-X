@@ -371,13 +371,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         // Includes multiline input, emoji/bot keyboards and the system gesture inset.
         bottom = Math.max(0, Math.round(bottomWrap.getMeasuredHeight() + getKeyboardOffset() + getReplyOffset() + getAttachedFilesOffset()));
       }
-      if (messagesView.getPaddingTop() != top || messagesView.getPaddingBottom() != bottom) {
-        final int paddingTop = top, paddingBottom = bottom;
-        manager.maintainScrollPositionAndOffset(() -> {
-          messagesView.setPadding(messagesView.getPaddingLeft(), paddingTop, messagesView.getPaddingRight(), paddingBottom);
-          return true;
-        });
-      }
+      messagesView.setOverlayPadding(top, bottom);
       if (topGlassView != null) {
         Views.setLayoutHeight(topGlassView, header + topBar.getTotalVisualHeight() + Screen.dp(6f));
         topGlassView.invalidate();
