@@ -266,6 +266,8 @@ public class Lang {
         resId != R.string.DoubleBottomGenericNotification && resId != R.string.DoubleBottomChangeHiddenPasscode &&
         resId != R.string.DoubleBottomUnsupportedPasscode && resId != R.string.PasscodeNotificationsInfo &&
         resId != R.string.PasscodeNotificationActions &&
+        resId != R.string.FrogramNewUi && resId != R.string.FrogramNewChatHeader &&
+        resId != R.string.FrogramNewChatInput &&
         resId != R.string.FrogramUpdates && resId != R.string.FrogramAutoCheckUpdates &&
         resId != R.string.FrogramInstalledVersion && resId != R.string.FrogramUpdateAvailable &&
         resId != R.string.FrogramWhatsNew && resId != R.string.FrogramUpdateDownload &&

@@ -359,8 +359,20 @@ public class WallpaperView extends View implements ThemeChangeListener, ChatStyl
 
   public static final int OVERLAY_ALPHA = 0x70;
 
+  private Runnable glassInvalidationListener;
+
+  public void setGlassInvalidationListener (Runnable listener) {
+    glassInvalidationListener = listener;
+  }
+
   @Override
   protected void onDraw (Canvas c) {
+    drawForGlass(c);
+    if (glassInvalidationListener != null) glassInvalidationListener.run();
+  }
+
+  /** Draw only the wallpaper; do not recursively invalidate its glass consumers. */
+  public void drawForGlass (Canvas c) {
     if (manager.useBubbles()) {
       layoutReceivers();
       if (!isAnimatingChanges()) {

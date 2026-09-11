@@ -976,6 +976,24 @@ public class Settings {
     pmc.putFloat(key, value).apply();
   }
 
+  private Boolean newChatHeader, newChatInput;
+
+  public boolean useNewChatHeader () {
+    return newChatHeader != null ? newChatHeader : (newChatHeader = getBoolean("frogram_ui_chat_header", true));
+  }
+
+  public void setUseNewChatHeader (boolean enabled) {
+    putBoolean("frogram_ui_chat_header", newChatHeader = enabled);
+  }
+
+  public boolean useNewChatInput () {
+    return newChatInput != null ? newChatInput : (newChatInput = getBoolean("frogram_ui_chat_input", true));
+  }
+
+  public void setUseNewChatInput (boolean enabled) {
+    putBoolean("frogram_ui_chat_input", newChatInput = enabled);
+  }
+
   public void putBoolean (String key, boolean value) {
     pmc.putBoolean(key, value);
   }

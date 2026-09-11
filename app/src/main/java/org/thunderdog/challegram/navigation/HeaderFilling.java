@@ -390,6 +390,15 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   @Override
   public void draw (@NonNull Canvas c) {
+    // Keep transforms, selection/search and ongoing call/player bars on their native surface.
+    if (!restoreRect && fillFactor == 1f && hideFactor == 0f && radiusFactor == 0f &&
+        !hasVisibleOngoingBar() && !headerView.isAnimating() && navigationController != null) {
+      ViewController<?> current = navigationController.getCurrentStackItem();
+      if (current != null && !current.inTransformMode() &&
+          current.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) {
+        return;
+      }
+    }
     if (restoreRect && restorePixels > 0) {
       if (Lang.rtl()) {
         c.drawRect(0, 0, restorePixels, fillingBottom, Paints.fillingPaint(restoreColor));

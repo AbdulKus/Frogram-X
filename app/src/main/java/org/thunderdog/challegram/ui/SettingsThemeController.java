@@ -400,6 +400,10 @@ public class SettingsThemeController extends RecyclerViewController<SettingsThem
       items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_chatFontSize, 0, R.string.TextSize));
       items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
 
+      items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
+      items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_newUi, 0, R.string.FrogramNewUi));
+      items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
+
       items.add(new ListItem(ListItem.TYPE_HEADER, 0, 0, R.string.ColorTheme));
 
       this.builtinThemes = ThemeManager.instance().getBuiltinThemes();
@@ -927,6 +931,10 @@ public class SettingsThemeController extends RecyclerViewController<SettingsThem
 
   @Override
   public void onClick (View v) {
+    if (v.getId() == R.id.btn_newUi) {
+      navigateTo(new SettingsNewUiController(context, tdlib));
+      return;
+    }
     final int viewId = v.getId();
     if (viewId == R.id.btn_reduceMotion) {
       Settings.instance().toggleReduceMotion();

@@ -1262,6 +1262,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
     return true;
   }
 
+  public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
+    return false;
+  }
+
   public final void drawTransform (Canvas c, int width, int height) {
     if (!transformFullyApplied && transformFactor > 0f) {
       drawTransform(c, transformFactor, width, height);

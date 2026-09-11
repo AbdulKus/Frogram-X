@@ -769,8 +769,17 @@ public class RecordAudioVideoController implements
   public void updatePositions () {
     ViewController<?> c = UI.getCurrentStackItem(context);
     if (c instanceof MessagesController) {
-      View view = ((MessagesController) c).getBottomWrap();
-      setOverallTranslation((Views.getLocationInWindow(view)[1] - Views.getLocationInWindow(rootLayout)[1]) - voiceVideoButtonView.getTop());
+      MessagesController chat = (MessagesController) c;
+      View anchor = chat.getFloatingRecordAnchor();
+      View view = anchor != null ? anchor : chat.getBottomWrap();
+      int[] position = Views.getLocationInWindow(view);
+      int[] rootPosition = Views.getLocationInWindow(rootLayout);
+      float x = anchor != null ? position[0] - rootPosition[0] + view.getWidth() / 2f -
+        voiceVideoButtonView.getLeft() - voiceVideoButtonView.getWidth() / 2f : 0f;
+      boolean xChanged = voiceVideoButtonView.getTranslationX() != x;
+      voiceVideoButtonView.setTranslationX(x);
+      setOverallTranslation(position[1] - rootPosition[1] - voiceVideoButtonView.getTop());
+      if (xChanged) updateTranslations();
     }
   }
 

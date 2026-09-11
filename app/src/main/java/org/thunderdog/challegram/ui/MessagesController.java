@@ -24,6 +24,7 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.graphics.Rect;
 import android.location.Location;
 import android.location.LocationManager;
@@ -235,6 +236,7 @@ import org.thunderdog.challegram.v.HeaderEditText;
 import org.thunderdog.challegram.v.MessagesLayoutManager;
 import org.thunderdog.challegram.v.MessagesRecyclerView;
 import org.thunderdog.challegram.voip.VoIPLogs;
+import org.thunderdog.challegram.widget.ChatGlassDrawable;
 import org.thunderdog.challegram.widget.AvatarView;
 import org.thunderdog.challegram.widget.CheckBoxView;
 import org.thunderdog.challegram.widget.CircleButton;
@@ -335,6 +337,57 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   private MessagesLayout contentView;
   private LinearLayout bottomWrap;
+  private boolean newChatInput;
+  private Drawable classicInputBackground;
+  private Drawable classicBottomSpaceBackground;
+  private ChatGlassDrawable inputGlass;
+  private ChatGlassDrawable headerGlass;
+
+  private void applyNewChatUi () {
+    if (inputView == null || inPreviewMode || isInForceTouchMode()) return;
+    boolean enabled = Settings.instance().useNewChatInput();
+    if (inputGlass == null) {
+      classicInputBackground = inputView.getBackground();
+      classicBottomSpaceBackground = bottomSpace.getBackground();
+      inputGlass = new ChatGlassDrawable(wallpaperView, inputView, ColorId.filling);
+    }
+    newChatInput = enabled;
+    inputView.setBackground(enabled ? inputGlass : classicInputBackground);
+    LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
+    int side = enabled ? Screen.dp(8f) : 0;
+    int gap = enabled ? Screen.dp(6f) : 0;
+    inputParams.setMargins(side, gap, side, gap);
+    inputView.setLayoutParams(inputParams);
+    for (View button : new View[] {emojiButton, attachButtons, sendButton, messageSenderButton}) {
+      RelativeLayout.LayoutParams buttonParams = (RelativeLayout.LayoutParams) button.getLayoutParams();
+      buttonParams.leftMargin = buttonParams.rightMargin = side;
+      button.setLayoutParams(buttonParams);
+    }
+    bottomSpace.setBackground(enabled ? null : classicBottomSpaceBackground);
+    bottomShadowView.setAlpha(enabled ? 0f : 1f);
+    inputView.checkPlaceholderWidth();
+    updateButtonsY();
+    if (headerView != null) headerView.invalidate();
+  }
+
+  @Override
+  public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
+    if (!Settings.instance().useNewChatHeader() || inPreviewMode || isInForceTouchMode() ||
+        wallpaperView == null || wallpaperView.getWidth() == 0) return false;
+    int top = header.getEffectiveTopOffset();
+    c.drawRect(0, 0, width, height, Paints.fillingPaint(color));
+    int save = c.save();
+    c.clipRect(0, top, width, height);
+    wallpaperView.drawForGlass(c);
+    c.restoreToCount(save);
+    if (headerGlass == null) {
+      headerGlass = new ChatGlassDrawable(wallpaperView, header, ColorId.headerBackground);
+    }
+    headerGlass.setBounds(Screen.dp(8f), top + Screen.dp(3f), width - Screen.dp(8f), height - Screen.dp(3f));
+    headerGlass.draw(c);
+    return true;
+  }
+
   private FillingSpace bottomSpace;
   private MessagesRecyclerView messagesView;
 
@@ -1482,6 +1535,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
       contentView.addView(sendButton);
       contentView.addView(messageSenderButton);
 
+      applyNewChatUi();
+      wallpaperView.setGlassInvalidationListener(() -> {
+        if (newChatInput && inputView != null) inputView.invalidate();
+        if (headerView != null && Settings.instance().useNewChatHeader()) headerView.invalidate();
+      });
       initSearchControls();
       contentView.addView(searchControlsLayout);
 
@@ -4035,6 +4093,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void onFocus () {
     super.onFocus();
+    applyNewChatUi();
     if (promptDraftPrefillOnFocus) {
       promptDraftPrefillOnFocus = false;
       fillDraft(this.fillDraft, true);
@@ -4301,6 +4360,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public void destroy () {
+    if (wallpaperView != null) wallpaperView.setGlassInvalidationListener(null);
+    if (inputGlass != null) inputGlass.release();
+    if (headerGlass != null) headerGlass.release();
     resetSelectableControl();
 
     discardAttachedFiles(false);
@@ -9731,6 +9793,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   // Record
 
+  public @Nullable View getFloatingRecordAnchor () {
+    return newChatInput ? recordButton : null;
+  }
+
   public LinearLayout getBottomWrap () {
     return bottomWrap;
   }
@@ -13350,6 +13416,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void onThemeColorsChanged (boolean areTemp, ColorState state) {
     super.onThemeColorsChanged(areTemp, state);
+    if (newChatInput && inputView != null) inputView.invalidate();
+    if (headerView != null) headerView.invalidate();
     if (attachedFiles != null) {
       attachedFiles.getThemeProvider().onThemeColorsChanged(areTemp);
     }

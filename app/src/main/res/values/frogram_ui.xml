@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="FrogramNewUi">New UI</string>
+  <string name="FrogramNewChatHeader">Chat top bar</string>
+  <string name="FrogramNewChatInput">Chat bottom bar</string>
+  <item type="id" name="controller_newUi" />
+  <item type="id" name="btn_newUi" />
+  <item type="id" name="btn_newChatHeader" />
+  <item type="id" name="btn_newChatInput" />
+</resources>
