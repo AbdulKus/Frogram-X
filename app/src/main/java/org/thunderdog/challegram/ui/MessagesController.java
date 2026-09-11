@@ -8288,6 +8288,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
     if (prevButtonsY != y) {
       prevButtonsY = y;
+      if (newChatInput && inputView != null) inputView.invalidate();
       onMessagesFrameChanged();
       updateRecordLayout();
     }
