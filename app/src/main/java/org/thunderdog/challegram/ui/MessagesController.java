@@ -463,7 +463,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
-    if (!useFloatingChatHeader() || topGlassView == null) return false;
+    if (!useFloatingChatHeader() || topGlassView == null || pagerScrollOffset != 0f) return false;
     // The shared surface is in the chat layer, behind both the title and pinned rows.
     c.drawRect(0, 0, width, header.getEffectiveTopOffset(), Paints.fillingPaint(color));
     return true;
@@ -1683,6 +1683,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
           return !blocked && super.onInterceptTouchEvent(ev);
         }
       };
+      pagerContentView.setClipChildren(false);
+      pagerContentView.setClipToPadding(false);
       pagerContentView.setOffscreenPageLimit(1);
       pagerContentView.setOverScrollMode(Config.HAS_NICE_OVER_SCROLL_EFFECT ? View.OVER_SCROLL_IF_CONTENT_SCROLLS : View.OVER_SCROLL_NEVER);
       pagerContentView.addOnPageChangeListener(this);
@@ -1690,6 +1692,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       pagerContentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
       FrameLayoutFix contentView = new FrameLayoutFix(context);
+      contentView.setClipChildren(false);
+      contentView.setClipToPadding(false);
       contentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
       contentView.addView(pagerContentView);
 
@@ -1822,6 +1826,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     pagerHeaderView.getTopView().setSelectionFactor(offset);
     if (this.pagerScrollOffset != offset) {
       this.pagerScrollOffset = offset;
+      if (headerView != null) headerView.invalidate();
       if (hideKeyboardOnPageScroll) {
         hideKeyboardOnPageScroll = false;
         hideSoftwareKeyboard();
