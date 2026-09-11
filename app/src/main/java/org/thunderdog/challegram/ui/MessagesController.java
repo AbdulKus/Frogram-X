@@ -345,6 +345,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   private void applyNewChatUi () {
     if (inputView == null || inPreviewMode || isInForceTouchMode()) return;
+    // Extend the wallpaper into the header's coordinate space. The header draws
+    // the hidden strip, so a photo or pattern continues across both surfaces.
+    RelativeLayout.LayoutParams wallpaperParams = (RelativeLayout.LayoutParams) wallpaperView.getLayoutParams();
+    int wallpaperTop = Settings.instance().useNewChatHeader() ? -getHeaderHeight() : 0;
+    if (wallpaperParams.topMargin != wallpaperTop) {
+      wallpaperParams.topMargin = wallpaperTop;
+      wallpaperView.setLayoutParams(wallpaperParams);
+    }
     boolean enabled = Settings.instance().useNewChatInput();
     if (inputGlass == null) {
       classicInputBackground = inputView.getBackground();
@@ -378,6 +386,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     c.drawRect(0, 0, width, height, Paints.fillingPaint(color));
     int save = c.save();
     c.clipRect(0, top, width, height);
+    c.translate(0, top);
     wallpaperView.drawForGlass(c);
     c.restoreToCount(save);
     if (headerGlass == null) {
