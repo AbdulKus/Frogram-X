@@ -343,21 +343,71 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private ChatGlassDrawable inputGlass;
   private ChatGlassDrawable headerGlass;
 
+  private View topGlassView;
+  private boolean updatingFloatingInsets;
+  private final android.graphics.Rect floatingReplyClip = new android.graphics.Rect();
+
+  private boolean useFloatingChatHeader () {
+    return !inPreviewMode && !isInForceTouchMode() && Settings.instance().useNewChatHeader();
+  }
+
+  public int getFloatingBottomInset () {
+    return newChatInput && messagesView != null ? messagesView.getPaddingBottom() : 0;
+  }
+
+  private void invalidateChatGlass () {
+    if (newChatInput && inputView != null) inputView.invalidate();
+    if (topGlassView != null && useFloatingChatHeader()) topGlassView.invalidate();
+  }
+
+  private void updateFloatingInsets () {
+    if (updatingFloatingInsets || messagesView == null || bottomWrap == null || topBar == null) return;
+    updatingFloatingInsets = true;
+    try {
+      int header = useFloatingChatHeader() ? getHeaderHeight() : 0;
+      int top = header > 0 ? header + topBar.getTotalVisualHeight() + Screen.dp(6f) : 0;
+      int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
+      if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
+        // Includes multiline input, emoji/bot keyboards and the system gesture inset.
+        bottom = Math.max(0, Math.round(bottomWrap.getMeasuredHeight() + getKeyboardOffset() + getReplyOffset() + getAttachedFilesOffset()));
+      }
+      if (messagesView.getPaddingTop() != top || messagesView.getPaddingBottom() != bottom) {
+        final int paddingTop = top, paddingBottom = bottom;
+        manager.maintainScrollPositionAndOffset(() -> {
+          messagesView.setPadding(messagesView.getPaddingLeft(), paddingTop, messagesView.getPaddingRight(), paddingBottom);
+          return true;
+        });
+      }
+      if (topGlassView != null) {
+        Views.setLayoutHeight(topGlassView, header + topBar.getTotalVisualHeight() + Screen.dp(6f));
+        topGlassView.invalidate();
+      }
+      if (replyBarView != null && newChatInput) {
+        floatingReplyClip.set(0, 0, replyBarView.getWidth(), Math.round(getReplyOffset()));
+        replyBarView.setClipBounds(floatingReplyClip);
+        replyBarView.setVisibility(bottomWrap.getVisibility() == View.VISIBLE && getReplyOffset() > 0f ? View.VISIBLE : View.INVISIBLE);
+      }
+    } finally {
+      updatingFloatingInsets = false;
+    }
+  }
+
   private void applyNewChatUi () {
     if (inputView == null || inPreviewMode || isInForceTouchMode()) return;
-    // Extend the wallpaper into the header's coordinate space. The header draws
-    // the hidden strip, so a photo or pattern continues across both surfaces.
+    boolean floatingHeader = useFloatingChatHeader();
+    int header = floatingHeader ? getHeaderHeight() : 0;
     RelativeLayout.LayoutParams wallpaperParams = (RelativeLayout.LayoutParams) wallpaperView.getLayoutParams();
-    int wallpaperTop = Settings.instance().useNewChatHeader() ? -getHeaderHeight() : 0;
-    if (wallpaperParams.topMargin != wallpaperTop) {
-      wallpaperParams.topMargin = wallpaperTop;
-      wallpaperView.setLayoutParams(wallpaperParams);
-    }
+    wallpaperParams.topMargin = -header;
+    wallpaperView.setLayoutParams(wallpaperParams);
+    contentView.setClipChildren(!floatingHeader);
+    contentView.setClipToPadding(!floatingHeader);
+
     boolean enabled = Settings.instance().useNewChatInput();
     if (inputGlass == null) {
       classicInputBackground = inputView.getBackground();
       classicBottomSpaceBackground = bottomSpace.getBackground();
       inputGlass = new ChatGlassDrawable(wallpaperView, inputView, ColorId.filling);
+      inputGlass.setMessages(messagesView);
     }
     newChatInput = enabled;
     inputView.setBackground(enabled ? inputGlass : classicInputBackground);
@@ -373,27 +423,55 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
     bottomSpace.setBackground(enabled ? null : classicBottomSpaceBackground);
     bottomShadowView.setAlpha(enabled ? 0f : 1f);
+    if (!enabled && replyBarView != null) {
+      replyBarView.setClipBounds(null);
+      if (bottomWrap.getVisibility() == View.VISIBLE) replyBarView.setVisibility(View.VISIBLE);
+    }
+
+    RelativeLayout.LayoutParams listParams = (RelativeLayout.LayoutParams) messagesView.getLayoutParams();
+    listParams.topMargin = -header;
+    listParams.addRule(RelativeLayout.ABOVE, enabled ? 0 : R.id.msg_bottom);
+    listParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, enabled ? RelativeLayout.TRUE : 0);
+    messagesView.setLayoutParams(listParams);
+    messagesView.setClipToPadding(!(floatingHeader || enabled));
+    messagesView.setTranslationY(enabled ? 0f : -getReplyOffset() - getAttachedFilesOffset() - getKeyboardOffset());
+
+    RelativeLayout.LayoutParams topParams = (RelativeLayout.LayoutParams) topBar.getLayoutParams();
+    topParams.leftMargin = topParams.rightMargin = floatingHeader ? Screen.dp(8f) : 0;
+    topBar.setLayoutParams(topParams);
+    topBar.setFloatingSurface(floatingHeader);
+    pinnedMessagesBar.setFloatingSurface(floatingHeader);
+    if (topGlassView == null) {
+      topGlassView = new View(context()) {
+        @Override protected void onDraw (Canvas canvas) {
+          if (headerGlass == null) {
+            headerGlass = new ChatGlassDrawable(wallpaperView, this, ColorId.filling);
+            headerGlass.setMessages(messagesView);
+          }
+          headerGlass.setBounds(Screen.dp(8f), Screen.dp(3f), getWidth() - Screen.dp(8f), getHeight());
+          headerGlass.draw(canvas);
+        }
+      };
+      topGlassView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+      contentView.addView(topGlassView, contentView.indexOfChild(topBar));
+      addThemeInvalidateListener(topGlassView);
+    }
+    RelativeLayout.LayoutParams glassParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, header + topBar.getTotalVisualHeight() + Screen.dp(6f));
+    glassParams.topMargin = -header;
+    topGlassView.setLayoutParams(glassParams);
+    topGlassView.setVisibility(floatingHeader ? View.VISIBLE : View.GONE);
+    headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
+    if (headerView != null) headerView.resetColors(this, null);
     inputView.checkPlaceholderWidth();
+    updateFloatingInsets();
     updateButtonsY();
-    if (headerView != null) headerView.invalidate();
   }
 
   @Override
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
-    if (!Settings.instance().useNewChatHeader() || inPreviewMode || isInForceTouchMode() ||
-        wallpaperView == null || wallpaperView.getWidth() == 0) return false;
-    int top = header.getEffectiveTopOffset();
-    c.drawRect(0, 0, width, height, Paints.fillingPaint(color));
-    int save = c.save();
-    c.clipRect(0, top, width, height);
-    c.translate(0, top);
-    wallpaperView.drawForGlass(c);
-    c.restoreToCount(save);
-    if (headerGlass == null) {
-      headerGlass = new ChatGlassDrawable(wallpaperView, header, ColorId.headerBackground);
-    }
-    headerGlass.setBounds(Screen.dp(8f), top + Screen.dp(3f), width - Screen.dp(8f), height - Screen.dp(3f));
-    headerGlass.draw(c);
+    if (!useFloatingChatHeader() || topGlassView == null) return false;
+    // The shared surface is in the chat layer, behind both the title and pinned rows.
+    c.drawRect(0, 0, width, header.getEffectiveTopOffset(), Paints.fillingPaint(color));
     return true;
   }
 
@@ -692,6 +770,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void updateMessagesViewInset () {
+    if (newChatInput || useFloatingChatHeader()) {
+      updateFloatingInsets();
+      return;
+    }
     int inset = bottomWrap != null && bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
     int appliedInset = Views.getAppliedBottomInset(messagesView);
     if (inset != appliedInset) {
@@ -761,7 +843,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         break;
       }
     }
-    headerCell.initWithController(this, true);
+    headerCell.initWithController(this, false);
 
     wallpaperView = new WallpaperView(context, manager, tdlib);
     if (previewMode == PREVIEW_MODE_WALLPAPER_OBJECT) {
@@ -903,7 +985,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
       @Override
       protected void onDraw (Canvas c) {
-        c.drawRect(0, 0, getMeasuredWidth(), Screen.dp(36f), Paints.fillingPaint(Theme.fillingColor()));
+        if (!useFloatingChatHeader()) c.drawRect(0, 0, getMeasuredWidth(), Screen.dp(36f), Paints.fillingPaint(Theme.fillingColor()));
         if (liveLocation != null) {
           liveLocation.draw(c, 0);
         }
@@ -1522,12 +1604,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (wallpaperViewBlurPreview != null) {
       contentView.addView(wallpaperViewBlurPreview);
     }
+    contentView.addView(messagesView);
     if (!inPreviewMode) {
       contentView.addView(replyBarView);
     }
     contentView.addView(bottomSpace);
     contentView.addView(bottomWrap);
-    contentView.addView(messagesView);
     contentView.addView(bottomShadowView);
 
     contentView.addView(topBar);
@@ -1545,10 +1627,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       contentView.addView(messageSenderButton);
 
       applyNewChatUi();
-      wallpaperView.setGlassInvalidationListener(() -> {
-        if (newChatInput && inputView != null) inputView.invalidate();
-        if (headerView != null && Settings.instance().useNewChatHeader()) headerView.invalidate();
-      });
+      wallpaperView.setGlassInvalidationListener(this::invalidateChatGlass);
+      messagesView.setBackdropInvalidationListener(this::invalidateChatGlass);
       initSearchControls();
       contentView.addView(searchControlsLayout);
 
@@ -4370,6 +4450,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void destroy () {
     if (wallpaperView != null) wallpaperView.setGlassInvalidationListener(null);
+    if (messagesView != null) messagesView.setBackdropInvalidationListener(null);
     if (inputGlass != null) inputGlass.release();
     if (headerGlass != null) headerGlass.release();
     resetSelectableControl();
@@ -6661,6 +6742,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private final BoolAnimator bottomBarVisible = new BoolAnimator(ANIMATOR_BOTTOM_BUTTON, this, AnimatorUtils.DECELERATE_INTERPOLATOR, 180l);
 
   public int getBottomOffset () {
+    if (newChatInput) return 0;
     return (int) (getReplyOffset() + getAttachedFilesOffset());
   }
 
@@ -7611,7 +7693,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
     float y = -getReplyOffset();
     float offset = -getAttachedFilesOffset();
     final float keyboardOffset = -getKeyboardOffset();
-    messagesView.setTranslationY(y + offset + keyboardOffset);
+    messagesView.setTranslationY(newChatInput ? 0f : y + offset + keyboardOffset);
+    updateFloatingInsets();
     bottomShadowView.setTranslationY(y + offset + keyboardOffset);
     if (replyBarView != null) {
       replyBarView.setTranslationY(y + keyboardOffset);
@@ -9389,6 +9472,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         height = Screen.currentHeight() - HeaderView.getSize(true);
       }
 
+      if (useFloatingChatHeader()) height += getHeaderHeight();
       if (canWriteMessages() || actionShowing) {
         height -= Screen.dp(49f);
       }
@@ -9754,10 +9838,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public int getTopOffset () {
     int total = topBar.getTotalVisualHeight();
     total *= (1f - getSearchTransformFactor());
-    return total;
+    return total + (useFloatingChatHeader() ? getHeaderHeight() + Screen.dp(6f) : 0);
   }
 
   public final void onMessagesFrameChanged () {
+    updateFloatingInsets();
+    invalidateChatGlass();
     context().updateHackyOverlaysPositions();
     manager.onViewportMeasure();
     if (attachedFiles != null && attachedFiles.getParent() != null) {
@@ -12411,8 +12497,18 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override
+  protected int getHeaderTextColorId () {
+    return useFloatingChatHeader() ? ColorId.text : super.getHeaderTextColorId();
+  }
+
+  @Override
+  protected int getHeaderIconColorId () {
+    return useFloatingChatHeader() ? ColorId.icon : super.getHeaderIconColorId();
+  }
+
+  @Override
   protected int getHeaderColorId () {
-    if (previewSearchSender != null) {
+    if (previewSearchSender != null || useFloatingChatHeader()) {
       return ColorId.filling;
     }
     return super.getHeaderColorId();
@@ -13426,7 +13522,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void onThemeColorsChanged (boolean areTemp, ColorState state) {
     super.onThemeColorsChanged(areTemp, state);
-    if (newChatInput && inputView != null) inputView.invalidate();
+    invalidateChatGlass();
+    if (headerCell != null) headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
     if (headerView != null) headerView.invalidate();
     if (attachedFiles != null) {
       attachedFiles.getThemeProvider().onThemeColorsChanged(areTemp);

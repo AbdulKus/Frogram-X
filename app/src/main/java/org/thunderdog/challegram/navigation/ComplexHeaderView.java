@@ -739,14 +739,14 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     float darkness = Theme.getDarkFactor();
     if (darkness == 0f) {
       if (this instanceof ChatHeaderView) {
-        return Theme.headerTextColor();
+        return titleColor;
       } else {
         return ColorUtils.color(0xff, (subtitleColor & 0x00ffffff));
       }
     } else if (darkness == 1f) {
       return Theme.chatListActionColor();
     } else {
-      return ColorUtils.fromToArgb(this instanceof ChatHeaderView ? Theme.headerTextColor() : ColorUtils.color(0xff, (subtitleColor & 0x00ffffff)), Theme.chatListActionColor(), darkness);
+      return ColorUtils.fromToArgb(this instanceof ChatHeaderView ? titleColor : ColorUtils.color(0xff, (subtitleColor & 0x00ffffff)), Theme.chatListActionColor(), darkness);
     }
   }
 
@@ -1017,8 +1017,8 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
           int knownColorId = 0;
           if (darkness == 0f) {
             if (this instanceof ChatHeaderView) {
-              statusTextColor = Theme.headerTextColor();
-              knownColorId = ColorId.headerText;
+              statusTextColor = titleColor;
+              knownColorId = titleColor == Theme.headerTextColor() ? ColorId.headerText : 0;
             } else {
               statusTextColor = ColorUtils.color(0xff, (subtitleColor & 0x00ffffff));
             }
@@ -1026,7 +1026,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
             statusTextColor = Theme.chatListActionColor();
             knownColorId = ColorId.chatListAction;
           } else {
-            statusTextColor = ColorUtils.fromToArgb(this instanceof ChatHeaderView ? Theme.headerTextColor() : ColorUtils.color(0xff, (subtitleColor & 0x00ffffff)), Theme.chatListActionColor(), darkness);
+            statusTextColor = ColorUtils.fromToArgb(this instanceof ChatHeaderView ? titleColor : ColorUtils.color(0xff, (subtitleColor & 0x00ffffff)), Theme.chatListActionColor(), darkness);
             knownColorId = ColorId.chatListAction;
           }
           DrawAlgorithms.drawStatus(c, state, baseTextLeft, top + text.getLineHeight() / 2f, ColorUtils.alphaColor(statusVisibility, statusTextColor), this, statusVisibility == 1f ? knownColorId : 0);

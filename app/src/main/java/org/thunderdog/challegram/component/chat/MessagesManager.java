@@ -2971,7 +2971,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   public int getRecyclerHeight () {
     int height = manager.getHeight();
     if (height != 0 && controller.isFocused()) {
-      return height;
+      return Math.max(0, height - controller.getFloatingBottomInset());
     }
     return controller.makeGuessAboutHeight();
   }

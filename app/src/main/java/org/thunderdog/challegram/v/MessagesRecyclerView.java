@@ -44,6 +44,20 @@ import me.vkryl.core.MathUtils;
 public class MessagesRecyclerView extends RecyclerView implements FactorAnimator.Target {
   public static final long ITEM_ANIMATOR_DURATION = Config.DEBUG_REACTIONS_ANIMATIONS ? 1400l : 140L;
 
+  private Runnable backdropInvalidationListener;
+
+  public void setBackdropInvalidationListener (Runnable listener) {
+    backdropInvalidationListener = listener;
+  }
+
+  @Override protected void dispatchDraw (Canvas canvas) {
+    super.dispatchDraw(canvas);
+    // A glass capture uses a software canvas and must not trigger another capture.
+    if (canvas.isHardwareAccelerated() && backdropInvalidationListener != null) {
+      backdropInvalidationListener.run();
+    }
+  }
+
   private MessagesManager manager;
   private CustomTouchHelper touchHelper;
   private MessagesTouchHelperCallback callback;

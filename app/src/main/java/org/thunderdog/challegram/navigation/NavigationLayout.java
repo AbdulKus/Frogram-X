@@ -26,6 +26,8 @@ import me.vkryl.core.lambda.Destroyable;
 public class NavigationLayout extends FrameLayoutFix implements Destroyable, RootFrameLayout.InsetsChangeListener {
   public NavigationLayout (Context context) {
     super(context);
+    setClipToPadding(false);
+    setClipChildren(false);
   }
 
   private RootFrameLayout rootView;

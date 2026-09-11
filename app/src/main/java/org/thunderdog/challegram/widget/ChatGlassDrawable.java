@@ -22,7 +22,7 @@ import org.thunderdog.challegram.component.chat.WallpaperView;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Screen;
 
-/** Frosted chat wallpaper, never a capture of message text or another window. */
+/** A small in-memory backdrop of this chat, excluding the overlaid controls. */
 public final class ChatGlassDrawable extends Drawable {
   private final WallpaperView wallpaper;
   private final View host;
@@ -32,6 +32,8 @@ public final class ChatGlassDrawable extends Drawable {
   private final Path clip = new Path();
   private final int[] hostPosition = new int[2];
   private final int[] wallpaperPosition = new int[2];
+  private View messages;
+  private final int[] messagesPosition = new int[2];
   private Bitmap sample;
   private Canvas sampleCanvas;
   private Shader sheen;
@@ -41,6 +43,10 @@ public final class ChatGlassDrawable extends Drawable {
     this.wallpaper = wallpaper;
     this.host = host;
     this.colorId = colorId;
+  }
+
+  public void setMessages (View messages) {
+    this.messages = messages;
   }
 
   @Override protected void onBoundsChange (Rect bounds) {
@@ -84,6 +90,11 @@ public final class ChatGlassDrawable extends Drawable {
       sampleCanvas.scale(width / panel.width(), height / panel.height());
       sampleCanvas.translate(-x, -y);
       wallpaper.drawForGlass(sampleCanvas);
+      if (messages != null && messages.getWidth() > 0) {
+        messages.getLocationInWindow(messagesPosition);
+        sampleCanvas.translate(messagesPosition[0] - wallpaperPosition[0], messagesPosition[1] - wallpaperPosition[1]);
+        messages.draw(sampleCanvas);
+      }
       sampleCanvas.restoreToCount(sampleSave);
       U.blurBitmap(sample, 3, 1);
       paint.setColor(Color.WHITE);

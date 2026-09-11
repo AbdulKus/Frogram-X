@@ -249,6 +249,23 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
     setWillNotDraw(false);
   }
 
+  private boolean floatingSurface;
+
+  public void setFloatingSurface (boolean enabled) {
+    if (floatingSurface == enabled) return;
+    floatingSurface = enabled;
+    if (enabled) {
+      setBackground(null);
+      recyclerView.setBackground(null);
+      showAllButton.setBackground(null);
+    } else {
+      ViewSupport.setThemedBackground(this, ColorId.filling, null);
+      ViewSupport.setThemedBackground(recyclerView, ColorId.filling, null);
+      ViewSupport.setThemedBackground(showAllButton, ColorId.filling, null);
+    }
+    invalidate();
+  }
+
   private boolean ignoreAlbums;
 
   public void setIgnoreAlbums (boolean ignoreAlbums) {
@@ -273,7 +290,7 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
 
   @Override
   protected void onDraw (Canvas c) {
-    c.drawRect(0, getRecyclerHeight(), getMeasuredWidth(), getMeasuredHeight(), Paints.fillingPaint(Theme.fillingColor()));
+    if (!floatingSurface) c.drawRect(0, getRecyclerHeight(), getMeasuredWidth(), getMeasuredHeight(), Paints.fillingPaint(Theme.fillingColor()));
   }
 
   private int getContentInset () {

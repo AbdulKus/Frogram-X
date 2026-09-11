@@ -13,6 +13,10 @@
 package org.thunderdog.challegram.widget;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -67,6 +71,7 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
     final Item item;
     final View view;
     final ShadowView shadowView;
+    final Drawable background;
     final BoolAnimator isVisible;
 
     int height;
@@ -74,10 +79,39 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
     public Entry (Item item, View view, ShadowView shadowView, FactorAnimator.Target target) {
       this.item = item;
       this.view = view;
+      this.background = view.getBackground();
       this.shadowView = shadowView;
       this.isVisible = new BoolAnimator(0, target, AnimatorUtils.DECELERATE_INTERPOLATOR, 180l);
       this.height = item.getVisualHeight();
     }
+  }
+
+  private boolean floatingSurface;
+  private final Path surfaceClip = new Path();
+  private final RectF surfaceBounds = new RectF();
+
+  public void setFloatingSurface (boolean enabled) {
+    if (floatingSurface == enabled) return;
+    floatingSurface = enabled;
+    for (Entry entry : entries) {
+      entry.view.setBackground(enabled ? null : entry.background);
+    }
+    updatePositions();
+    invalidate();
+  }
+
+  @Override protected void dispatchDraw (Canvas canvas) {
+    if (!floatingSurface) {
+      super.dispatchDraw(canvas);
+      return;
+    }
+    int save = canvas.save();
+    surfaceBounds.set(0, -Screen.dp(56f), getWidth(), getTotalVisualHeight() + Screen.dp(6f));
+    surfaceClip.reset();
+    surfaceClip.addRoundRect(surfaceBounds, Screen.dp(26f), Screen.dp(26f), Path.Direction.CW);
+    canvas.clipPath(surfaceClip);
+    super.dispatchDraw(canvas);
+    canvas.restoreToCount(save);
   }
 
   private final ArrayList<Entry> entries = new ArrayList<>();
@@ -210,7 +244,7 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
 
       positionY += height;
 
-      entry.shadowView.setAlpha(visibility);
+      entry.shadowView.setAlpha(floatingSurface ? 0f : visibility);
       entry.shadowView.setTranslationY(positionY);
       if (entry.shadowView.getVisibility() != viewVisibility) {
         entry.shadowView.setVisibility(viewVisibility);
