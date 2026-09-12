@@ -80,6 +80,38 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
 
   // private int currentWidth;
   private int anchorMode;
+  private Drawable classicBackground;
+  private final android.graphics.Rect classicPadding = new android.graphics.Rect();
+  private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
+  private final android.graphics.Path surfaceClip = new android.graphics.Path();
+
+  public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
+    if (classicBackground == null) {
+      classicBackground = getBackground();
+      classicPadding.set(getPaddingLeft(), getPaddingTop(), getPaddingRight(), getPaddingBottom());
+    }
+    if (glass != null) glass.release();
+    glass = controller != null ? controller.createGlassSurface(this, ColorId.overlayFilling) : null;
+    setBackground(glass != null ? glass : classicBackground);
+    if (glass != null) {
+      setPadding(Screen.dp(6f), Screen.dp(8f), Screen.dp(6f), Screen.dp(8f));
+      setLayerType(LAYER_TYPE_NONE, null);
+    } else {
+      setPadding(classicPadding.left, classicPadding.top, classicPadding.right, classicPadding.bottom);
+    }
+  }
+
+  @Override protected void dispatchDraw (Canvas canvas) {
+    int save = canvas.save();
+    if (glass != null) {
+      surfaceClip.reset();
+      surfaceClip.addRoundRect(0, 0, getWidth(), getHeight(), Screen.dp(26f), Screen.dp(26f), android.graphics.Path.Direction.CW);
+      canvas.clipPath(surfaceClip);
+    }
+    super.dispatchDraw(canvas);
+    canvas.restoreToCount(save);
+  }
+
 
   private @Nullable ThemeListenerList themeListeners;
   private @Nullable ThemeDelegate forcedTheme;

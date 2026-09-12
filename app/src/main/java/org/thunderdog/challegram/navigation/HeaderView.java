@@ -254,7 +254,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       Views.setTopMargin(textTitle, Screen.dp(15f) + headerOffset);
       Views.setTopMargin(textPreview, Screen.dp(15f) + headerOffset);
       if (moreWrap != null) {
-        moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset());
+        moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset() + controlsInset(stack != null ? stack.getCurrent() : null));
       }
       if (title != textTitle) {
         dispatchOffset(title);
@@ -978,6 +978,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         }
       };
     }
+    moreWrap.setGlassSurface(null);
     moreWrap.setAnchorMode(MenuMoreWrap.ANCHOR_MODE_HEADER);
     moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset());
     showMore(null, options, null, onToggleItemClick, false, getThemeListeners());
@@ -1075,9 +1076,11 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         }
       };
     }
+    moreWrap.setGlassSurface(themeProvider instanceof org.thunderdog.challegram.ui.MessagesController &&
+      org.thunderdog.challegram.unsorted.Settings.instance().useNewChatMenu() ? (org.thunderdog.challegram.ui.MessagesController) themeProvider : null);
     moreWrap.setAnchorMode(MenuMoreWrap.ANCHOR_MODE_RIGHT);
     moreWrap.setRightNumber(buttonIndex);
-    moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset());
+    moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset() + controlsInset(themeProvider));
     showMore(ids, titles, icons, onMoreItemClick, isLayered, themeListenerList);
   }
 

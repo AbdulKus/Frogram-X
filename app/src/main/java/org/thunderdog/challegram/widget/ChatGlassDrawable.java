@@ -42,8 +42,9 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
   public void refresh () {
     if (released) return;
-    onViewDetachedFromWindow(host);
-    if (host.getWindowToken() != null) onViewAttachedToWindow(host);
+    if (host.getWindowToken() != null && (observer == null || !observer.isAlive() || observer != host.getViewTreeObserver())) {
+      onViewAttachedToWindow(host);
+    }
     backdropDirty = true;
     host.invalidate();
   }
@@ -64,7 +65,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     this.host = host;
     this.colorId = colorId;
     prepareFrame = () -> {
-      if (!released && enabled && host.isShown() && prepareBackdrop()) host.invalidate();
+      if (!released && enabled && host.isShown() && host.getAlpha() > 0f && prepareBackdrop()) host.invalidate();
       return true;
     };
     host.addOnAttachStateChangeListener(this);
@@ -74,6 +75,8 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   @Override public void onViewAttachedToWindow (View view) {
     if (released) return;
     if (observer != null && observer.isAlive()) observer.removeOnPreDrawListener(prepareFrame);
+    sample = null;
+    sampleCanvas = null;
     observer = host.getViewTreeObserver();
     observer.addOnPreDrawListener(prepareFrame);
     invalidateBackdrop();
@@ -110,10 +113,6 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     int save = canvas.save();
     canvas.clipPath(clip);
     paint.setShader(null);
-    paint.setColor(Theme.getColor(colorId));
-    paint.setAlpha(alpha);
-    canvas.drawRect(panel, paint);
-
     // Normally prepared by pre-draw. The fallback covers the very first bounds assignment.
     if (sample == null || backdropDirty) prepareBackdrop();
     if (sample != null) {
@@ -123,7 +122,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     }
     // Keep theme foreground colours legible even over a high-contrast photo.
     paint.setColor(Theme.getColor(colorId));
-    paint.setAlpha(Math.round(alpha * (Theme.isDark() ? .68f : .64f)));
+    paint.setAlpha(Math.round(alpha * (sample != null ? (Theme.isDark() ? .46f : .52f) : .82f)));
     canvas.drawRect(panel, paint);
     paint.setShader(sheen);
     paint.setAlpha(alpha);
@@ -147,7 +146,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   }
 
   private boolean prepareBackdrop () {
-    if (released || panel.isEmpty() || wallpaper.getWidth() == 0 || wallpaper.getHeight() == 0) return false;
+    if (released || !enabled || panel.isEmpty() || wallpaper.getWidth() == 0 || wallpaper.getHeight() == 0) return false;
     host.getLocationInWindow(hostPosition);
     wallpaper.getLocationInWindow(wallpaperPosition);
     int relativeX = hostPosition[0] - wallpaperPosition[0];
@@ -171,7 +170,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     sample.eraseColor(Theme.getColor(colorId));
 
     float x = hostPosition[0] - wallpaperPosition[0] + panel.left;
-    float y = Math.max(0, hostPosition[1] - wallpaperPosition[1] + panel.top);
+    float y = hostPosition[1] - wallpaperPosition[1] + panel.top;
     int sampleSave = sampleCanvas.save();
     sampleCanvas.scale(width / panel.width(), height / panel.height());
     sampleCanvas.translate(-x, -y);

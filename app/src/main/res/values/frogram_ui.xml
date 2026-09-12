@@ -7,4 +7,10 @@
   <item type="id" name="btn_newUi" />
   <item type="id" name="btn_newChatHeader" />
   <item type="id" name="btn_newChatInput" />
+  <string name="FrogramNewChatMenu">Chat menu</string>
+  <item type="id" name="btn_newChatMenu" />
+  <string name="FrogramNewChatSuggestions">Input suggestions</string>
+  <item type="id" name="btn_newChatSuggestions" />
+  <string name="FrogramNewChatActions">Chat action buttons</string>
+  <item type="id" name="btn_newChatActions" />
 </resources>

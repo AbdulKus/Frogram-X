@@ -3,4 +3,7 @@
   <string name="FrogramNewUi">Новый UI</string>
   <string name="FrogramNewChatHeader">Верхняя панель чата</string>
   <string name="FrogramNewChatInput">Нижняя панель чата</string>
+  <string name="FrogramNewChatMenu">Меню чата</string>
+  <string name="FrogramNewChatSuggestions">Подсказки ввода</string>
+  <string name="FrogramNewChatActions">Кнопки действий в чате</string>
 </resources>

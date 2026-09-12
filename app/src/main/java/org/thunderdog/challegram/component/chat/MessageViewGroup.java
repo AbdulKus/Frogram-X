@@ -87,6 +87,13 @@ public class MessageViewGroup extends ViewGroup implements Destroyable, AttachDe
     setLayoutParams(new RecyclerView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
   }
 
+  public void drawForGlass (Canvas canvas) {
+    if (messageView == null || messageView.getMessage() == null) return;
+    messageView.getMessage().drawBackground(messageView, canvas);
+    messageView.onDraw(canvas);
+    if (overlayView != null && overlayView.getParent() == this) overlayView.onDraw(canvas);
+  }
+
   public MessageOverlayView getOverlayView () {
     return overlayView;
   }

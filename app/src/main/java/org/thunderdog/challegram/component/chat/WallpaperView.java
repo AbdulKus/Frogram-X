@@ -367,7 +367,10 @@ public class WallpaperView extends View implements ThemeChangeListener, ChatStyl
 
   @Override
   protected void onDraw (Canvas c) {
+    int save = c.save();
+    c.clipRect(0, 0, getWidth(), getHeight());
     drawForGlass(c);
+    c.restoreToCount(save);
     if (glassInvalidationListener != null) glassInvalidationListener.run();
   }
 

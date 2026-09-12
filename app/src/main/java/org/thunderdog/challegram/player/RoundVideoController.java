@@ -383,7 +383,7 @@ public class RoundVideoController extends BasePlaybackController implements
       MessageOverlayView overlay = currentOwnedOverlay.getOverlayView();
       int save = canvas.save();
       canvas.translate(overlay.getX(), overlay.getY());
-      overlay.draw(canvas);
+      overlay.drawForGlass(canvas);
       canvas.restoreToCount(save);
     }
   }

@@ -20,7 +20,13 @@ public final class SettingsNewUiController extends RecyclerViewController<Void> 
   @Override protected void onCreateView (Context context, CustomRecyclerView recyclerView) {
     adapter = new SettingsAdapter(this) {
       @Override protected void setValuedSetting (ListItem item, SettingView view, boolean isUpdate) {
-        if (item.getId() == R.id.btn_newChatHeader) {
+        if (item.getId() == R.id.btn_newChatMenu) {
+          view.getToggler().setRadioEnabled(Settings.instance().useNewChatMenu(), isUpdate);
+        } else if (item.getId() == R.id.btn_newChatSuggestions) {
+          view.getToggler().setRadioEnabled(Settings.instance().useNewChatSuggestions(), isUpdate);
+        } else if (item.getId() == R.id.btn_newChatActions) {
+          view.getToggler().setRadioEnabled(Settings.instance().useNewChatActions(), isUpdate);
+        } else if (item.getId() == R.id.btn_newChatHeader) {
           view.getToggler().setRadioEnabled(Settings.instance().useNewChatHeader(), isUpdate);
         } else if (item.getId() == R.id.btn_newChatInput) {
           view.getToggler().setRadioEnabled(Settings.instance().useNewChatInput(), isUpdate);
@@ -32,13 +38,25 @@ public final class SettingsNewUiController extends RecyclerViewController<Void> 
       new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newChatHeader, 0, R.string.FrogramNewChatHeader),
       new ListItem(ListItem.TYPE_SEPARATOR_FULL),
       new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newChatInput, 0, R.string.FrogramNewChatInput),
+      new ListItem(ListItem.TYPE_SEPARATOR_FULL),
+      new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newChatMenu, 0, R.string.FrogramNewChatMenu),
+      new ListItem(ListItem.TYPE_SEPARATOR_FULL),
+      new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newChatSuggestions, 0, R.string.FrogramNewChatSuggestions),
+      new ListItem(ListItem.TYPE_SEPARATOR_FULL),
+      new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newChatActions, 0, R.string.FrogramNewChatActions),
       new ListItem(ListItem.TYPE_SHADOW_BOTTOM)
     }, false);
     recyclerView.setAdapter(adapter);
   }
 
   @Override public void onClick (View view) {
-    if (view.getId() == R.id.btn_newChatHeader) {
+    if (view.getId() == R.id.btn_newChatMenu) {
+      Settings.instance().setUseNewChatMenu(adapter.toggleView(view));
+    } else if (view.getId() == R.id.btn_newChatSuggestions) {
+      Settings.instance().setUseNewChatSuggestions(adapter.toggleView(view));
+    } else if (view.getId() == R.id.btn_newChatActions) {
+      Settings.instance().setUseNewChatActions(adapter.toggleView(view));
+    } else if (view.getId() == R.id.btn_newChatHeader) {
       Settings.instance().setUseNewChatHeader(adapter.toggleView(view));
     } else if (view.getId() == R.id.btn_newChatInput) {
       Settings.instance().setUseNewChatInput(adapter.toggleView(view));

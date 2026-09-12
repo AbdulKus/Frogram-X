@@ -159,12 +159,31 @@ public class RecordAudioVideoController implements
     updateColors();
   }
 
+  private org.thunderdog.challegram.widget.ChatGlassDrawable inputGlass;
+  private MessagesController glassController;
+
+  private void updateInputSurface (MessagesController controller) {
+    if (controller != null && !controller.useFloatingInput()) controller = null;
+    if (glassController != controller) {
+      if (inputGlass != null) inputGlass.release();
+      glassController = controller;
+      inputGlass = controller != null ? controller.createGlassSurface(inputOverlayView, ColorId.filling) : null;
+      inputOverlayView.setBackground(inputGlass);
+      FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) inputOverlayView.getLayoutParams();
+      params.leftMargin = params.rightMargin = controller != null ? Screen.dp(8f) : 0;
+      inputOverlayView.setLayoutParams(params);
+      Views.setLeftMargin(durationView, controller != null ? Screen.dp(8f) : 0);
+      if (inputGlass == null) inputOverlayView.setBackgroundColor(Theme.fillingColor());
+    }
+  }
+
   private void updateColors () {
     if (rootLayout == null) {
       return;
     }
 
-    this.inputOverlayView.setBackgroundColor(Theme.fillingColor());
+    if (inputGlass == null) this.inputOverlayView.setBackgroundColor(Theme.fillingColor());
+    else inputGlass.invalidateBackdrop();
     this.slideHintView.setTextColor(Theme.textDecentColor());
     this.cancelView.setTextColor(Theme.getColor(ColorId.textNeutral));
     this.videoPlaceholderView.setBackgroundColor(Theme.fillingColor());
@@ -767,9 +786,11 @@ public class RecordAudioVideoController implements
   }
 
   public void updatePositions () {
+    if (rootLayout == null) return;
     ViewController<?> c = UI.getCurrentStackItem(context);
     if (c instanceof MessagesController) {
       MessagesController chat = (MessagesController) c;
+      updateInputSurface(chat);
       View anchor = chat.getFloatingRecordAnchor();
       View view = anchor != null ? anchor : chat.getBottomWrap();
       int[] position = Views.getLocationInWindow(view).clone();
@@ -1322,8 +1343,8 @@ public class RecordAudioVideoController implements
 
     float videoRange = recordingVideo ? editRange : 0f;
     videoBackgroundView.setFactor(videoRange);
-    videoTopShadowView.setAlpha(videoRange);
-    videoBottomShadowView.setAlpha(videoRange);
+    videoTopShadowView.setAlpha(inputGlass != null ? 0f : videoRange);
+    videoBottomShadowView.setAlpha(inputGlass != null ? 0f : videoRange);
     videoLayout.setAlpha(videoRange);
     progressView.setAlpha(videoRange * Math.max(recordFactor, editFactor));
     progressView.setEditFactor(editAnimator.getFloatValue());

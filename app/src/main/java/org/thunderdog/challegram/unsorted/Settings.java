@@ -976,7 +976,7 @@ public class Settings {
     pmc.putFloat(key, value).apply();
   }
 
-  private Boolean newChatHeader, newChatInput;
+  private Boolean newChatHeader, newChatInput, newChatMenu, newChatSuggestions, newChatActions;
 
   public boolean useNewChatHeader () {
     return newChatHeader != null ? newChatHeader : (newChatHeader = getBoolean("frogram_ui_chat_header", true));
@@ -993,6 +993,15 @@ public class Settings {
   public void setUseNewChatInput (boolean enabled) {
     putBoolean("frogram_ui_chat_input", newChatInput = enabled);
   }
+
+  public boolean useNewChatMenu () { return newChatMenu != null ? newChatMenu : (newChatMenu = getBoolean("frogram_ui_chat_menu", true)); }
+  public void setUseNewChatMenu (boolean enabled) { putBoolean("frogram_ui_chat_menu", newChatMenu = enabled); }
+
+  public boolean useNewChatSuggestions () { return newChatSuggestions != null ? newChatSuggestions : (newChatSuggestions = getBoolean("frogram_ui_chat_suggestions", true)); }
+  public void setUseNewChatSuggestions (boolean enabled) { putBoolean("frogram_ui_chat_suggestions", newChatSuggestions = enabled); }
+
+  public boolean useNewChatActions () { return newChatActions != null ? newChatActions : (newChatActions = getBoolean("frogram_ui_chat_actions", true)); }
+  public void setUseNewChatActions (boolean enabled) { putBoolean("frogram_ui_chat_actions", newChatActions = enabled); }
 
   public void putBoolean (String key, boolean value) {
     pmc.putBoolean(key, value);

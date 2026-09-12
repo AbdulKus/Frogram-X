@@ -87,6 +87,23 @@ public class InlineResultsWrap extends FrameLayoutFix implements View.OnClickLis
   private final InlineResultsAdapter adapter;
   private int layoutMode;
   private float backgroundFactor;
+  private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
+  private MessagesController glassController;
+  private final android.graphics.Path surfaceClip = new android.graphics.Path();
+
+  private void updateSurface () {
+    MessagesController controller = offsetProvider == null && !adapter.useDarkMode() &&
+      org.thunderdog.challegram.unsorted.Settings.instance().useNewChatSuggestions() ? findMessagesController() : null;
+    if (controller == glassController && (controller != null || recyclerView.getPaddingLeft() == 0)) return;
+    if (glass != null) glass.release();
+    glassController = controller;
+    glass = controller != null ? controller.createGlassSurface(recyclerView, ColorId.filling) : null;
+    shadowView.setVisibility(glass != null ? GONE : VISIBLE);
+    int side = glass != null ? Screen.dp(8f) : 0;
+    recyclerView.setPadding(side, 0, side, 0);
+    recyclerView.invalidate();
+  }
+
 
   private static final int LAYOUT_MODE_LINEAR = 0;
   private static final int LAYOUT_MODE_FLOW = 1;
@@ -170,6 +187,7 @@ public class InlineResultsWrap extends FrameLayoutFix implements View.OnClickLis
       public boolean onTouchEvent (MotionEvent e) {
         switch (e.getAction()) {
           case MotionEvent.ACTION_DOWN: {
+            if (glass != null && (e.getX() < Screen.dp(8f) || e.getX() > getWidth() - Screen.dp(8f))) return false;
             int i = flowManager.findFirstVisibleItemPosition();
             ignoreTouch = false;
             if (i == 0) {
@@ -206,9 +224,19 @@ public class InlineResultsWrap extends FrameLayoutFix implements View.OnClickLis
       public void draw (Canvas c) {
         int top = detectRecyclerTopEdge();
         int width = getMeasuredWidth();
-        c.drawRect(0, top, width, getMeasuredHeight(), Paints.fillingPaint(adapter.useDarkMode() ? Theme.getColor(ColorId.filling, ThemeId.NIGHT_BLACK) : Theme.fillingColor()));
-
+        int save = c.save();
+        if (glass != null) {
+          int side = Screen.dp(8f);
+          glass.setBounds(side, top, width - side, getMeasuredHeight());
+          glass.draw(c);
+          surfaceClip.reset();
+          surfaceClip.addRoundRect(side, top, width - side, getMeasuredHeight(), Screen.dp(22f), Screen.dp(22f), android.graphics.Path.Direction.CW);
+          c.clipPath(surfaceClip);
+        } else {
+          c.drawRect(0, top, width, getMeasuredHeight(), Paints.fillingPaint(adapter.useDarkMode() ? Theme.getColor(ColorId.filling, ThemeId.NIGHT_BLACK) : Theme.fillingColor()));
+        }
         super.draw(c);
+        c.restoreToCount(save);
       }
     };
     recyclerView.addItemDecoration(new RecyclerView.ItemDecoration() {
@@ -839,6 +867,8 @@ public class InlineResultsWrap extends FrameLayoutFix implements View.OnClickLis
   }
 
   public void updatePosition (boolean needTranslate) {
+    updateSurface();
+    if (glass != null) glass.invalidateBackdrop();
     if (offsetProvider != null) {
       setBottomMargin(offsetProvider.provideOffset(this));
     } else {
@@ -901,12 +931,16 @@ public class InlineResultsWrap extends FrameLayoutFix implements View.OnClickLis
   protected void onAttachedToWindow () {
     super.onAttachedToWindow();
     rootView = Views.findAncestor(this, RootFrameLayout.class, true);
+    updateSurface();
   }
 
   @Override
   protected void onDetachedFromWindow () {
     super.onDetachedFromWindow();
     rootView = null;
+    if (glass != null) glass.release();
+    glass = null;
+    glassController = null;
   }
 
   public int getMinItemsHeight () {

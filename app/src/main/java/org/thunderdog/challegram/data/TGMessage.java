@@ -1400,7 +1400,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
       return Screen.dp(7f);
     }
 
-    return (flags & FLAG_EXTRA_PADDING) != 0 ? Screen.dp(7f) + (messagesController().needExtraBigPadding() ? Screen.dp(48f) : 0) : 0;
+    return (flags & FLAG_EXTRA_PADDING) != 0 ? Screen.dp(7f) + (messagesController().needExtraBigPadding() ? messagesController().getActionBarHeight() : 0) : 0;
   }
 
   public int computeHeight () {

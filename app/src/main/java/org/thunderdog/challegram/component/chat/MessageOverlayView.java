@@ -78,6 +78,8 @@ public class MessageOverlayView extends View {
     }
   }
 
+  public void drawForGlass (Canvas canvas) { onDraw(canvas); }
+
   @Override
   protected void onDraw (Canvas c) {
     if (msg != null) {

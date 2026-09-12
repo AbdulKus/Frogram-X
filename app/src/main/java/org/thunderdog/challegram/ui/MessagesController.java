@@ -348,6 +348,18 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private FrameLayoutFix videoLayer;
   private View floatingPlayerView;
   private ChatGlassDrawable playerGlass;
+  private final java.util.ArrayList<java.lang.ref.WeakReference<ChatGlassDrawable>> extraGlass = new java.util.ArrayList<>();
+
+  public ChatGlassDrawable createGlassSurface (View host, int colorId) {
+    ChatGlassDrawable glass = new ChatGlassDrawable(wallpaperView, host, colorId);
+    glass.setMessages(messagesView);
+    glass.setVideoLayer(this::drawVideoForGlass);
+    extraGlass.add(new java.lang.ref.WeakReference<>(glass));
+    return glass;
+  }
+
+  public boolean useFloatingInput () { return newChatInput; }
+
   private float floatingPlayerOffset;
 
   private int getGlassTopExtension () {
@@ -406,6 +418,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void invalidateChatGlass () {
+    for (int i = extraGlass.size() - 1; i >= 0; i--) {
+      ChatGlassDrawable glass = extraGlass.get(i).get();
+      if (glass == null) extraGlass.remove(i); else glass.invalidateBackdrop();
+    }
     if (newChatInput && inputGlass != null) inputGlass.invalidateBackdrop();
     if (headerGlass != null && useFloatingChatHeader()) headerGlass.invalidateBackdrop();
     if (playerGlass != null && hasFloatingPlayer()) playerGlass.invalidateBackdrop();
@@ -416,6 +432,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     updatingFloatingInsets = true;
     try {
       int header = useFloatingChatHeader() ? getGlassTopExtension() : 0;
+      contentView.setTopOverflow(header);
       int top = header > 0 ? header + topBar.getTotalVisualHeight() + Screen.dp(6f) + getFloatingPlayerInset() : 0;
       int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
       if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
@@ -454,6 +471,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     RelativeLayout.LayoutParams wallpaperParams = (RelativeLayout.LayoutParams) wallpaperView.getLayoutParams();
     wallpaperParams.topMargin = -header;
     wallpaperView.setLayoutParams(wallpaperParams);
+    contentView.setTopOverflow(header);
     contentView.setClipChildren(!floatingHeader);
     contentView.setClipToPadding(!floatingHeader);
 
@@ -466,6 +484,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
       inputGlass.setVideoLayer(this::drawVideoForGlass);
     }
     newChatInput = enabled;
+    bottomBar.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
+    Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
+    if (needBigPadding) manager.rebuildLastItem();
     inputGlass.setEnabled(enabled);
     inputView.setBackground(enabled ? inputGlass : classicInputBackground);
     LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
@@ -838,7 +859,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     iterateMediaTabs(c ->
       c.setBottomInset(extraBottomInset, extraBottomInsetWithoutIme)
     );
-    Views.setLayoutHeight(bottomBar, Screen.dp(48f) + extraBottomInsetWithoutIme);
+    Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
     Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme);
     checkScrollButtonOffsets();
     updateMessagesViewInset();
@@ -1672,7 +1693,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
     // Bottom bar
 
-    params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(48f) + extraBottomInsetWithoutIme);
+    params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, getActionBarHeight() + extraBottomInsetWithoutIme);
     params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
 
     bottomBar = new ChatBottomBarView(context, tdlib) {
@@ -1799,7 +1820,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
       pagerContentView.setAdapter(pagerContentAdapter);
       pagerContentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-      FrameLayoutFix contentView = new FrameLayoutFix(context);
+      FrameLayoutFix contentView = new FrameLayoutFix(context) {
+        @Override protected void dispatchDraw (Canvas canvas) {
+          int save = canvas.save();
+          canvas.clipRect(0, useFloatingChatHeader() ? -getGlassTopExtension() : 0, getWidth(), getHeight());
+          super.dispatchDraw(canvas);
+          canvas.restoreToCount(save);
+        }
+      };
       contentView.setClipChildren(false);
       contentView.setClipToPadding(false);
       contentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -4290,7 +4318,6 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void onFocus () {
     super.onFocus();
-    applyNewChatUi();
     if (!allowLayerTypeChanges()) getValue().setLayerType(View.LAYER_TYPE_NONE, null);
     if (inputGlass != null) inputGlass.refresh();
     if (headerGlass != null) headerGlass.refresh();
@@ -4404,6 +4431,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void onPrepareToShow () {
     super.onPrepareToShow();
+    applyNewChatUi();
     triggerOneShot = false;
     if (headerCell != null) { // Fix for new profiles
       headerCell.setTranslationX(0f);
@@ -4567,6 +4595,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (inputGlass != null) inputGlass.release();
     if (headerGlass != null) headerGlass.release();
     if (playerGlass != null) playerGlass.release();
+    for (java.lang.ref.WeakReference<ChatGlassDrawable> reference : extraGlass) {
+      ChatGlassDrawable glass = reference.get();
+      if (glass != null) glass.release();
+    }
+    extraGlass.clear();
     resetSelectableControl();
 
     discardAttachedFiles(false);
@@ -6830,12 +6863,16 @@ public class MessagesController extends ViewController<MessagesController.Argume
     checkExtraPadding();
   }
 
+  public int getActionBarHeight () {
+    return Screen.dp(!inPreviewMode && !isInForceTouchMode() && Settings.instance().useNewChatActions() ? 60f : 48f);
+  }
+
   private void updateBottomBarStyle () {
     if (bottomBar == null)
       return;
     float bottomButtonFactor = bottomBarVisible.getFloatValue();
     float detachFactor = scrollToBottomVisible.getFloatValue();
-    int barHeight = Screen.dp(48f) + extraBottomInset;
+    int barHeight = getActionBarHeight() + extraBottomInset;
     int baseY = needSearchControlsTranslate() ? (int) ((float) barHeight * MathUtils.clamp(searchControlsFactor)) : 0;
     float fromY = bottomButtonFactor == 1f ? baseY : baseY + (int) ((float) barHeight * (1f - bottomButtonFactor));
     float alpha = (1f - 1f * detachFactor * (1f - bottomButtonFactor)) * (1f - searchControlsFactor);

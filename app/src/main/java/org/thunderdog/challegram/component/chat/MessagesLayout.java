@@ -34,6 +34,24 @@ public class MessagesLayout extends RelativeLayout implements Animated {
     this.controller = controller;
   }
 
+  private int topOverflow;
+
+  public void setTopOverflow (int height) {
+    if (topOverflow != height) {
+      topOverflow = height;
+      invalidate();
+    }
+  }
+
+  @Override
+  protected void dispatchDraw (android.graphics.Canvas canvas) {
+    int save = canvas.save();
+    // Only the status/header area may overflow. Never paint into the adjacent page.
+    canvas.clipRect(0, -topOverflow, getWidth(), getHeight());
+    super.dispatchDraw(canvas);
+    canvas.restoreToCount(save);
+  }
+
   boolean changedMin;
   int lastMeasuredWidth;
 

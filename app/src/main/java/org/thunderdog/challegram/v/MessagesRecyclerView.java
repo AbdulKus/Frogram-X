@@ -55,7 +55,23 @@ public class MessagesRecyclerView extends RecyclerView implements FactorAnimator
   public void drawForGlass (Canvas canvas) {
     capturingGlass = true;
     try {
-      draw(canvas);
+      for (int i = 0; i < getChildCount(); i++) {
+        View child = getChildAt(i);
+        if (child.getVisibility() != View.VISIBLE || child.getAlpha() == 0f) continue;
+        int save = canvas.save();
+        canvas.translate(child.getLeft(), child.getTop());
+        canvas.concat(child.getMatrix());
+        if (canvas.clipRect(0, 0, child.getWidth(), child.getHeight())) {
+          if (child.getAlpha() < 1f) canvas.saveLayerAlpha(0, 0, child.getWidth(), child.getHeight(), Math.round(255f * child.getAlpha()));
+          if (child instanceof org.thunderdog.challegram.component.chat.MessageView) {
+            org.thunderdog.challegram.component.chat.MessageView message = (org.thunderdog.challegram.component.chat.MessageView) child;
+            if (message.getMessage() != null) message.onDraw(canvas);
+          } else if (child instanceof org.thunderdog.challegram.component.chat.MessageViewGroup) {
+            ((org.thunderdog.challegram.component.chat.MessageViewGroup) child).drawForGlass(canvas);
+          }
+        }
+        canvas.restoreToCount(save);
+      }
     } finally {
       capturingGlass = false;
     }

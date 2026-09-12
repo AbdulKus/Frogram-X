@@ -48,6 +48,16 @@ import me.vkryl.core.MathUtils;
 
 public class ChatBottomBarView extends BaseView {
   private Drawable drawable;
+  private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
+  private org.thunderdog.challegram.ui.MessagesController glassController;
+
+  public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
+    if (glassController == controller) return;
+    if (glass != null) glass.release();
+    glassController = controller;
+    glass = controller != null ? controller.createGlassSurface(this, ColorId.filling) : null;
+    update();
+  }
 
   public ChatBottomBarView (Context context, Tdlib tdlib) {
     super(context, tdlib);
@@ -56,6 +66,11 @@ public class ChatBottomBarView extends BaseView {
       @Override
       public void draw (@NonNull Canvas c) {
         RectF rectF = buildRectF();
+        if (glass != null) {
+          glass.setBounds(Math.round(rectF.left), Math.round(rectF.top), Math.round(rectF.right), Math.round(rectF.bottom));
+          glass.draw(c);
+          return;
+        }
         int radius = calculateRadius();
         int color = ColorUtils.fromToArgb(Theme.fillingColor(), Theme.getColor(ColorId.circleButtonChat), collapseFactor);
         if (radius == 0) {
@@ -98,7 +113,7 @@ public class ChatBottomBarView extends BaseView {
   }
 
   private int calculateRadius () {
-    return (int) (Screen.dp(48f) / 2f * collapseFactor);
+    return glass != null ? Screen.dp(24f) : (int) (Screen.dp(48f) / 2f * collapseFactor);
   }
 
   private final RectF fromRect = new RectF(), toRect = new RectF();
@@ -113,7 +128,8 @@ public class ChatBottomBarView extends BaseView {
     float centerX = fromWidth / 2f;
     float centerY = getPaddingTop() + (getMeasuredHeight() - getPaddingTop() - getPaddingBottom()) / 2f;
 
-    fromRect.set(0, 0, fromWidth, fromHeight);
+    if (glass != null) fromRect.set(Screen.dp(8f), Screen.dp(6f), fromWidth - Screen.dp(8f), fromHeight - getPaddingBottom() - Screen.dp(6f));
+    else fromRect.set(0, 0, fromWidth, fromHeight);
     toRect.set(
       centerX - toSize / 2f,
       centerY - toSize / 2f,
@@ -195,7 +211,7 @@ public class ChatBottomBarView extends BaseView {
         drawingText.draw(c, (int) (cx - drawingText.getWidth() / 2f), (int) (cy - drawingText.getHeight() / 2f), null, factor * (1f - collapseFactor));
       }
       if (collapseFactor > 0f && drawable != null) {
-        Paint paint = PorterDuffPaint.get(ColorId.circleButtonChatIcon, factor * collapseFactor);
+        Paint paint = PorterDuffPaint.get(((ChatBottomBarView) view).glass != null ? ColorId.textNeutral : ColorId.circleButtonChatIcon, factor * collapseFactor);
         Drawables.drawCentered(c, drawable, cx, cy, paint);
       }
       if (needScale) {
