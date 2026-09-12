@@ -1693,7 +1693,9 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       }
     }
 
-    if (useHeightSwitch || useColorSwitch || useShadowSwitch || useBackColorSwitch) {
+    if (useHeightSwitch || useColorSwitch || useShadowSwitch || useBackColorSwitch ||
+        (previewOpened && ((baseItem != null && baseItem.hasFloatingHeader()) || (previewItem != null && previewItem.hasFloatingHeader())))) {
+      // The exposed glass region changes even when both pages have identical theme colours.
       invalidate();
     }
 
