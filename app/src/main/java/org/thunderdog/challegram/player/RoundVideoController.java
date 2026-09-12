@@ -1363,7 +1363,10 @@ public class RoundVideoController extends BasePlaybackController implements
       }
       MessagesRecyclerView recyclerView = m.getMessagesView();
       int translationY = (int) recyclerView.getTranslationY() - Views.getBottomMargin(recyclerView);
-      int topOffset = m.getTopOffset();
+      // The recycler can extend above the controller under the floating header.
+      // Its children are in recycler coordinates; the video layer starts below the header.
+      totalY += recyclerView.getTop();
+      int topOffset = m.getTopOffset() + recyclerView.getTop();
       topOffset += UI.getContext(context).navigation().getHeaderView().getFilling().getPlayerOffset();
       setMargins(topOffset + Math.max(0, translationY), bottomOffset + Math.max(-translationY, 0));
       abort = abort || !m.isFocused() && isAnimatingBackward;

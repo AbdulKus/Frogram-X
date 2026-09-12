@@ -50,12 +50,34 @@ public class MessagesRecyclerView extends RecyclerView implements FactorAnimator
     backdropInvalidationListener = listener;
   }
 
-  @Override protected void dispatchDraw (Canvas canvas) {
-    super.dispatchDraw(canvas);
-    // A glass capture uses a software canvas and must not trigger another capture.
-    if (canvas.isHardwareAccelerated() && backdropInvalidationListener != null) {
-      backdropInvalidationListener.run();
+  private boolean capturingGlass;
+
+  public void drawForGlass (Canvas canvas) {
+    capturingGlass = true;
+    try {
+      draw(canvas);
+    } finally {
+      capturingGlass = false;
     }
+  }
+
+  private void invalidateBackdrop () {
+    if (!capturingGlass && backdropInvalidationListener != null) backdropInvalidationListener.run();
+  }
+
+  @Override public void onDescendantInvalidated (View child, View target) {
+    super.onDescendantInvalidated(child, target);
+    invalidateBackdrop();
+  }
+
+  @Override public android.view.ViewParent invalidateChildInParent (int[] location, android.graphics.Rect dirty) {
+    invalidateBackdrop();
+    return super.invalidateChildInParent(location, dirty);
+  }
+
+  @Override public void onScrolled (int dx, int dy) {
+    super.onScrolled(dx, dy);
+    invalidateBackdrop();
   }
 
   public void setOverlayPadding (int top, int bottom) {

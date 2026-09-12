@@ -1262,6 +1262,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
     return true;
   }
 
+  public boolean hasFloatingPlayer () { return false; }
+
+  public void invalidateFloatingPlayer () { }
+
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
     return false;
   }

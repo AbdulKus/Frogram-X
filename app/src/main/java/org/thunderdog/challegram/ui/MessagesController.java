@@ -281,6 +281,7 @@ import me.vkryl.android.widget.FrameLayoutFix;
 import me.vkryl.core.ArrayUtils;
 import me.vkryl.core.BitwiseUtils;
 import me.vkryl.core.MathUtils;
+import me.vkryl.core.ColorUtils;
 import me.vkryl.core.StringUtils;
 import me.vkryl.core.collection.IntList;
 import me.vkryl.core.collection.LongList;
@@ -344,6 +345,25 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private ChatGlassDrawable headerGlass;
 
   private View topGlassView;
+  private View floatingPlayerView;
+  private ChatGlassDrawable playerGlass;
+  private float floatingPlayerOffset;
+
+  private int getGlassTopExtension () {
+    return getHeaderHeight() + context().getRootView().getTopInset();
+  }
+
+  @Override public boolean hasFloatingPlayer () {
+    return useFloatingChatHeader() && pagerScrollOffset == 0f && !inTransformMode();
+  }
+
+  @Override public void invalidateFloatingPlayer () {
+    if (floatingPlayerView != null) floatingPlayerView.invalidate();
+  }
+
+  private int getFloatingPlayerInset () {
+    return hasFloatingPlayer() && floatingPlayerOffset > 0f ? Math.round(floatingPlayerOffset) + Screen.dp(12f) : 0;
+  }
   private boolean updatingFloatingInsets;
   private final android.graphics.Rect floatingReplyClip = new android.graphics.Rect();
 
@@ -356,16 +376,17 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void invalidateChatGlass () {
-    if (newChatInput && inputView != null) inputView.invalidate();
-    if (topGlassView != null && useFloatingChatHeader()) topGlassView.invalidate();
+    if (newChatInput && inputGlass != null) inputGlass.invalidateBackdrop();
+    if (headerGlass != null && useFloatingChatHeader()) headerGlass.invalidateBackdrop();
+    if (playerGlass != null && hasFloatingPlayer()) playerGlass.invalidateBackdrop();
   }
 
   private void updateFloatingInsets () {
     if (updatingFloatingInsets || messagesView == null || bottomWrap == null || topBar == null) return;
     updatingFloatingInsets = true;
     try {
-      int header = useFloatingChatHeader() ? getHeaderHeight() : 0;
-      int top = header > 0 ? header + topBar.getTotalVisualHeight() + Screen.dp(6f) : 0;
+      int header = useFloatingChatHeader() ? getGlassTopExtension() : 0;
+      int top = header > 0 ? header + topBar.getTotalVisualHeight() + Screen.dp(6f) + getFloatingPlayerInset() : 0;
       int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
       if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
         // Includes multiline input, emoji/bot keyboards and the system gesture inset.
@@ -373,8 +394,17 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
       messagesView.setOverlayPadding(top, bottom);
       if (topGlassView != null) {
+        // Include the status bar in the backdrop, but keep the island below it.
+        Views.setTopMargin(topGlassView, -header);
         Views.setLayoutHeight(topGlassView, header + topBar.getTotalVisualHeight() + Screen.dp(6f));
+        Views.setTopMargin(messagesView, -header);
+        Views.setTopMargin(wallpaperView, -header);
         topGlassView.invalidate();
+      }
+      if (floatingPlayerView != null) {
+        Views.setTopMargin(floatingPlayerView, topBar.getTotalVisualHeight() + Screen.dp(12f));
+        Views.setLayoutHeight(floatingPlayerView, Math.round(floatingPlayerOffset));
+        floatingPlayerView.setVisibility(hasFloatingPlayer() && floatingPlayerOffset > 0f ? View.VISIBLE : View.GONE);
       }
       if (replyBarView != null && newChatInput) {
         floatingReplyClip.set(0, 0, replyBarView.getWidth(), Math.round(getReplyOffset()));
@@ -389,7 +419,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private void applyNewChatUi () {
     if (inputView == null || inPreviewMode || isInForceTouchMode()) return;
     boolean floatingHeader = useFloatingChatHeader();
-    int header = floatingHeader ? getHeaderHeight() : 0;
+    int header = floatingHeader ? getGlassTopExtension() : 0;
     RelativeLayout.LayoutParams wallpaperParams = (RelativeLayout.LayoutParams) wallpaperView.getLayoutParams();
     wallpaperParams.topMargin = -header;
     wallpaperView.setLayoutParams(wallpaperParams);
@@ -404,6 +434,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       inputGlass.setMessages(messagesView);
     }
     newChatInput = enabled;
+    inputGlass.setEnabled(enabled);
     inputView.setBackground(enabled ? inputGlass : classicInputBackground);
     LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
     int side = enabled ? Screen.dp(8f) : 0;
@@ -433,19 +464,21 @@ public class MessagesController extends ViewController<MessagesController.Argume
     RelativeLayout.LayoutParams topParams = (RelativeLayout.LayoutParams) topBar.getLayoutParams();
     topParams.leftMargin = topParams.rightMargin = floatingHeader ? Screen.dp(8f) : 0;
     topBar.setLayoutParams(topParams);
+    topBar.setTranslationY(floatingHeader ? 0f : floatingPlayerOffset);
     topBar.setFloatingSurface(floatingHeader);
     pinnedMessagesBar.setFloatingSurface(floatingHeader);
     if (topGlassView == null) {
       topGlassView = new View(context()) {
+        @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+          super.onSizeChanged(w, h, oldw, oldh);
+          headerGlass.setBounds(Screen.dp(8f), context().getRootView().getTopInset() + Screen.dp(3f), w - Screen.dp(8f), h);
+        }
         @Override protected void onDraw (Canvas canvas) {
-          if (headerGlass == null) {
-            headerGlass = new ChatGlassDrawable(wallpaperView, this, ColorId.filling);
-            headerGlass.setMessages(messagesView);
-          }
-          headerGlass.setBounds(Screen.dp(8f), Screen.dp(3f), getWidth() - Screen.dp(8f), getHeight());
           headerGlass.draw(canvas);
         }
       };
+      headerGlass = new ChatGlassDrawable(wallpaperView, topGlassView, ColorId.filling);
+      headerGlass.setMessages(messagesView);
       topGlassView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
       contentView.addView(topGlassView, contentView.indexOfChild(topBar));
       addThemeInvalidateListener(topGlassView);
@@ -454,6 +487,35 @@ public class MessagesController extends ViewController<MessagesController.Argume
     glassParams.topMargin = -header;
     topGlassView.setLayoutParams(glassParams);
     topGlassView.setVisibility(floatingHeader ? View.VISIBLE : View.GONE);
+    if (floatingPlayerView == null) {
+      floatingPlayerView = new View(context()) {
+        private final android.graphics.Path playerClip = new android.graphics.Path();
+        @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+          super.onSizeChanged(w, h, oldw, oldh);
+          playerGlass.setBounds(Screen.dp(8f), 0, w - Screen.dp(8f), h);
+        }
+        @Override protected void onDraw (Canvas canvas) {
+          if (headerView == null) return;
+          playerGlass.draw(canvas);
+          int save = canvas.save();
+          playerClip.reset();
+          playerClip.addRoundRect(Screen.dp(8f), 0, getWidth() - Screen.dp(8f), getHeight(), Screen.dp(18f), Screen.dp(18f), android.graphics.Path.Direction.CW);
+          canvas.clipPath(playerClip);
+          headerView.getFilling().drawFloatingPlayer(canvas, getHeight());
+          canvas.restoreToCount(save);
+        }
+        @Override public boolean onTouchEvent (MotionEvent event) {
+          return headerView != null && headerView.getFilling().onFloatingPlayerTouch(event, getHeight());
+        }
+      };
+      playerGlass = new ChatGlassDrawable(wallpaperView, floatingPlayerView, ColorId.filling);
+      playerGlass.setMessages(messagesView);
+      floatingPlayerView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+      contentView.addView(floatingPlayerView, contentView.indexOfChild(topBar) + 1);
+      addThemeInvalidateListener(floatingPlayerView);
+    }
+    if (headerView != null) floatingPlayerOffset = headerView.getFilling().getPlayerOffset();
+    headerCell.setContentInsetY(floatingHeader ? Screen.dp(4.5f) : 0);
     headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
     if (headerView != null) headerView.resetColors(this, null);
     inputView.checkPlaceholderWidth();
@@ -465,7 +527,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
     if (!useFloatingChatHeader() || topGlassView == null || pagerScrollOffset != 0f) return false;
     // The shared surface is in the chat layer, behind both the title and pinned rows.
-    c.drawRect(0, 0, width, header.getEffectiveTopOffset(), Paints.fillingPaint(color));
+    c.drawRect(0, 0, width, header.getEffectiveTopOffset(), Paints.fillingPaint(ColorUtils.alphaColor(.45f, Theme.fillingColor())));
     return true;
   }
 
@@ -626,7 +688,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   protected boolean applyPlayerOffset (float factor, float top) {
-    if (super.applyPlayerOffset(factor, top)) {
+    floatingPlayerOffset = top;
+    boolean changed = super.applyPlayerOffset(factor, top);
+    if (hasFloatingPlayer() && topBar != null) topBar.setTranslationY(0f);
+    updateFloatingInsets();
+    invalidateFloatingPlayer();
+    if (changed) {
       if (messagesView != null) {
         messagesView.invalidateDate();
       }
@@ -1826,6 +1893,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     pagerHeaderView.getTopView().setSelectionFactor(offset);
     if (this.pagerScrollOffset != offset) {
       this.pagerScrollOffset = offset;
+      updateFloatingInsets();
       if (headerView != null) headerView.invalidate();
       if (hideKeyboardOnPageScroll) {
         hideKeyboardOnPageScroll = false;
@@ -4452,6 +4520,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (messagesView != null) messagesView.setBackdropInvalidationListener(null);
     if (inputGlass != null) inputGlass.release();
     if (headerGlass != null) headerGlass.release();
+    if (playerGlass != null) playerGlass.release();
     resetSelectableControl();
 
     discardAttachedFiles(false);
@@ -9471,7 +9540,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         height = Screen.currentHeight() - HeaderView.getSize(true);
       }
 
-      if (useFloatingChatHeader()) height += getHeaderHeight();
+      if (useFloatingChatHeader()) height += getGlassTopExtension();
       if (canWriteMessages() || actionShowing) {
         height -= Screen.dp(49f);
       }
@@ -9837,7 +9906,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public int getTopOffset () {
     int total = topBar.getTotalVisualHeight();
     total *= (1f - getSearchTransformFactor());
-    return total + (useFloatingChatHeader() ? getHeaderHeight() + Screen.dp(6f) : 0);
+    return total + (useFloatingChatHeader() ? getGlassTopExtension() + Screen.dp(6f) + (floatingPlayerOffset > 0f ? Screen.dp(12f) : 0) : 0);
   }
 
   public final void onMessagesFrameChanged () {
@@ -11438,8 +11507,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
           if (holder instanceof MessagesHolder && ((MessagesHolder.isMessageType(holder.getItemViewType())))) {
             TGMessage msg = manager.getAdapter().getMessage(i);
             // FIXME state with FOLLOW
-            int offset = (int) messagesView.getTranslationY();
-            return msg.getMediaThumbLocation(item.getSourceMessageId(), view, view.getTop() - getTopOffset(), messagesView.getBottom() - view.getBottom(), view.getTop() + HeaderView.getSize(true) + offset);
+            int[] location = new int[2];
+            messagesView.getLocationInWindow(location);
+            int playerOffset = headerView != null ? headerView.getFilling().getPlayerOffset() : 0;
+            return msg.getMediaThumbLocation(item.getSourceMessageId(), view, view.getTop() - getTopOffset() - playerOffset, messagesView.getHeight() - messagesView.getPaddingBottom() - view.getBottom(), view.getTop() + location[1]);
           }
         }
       }

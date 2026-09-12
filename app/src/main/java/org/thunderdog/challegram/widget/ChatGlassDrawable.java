@@ -13,6 +13,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.view.View;
+import android.view.ViewTreeObserver;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -21,9 +22,10 @@ import org.thunderdog.challegram.U;
 import org.thunderdog.challegram.component.chat.WallpaperView;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Screen;
+import org.thunderdog.challegram.v.MessagesRecyclerView;
 
 /** A small in-memory backdrop of this chat, excluding the overlaid controls. */
-public final class ChatGlassDrawable extends Drawable {
+public final class ChatGlassDrawable extends Drawable implements View.OnAttachStateChangeListener {
   private final WallpaperView wallpaper;
   private final View host;
   private final int colorId;
@@ -32,7 +34,13 @@ public final class ChatGlassDrawable extends Drawable {
   private final Path clip = new Path();
   private final int[] hostPosition = new int[2];
   private final int[] wallpaperPosition = new int[2];
-  private View messages;
+  private MessagesRecyclerView messages;
+  private boolean backdropDirty = true;
+  private boolean released;
+  private int lastX = Integer.MIN_VALUE, lastY, lastColor;
+  private boolean enabled = true;
+  private ViewTreeObserver observer;
+  private final ViewTreeObserver.OnPreDrawListener prepareFrame;
   private final int[] messagesPosition = new int[2];
   private Bitmap sample;
   private Canvas sampleCanvas;
@@ -43,13 +51,37 @@ public final class ChatGlassDrawable extends Drawable {
     this.wallpaper = wallpaper;
     this.host = host;
     this.colorId = colorId;
+    prepareFrame = () -> {
+      if (!released && enabled && host.isShown()) prepareBackdrop();
+      return true;
+    };
+    host.addOnAttachStateChangeListener(this);
+    if (host.isAttachedToWindow()) onViewAttachedToWindow(host);
   }
 
-  public void setMessages (View messages) {
+  @Override public void onViewAttachedToWindow (View view) {
+    if (released) return;
+    observer = host.getViewTreeObserver();
+    observer.addOnPreDrawListener(prepareFrame);
+    invalidateBackdrop();
+  }
+
+  @Override public void onViewDetachedFromWindow (View view) {
+    if (observer != null && observer.isAlive()) observer.removeOnPreDrawListener(prepareFrame);
+    observer = null;
+  }
+
+  public void setEnabled (boolean enabled) {
+    this.enabled = enabled;
+    if (enabled) invalidateBackdrop();
+  }
+
+  public void setMessages (MessagesRecyclerView messages) {
     this.messages = messages;
   }
 
   @Override protected void onBoundsChange (Rect bounds) {
+    backdropDirty = true;
     panel.set(bounds);
     panel.inset(Screen.dp(.5f), Screen.dp(.5f));
     clip.reset();
@@ -69,41 +101,16 @@ public final class ChatGlassDrawable extends Drawable {
     paint.setAlpha(alpha);
     canvas.drawRect(panel, paint);
 
-    if (wallpaper.getWidth() > 0 && wallpaper.getHeight() > 0) {
-      // Two small reusable surfaces at most, about 1/64 of the panel's pixels.
-      // The existing native blur works on every supported Android version.
-      // Native fastBlur accepts at most 160 * 160 pixels, including on tablets.
-      float scale = Math.max(8f, Math.max(panel.width(), panel.height()) / 160f);
-      int width = Math.max(8, Math.min(160, (int) Math.ceil(panel.width() / scale)));
-      int height = Math.max(8, Math.min(160, (int) Math.ceil(panel.height() / scale)));
-      if (sample == null || sample.getWidth() != width || sample.getHeight() != height) {
-        release();
-        sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        sampleCanvas = new Canvas(sample);
-      }
-      sample.eraseColor(Theme.getColor(colorId));
-      host.getLocationInWindow(hostPosition);
-      wallpaper.getLocationInWindow(wallpaperPosition);
-      float x = hostPosition[0] - wallpaperPosition[0] + panel.left;
-      float y = Math.max(0, hostPosition[1] - wallpaperPosition[1] + panel.top);
-      int sampleSave = sampleCanvas.save();
-      sampleCanvas.scale(width / panel.width(), height / panel.height());
-      sampleCanvas.translate(-x, -y);
-      wallpaper.drawForGlass(sampleCanvas);
-      if (messages != null && messages.getWidth() > 0) {
-        messages.getLocationInWindow(messagesPosition);
-        sampleCanvas.translate(messagesPosition[0] - wallpaperPosition[0], messagesPosition[1] - wallpaperPosition[1]);
-        messages.draw(sampleCanvas);
-      }
-      sampleCanvas.restoreToCount(sampleSave);
-      U.blurBitmap(sample, 3, 1);
+    // Normally prepared by pre-draw. The fallback covers the very first bounds assignment.
+    if (sample == null) prepareBackdrop();
+    if (sample != null) {
       paint.setColor(Color.WHITE);
       paint.setAlpha(alpha);
       canvas.drawBitmap(sample, null, panel, paint);
     }
     // Keep theme foreground colours legible even over a high-contrast photo.
     paint.setColor(Theme.getColor(colorId));
-    paint.setAlpha(Math.round(alpha * (Theme.isDark() ? .86f : .82f)));
+    paint.setAlpha(Math.round(alpha * (Theme.isDark() ? .68f : .64f)));
     canvas.drawRect(panel, paint);
     paint.setShader(sheen);
     paint.setAlpha(alpha);
@@ -119,7 +126,57 @@ public final class ChatGlassDrawable extends Drawable {
     paint.setStyle(Paint.Style.FILL);
   }
 
+  public void invalidateBackdrop () {
+    if (!released && enabled) {
+      backdropDirty = true;
+      host.invalidate();
+    }
+  }
+
+  private void prepareBackdrop () {
+    if (released || panel.isEmpty() || wallpaper.getWidth() == 0 || wallpaper.getHeight() == 0) return;
+    host.getLocationInWindow(hostPosition);
+    wallpaper.getLocationInWindow(wallpaperPosition);
+    int relativeX = hostPosition[0] - wallpaperPosition[0];
+    int relativeY = hostPosition[1] - wallpaperPosition[1];
+    int color = Theme.getColor(colorId);
+    if (!backdropDirty && relativeX == lastX && relativeY == lastY && lastColor == color) return;
+    backdropDirty = false;
+    lastX = relativeX;
+    lastY = relativeY;
+    lastColor = color;
+    // Capture only the panel region, once before the hardware frame is recorded.
+    // The existing native blur works on every supported Android version.
+    // Native fastBlur accepts at most 160 * 160 pixels, including on tablets.
+    float scale = Math.max(8f, Math.max(panel.width(), panel.height()) / 160f);
+    int width = Math.max(8, Math.min(160, (int) Math.ceil(panel.width() / scale)));
+    int height = Math.max(8, Math.min(160, (int) Math.ceil(panel.height() / scale)));
+    if (sample == null || sample.getWidth() != width || sample.getHeight() != height) {
+      sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+      sampleCanvas = new Canvas(sample);
+    }
+    sample.eraseColor(Theme.getColor(colorId));
+
+    float x = hostPosition[0] - wallpaperPosition[0] + panel.left;
+    float y = Math.max(0, hostPosition[1] - wallpaperPosition[1] + panel.top);
+    int sampleSave = sampleCanvas.save();
+    sampleCanvas.scale(width / panel.width(), height / panel.height());
+    sampleCanvas.translate(-x, -y);
+    wallpaper.drawForGlass(sampleCanvas);
+    if (messages != null && messages.getWidth() > 0) {
+      messages.getLocationInWindow(messagesPosition);
+      sampleCanvas.translate(messagesPosition[0] - wallpaperPosition[0], messagesPosition[1] - wallpaperPosition[1]);
+      messages.drawForGlass(sampleCanvas);
+    }
+    sampleCanvas.restoreToCount(sampleSave);
+    U.blurBitmap(sample, 3, 1);
+    host.invalidate();
+  }
+
   public void release () {
+    released = true;
+    onViewDetachedFromWindow(host);
+    host.removeOnAttachStateChangeListener(this);
     // Do not recycle a bitmap that may still be referenced by a display list.
     sampleCanvas = null;
     sample = null;

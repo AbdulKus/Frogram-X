@@ -247,6 +247,15 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     }
   }
 
+  private float contentInsetY;
+
+  public void setContentInsetY (float inset) {
+    if (contentInsetY != inset) {
+      contentInsetY = inset;
+      invalidate();
+    }
+  }
+
   private int currentHeaderOffset;
 
   @Override
@@ -858,6 +867,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     final int saveCount = Views.save(c);
     try {
       c.clipRect(0, 0, getMeasuredWidth(), calculateHeaderHeight());
+      c.translate(0, contentInsetY * (1f - avatarExpandFactor));
 
       final boolean showLock = (flags & FLAG_SHOW_LOCK) != 0;
       final boolean showMute = (flags & FLAG_SHOW_MUTE) != 0 && (flags & FLAG_IGNORE_MUTE) == 0;
