@@ -345,12 +345,42 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private ChatGlassDrawable headerGlass;
 
   private View topGlassView;
+  private FrameLayoutFix videoLayer;
   private View floatingPlayerView;
   private ChatGlassDrawable playerGlass;
   private float floatingPlayerOffset;
 
   private int getGlassTopExtension () {
     return getHeaderHeight() + context().getRootView().getTopInset();
+  }
+
+  @Override public boolean hasFloatingHeader () {
+    return useFloatingChatHeader() && pagerScrollOffset == 0f && !inTransformMode();
+  }
+
+  @Override public int getHeaderControlsInset () {
+    return hasFloatingHeader() ? Screen.dp(4.5f) : 0;
+  }
+
+  @Override public boolean allowLayerTypeChanges () {
+    // A cached page texture clips the glass outside the content bounds and freezes its source.
+    return !useFloatingChatHeader() && !Settings.instance().useNewChatInput();
+  }
+
+  public FrameLayoutFix videoLayer () { return videoLayer; }
+
+  public int videoClipTop () {
+    return useFloatingChatHeader() ? 0 : getTopOffset() + Math.round(floatingPlayerOffset);
+  }
+
+  public int videoClipBottom () {
+    return newChatInput ? 0 : messagesView.getPaddingBottom();
+  }
+
+  public void invalidateVideoBackdrop () { invalidateChatGlass(); }
+
+  private void drawVideoForGlass (Canvas canvas) {
+    context().getRoundVideoController().drawForGlass(this, canvas);
   }
 
   @Override public boolean hasFloatingPlayer () {
@@ -398,6 +428,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         Views.setTopMargin(topGlassView, -header);
         Views.setLayoutHeight(topGlassView, header + topBar.getTotalVisualHeight() + Screen.dp(6f));
         Views.setTopMargin(messagesView, -header);
+        if (videoLayer != null) Views.setTopMargin(videoLayer, -header);
         Views.setTopMargin(wallpaperView, -header);
         topGlassView.invalidate();
       }
@@ -432,6 +463,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       classicBottomSpaceBackground = bottomSpace.getBackground();
       inputGlass = new ChatGlassDrawable(wallpaperView, inputView, ColorId.filling);
       inputGlass.setMessages(messagesView);
+      inputGlass.setVideoLayer(this::drawVideoForGlass);
     }
     newChatInput = enabled;
     inputGlass.setEnabled(enabled);
@@ -458,6 +490,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     listParams.addRule(RelativeLayout.ABOVE, enabled ? 0 : R.id.msg_bottom);
     listParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, enabled ? RelativeLayout.TRUE : 0);
     messagesView.setLayoutParams(listParams);
+    if (videoLayer != null) videoLayer.setLayoutParams(new RelativeLayout.LayoutParams(listParams));
     messagesView.setClipToPadding(!(floatingHeader || enabled));
     messagesView.setTranslationY(enabled ? 0f : -getReplyOffset() - getAttachedFilesOffset() - getKeyboardOffset());
 
@@ -479,6 +512,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       };
       headerGlass = new ChatGlassDrawable(wallpaperView, topGlassView, ColorId.filling);
       headerGlass.setMessages(messagesView);
+      headerGlass.setVideoLayer(this::drawVideoForGlass);
       topGlassView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
       contentView.addView(topGlassView, contentView.indexOfChild(topBar));
       addThemeInvalidateListener(topGlassView);
@@ -510,12 +544,13 @@ public class MessagesController extends ViewController<MessagesController.Argume
       };
       playerGlass = new ChatGlassDrawable(wallpaperView, floatingPlayerView, ColorId.filling);
       playerGlass.setMessages(messagesView);
+      playerGlass.setVideoLayer(this::drawVideoForGlass);
       floatingPlayerView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
       contentView.addView(floatingPlayerView, contentView.indexOfChild(topBar) + 1);
       addThemeInvalidateListener(floatingPlayerView);
     }
     if (headerView != null) floatingPlayerOffset = headerView.getFilling().getPlayerOffset();
-    headerCell.setContentInsetY(floatingHeader ? Screen.dp(4.5f) : 0);
+    headerCell.setContentInsetY(getHeaderControlsInset());
     headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
     if (headerView != null) headerView.resetColors(this, null);
     inputView.checkPlaceholderWidth();
@@ -1666,6 +1701,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
       contentView.addView(wallpaperViewBlurPreview);
     }
     contentView.addView(messagesView);
+    videoLayer = new FrameLayoutFix(context);
+    videoLayer.setClipChildren(true);
+    videoLayer.setClipToPadding(true);
+    videoLayer.setLayoutParams(new RelativeLayout.LayoutParams((RelativeLayout.LayoutParams) messagesView.getLayoutParams()));
+    videoLayer.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> context().getRoundVideoController().checkLayout());
+    contentView.addView(videoLayer);
     if (!inPreviewMode) {
       contentView.addView(replyBarView);
     }
@@ -4250,6 +4291,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public void onFocus () {
     super.onFocus();
     applyNewChatUi();
+    if (!allowLayerTypeChanges()) getValue().setLayerType(View.LAYER_TYPE_NONE, null);
+    if (inputGlass != null) inputGlass.refresh();
+    if (headerGlass != null) headerGlass.refresh();
+    if (playerGlass != null) playerGlass.refresh();
     if (promptDraftPrefillOnFocus) {
       promptDraftPrefillOnFocus = false;
       fillDraft(this.fillDraft, true);
@@ -4516,6 +4561,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public void destroy () {
+    context().getRoundVideoController().detachVideoLayer(this);
     if (wallpaperView != null) wallpaperView.setGlassInvalidationListener(null);
     if (messagesView != null) messagesView.setBackdropInvalidationListener(null);
     if (inputGlass != null) inputGlass.release();
@@ -9911,6 +9957,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   public final void onMessagesFrameChanged () {
     updateFloatingInsets();
+    if (videoLayer != null && messagesView != null) videoLayer.setTranslationY(messagesView.getTranslationY());
+    context().getRoundVideoController().checkLayout();
     invalidateChatGlass();
     context().updateHackyOverlaysPositions();
     manager.onViewportMeasure();

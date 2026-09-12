@@ -390,6 +390,8 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   @Override
   public void draw (@NonNull Canvas c) {
+    // Each page keeps its own surface throughout a navigation transition.
+    if (headerView.drawFloatingHeaderTransition(c, width, (int) fillingBottom)) return;
     // Keep transforms and selection/search on their native surface.
     if (!restoreRect && fillFactor == 1f && hideFactor == 0f && radiusFactor == 0f &&
         !headerView.isAnimating() && navigationController != null) {

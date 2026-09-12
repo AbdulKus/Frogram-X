@@ -19,6 +19,8 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.RectF;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -112,6 +114,8 @@ public class RoundVideoController extends BasePlaybackController implements
   @Override
   protected void startPlayback (Tdlib tdlib, TdApi.Message message, boolean byUserRequest, boolean hadObject, Tdlib previousTdlib, int previousFileId) {
     float currentProgress = 0f;
+    capturedVideoRevision = -1;
+    videoFrameRevision++;
 
     if (texturePrepared) {
       fakeFrame.eraseColor(0);
@@ -303,6 +307,86 @@ public class RoundVideoController extends BasePlaybackController implements
 
   private boolean texturePrepared;
   private RectFrameLayout rootView;
+  private MessagesController videoController;
+  private final int[] messageLocation = new int[2], layerLocation = new int[2];
+  private final int[] textureLocation = new int[2], recyclerLocation = new int[2];
+  private final RectF glassVideoRect = new RectF();
+  private final Path glassVideoClip = new Path();
+  private final Paint glassVideoPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+  private Bitmap glassVideoFrame;
+  private long videoFrameRevision, capturedVideoRevision = -1;
+  private final java.util.concurrent.atomic.AtomicBoolean frameUpdatePosted = new java.util.concurrent.atomic.AtomicBoolean();
+  private final Runnable glassFrameUpdate = () -> {
+    frameUpdatePosted.set(false);
+    videoFrameRevision++;
+    if (videoController != null) videoController.invalidateVideoBackdrop();
+  };
+
+  private void attachVideoLayer (MessagesController controller) {
+    FrameLayoutFix parent = controller.videoLayer();
+    if (parent == null || rootView == null) return;
+    if (rootView.getParent() != parent) {
+      if (rootView.getParent() instanceof ViewGroup) ((ViewGroup) rootView.getParent()).removeView(rootView);
+      rootView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+      parent.addView(rootView);
+      videoController = controller;
+      capturedVideoRevision = -1;
+    }
+  }
+
+  public void detachVideoLayer (MessagesController controller) {
+    if (videoController != controller) return;
+    setTargetView(null, false, false);
+    if (targetController == controller) targetController = null;
+    videoController = null;
+    if (rootView != null) {
+      if (rootView.getParent() instanceof ViewGroup) ((ViewGroup) rootView.getParent()).removeView(rootView);
+      FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+      params.topMargin = HeaderView.getSize(true);
+      rootView.setLayoutParams(params);
+      context.addToNavigation(rootView);
+    }
+  }
+
+  /** Composite a small live texture sample over the message poster for the glass panels. */
+  public void drawForGlass (MessagesController controller, Canvas canvas) {
+    if (videoController != controller || rootView == null || isPlayingThroughPip || mainVisibilityFactor <= 0f ||
+        !(mainTextureView instanceof TextureView) || !hasRenderedAnyFrame) return;
+    TextureView texture = (TextureView) mainTextureView;
+    if (!texture.isAvailable()) return;
+    texture.getLocationInWindow(textureLocation);
+    controller.getMessagesView().getLocationInWindow(recyclerLocation);
+    float left = textureLocation[0] - recyclerLocation[0];
+    float top = textureLocation[1] - recyclerLocation[1];
+    float width = texture.getWidth() * mainPlayerView.getScaleX();
+    float height = texture.getHeight() * mainPlayerView.getScaleY();
+    glassVideoRect.set(left, top, left + width, top + height);
+    if (!canvas.quickReject(glassVideoRect, Canvas.EdgeType.AA)) {
+      if (glassVideoFrame == null) glassVideoFrame = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
+      if (capturedVideoRevision != videoFrameRevision) {
+        try {
+          if (texture.getBitmap(glassVideoFrame) != null) capturedVideoRevision = videoFrameRevision;
+        } catch (IllegalStateException ignored) {
+          // The decoder can replace its surface while moving to or from PiP.
+          return;
+        }
+      }
+      int save = canvas.save();
+      glassVideoClip.reset();
+      glassVideoClip.addOval(glassVideoRect, Path.Direction.CW);
+      canvas.clipPath(glassVideoClip);
+      glassVideoPaint.setAlpha(Math.round(255f * mainVisibilityFactor));
+      canvas.drawBitmap(glassVideoFrame, null, glassVideoRect, glassVideoPaint);
+      canvas.restoreToCount(save);
+    }
+    if (currentOwnedOverlay != null) {
+      MessageOverlayView overlay = currentOwnedOverlay.getOverlayView();
+      int save = canvas.save();
+      canvas.translate(overlay.getX(), overlay.getY());
+      overlay.draw(canvas);
+      canvas.restoreToCount(save);
+    }
+  }
   private CircleFrameLayout mainPlayerView;
   private View mainTextureView;
   private RoundProgressView2 mainProgressView;
@@ -412,6 +496,9 @@ public class RoundVideoController extends BasePlaybackController implements
       setExoPlayerParameters();
       setExoPlayerSpeed();
       this.exoPlayer.addListener(this);
+      this.exoPlayer.setVideoFrameMetadataListener((presentationTimeUs, releaseTimeNs, format, mediaFormat) -> {
+        if (frameUpdatePosted.compareAndSet(false, true)) handler.post(glassFrameUpdate);
+      });
       this.exoPlayer.setVolume(volume);
       if (mainTextureView instanceof SurfaceView) {
         this.exoPlayer.setVideoSurfaceView((SurfaceView) mainTextureView);
@@ -560,7 +647,13 @@ public class RoundVideoController extends BasePlaybackController implements
 
     texturePrepared = false;
 
-    context.removeFromNavigation(rootView);
+    if (rootView.getParent() instanceof ViewGroup) ((ViewGroup) rootView.getParent()).removeView(rootView);
+    if (videoController != null) videoController.invalidateVideoBackdrop();
+    videoController = null;
+    handler.removeCallbacks(glassFrameUpdate);
+    frameUpdatePosted.set(false);
+    glassVideoFrame = null;
+    capturedVideoRevision = -1;
     rootView = null;
     mainPlayerView = null; mainTextureView = null; mainProgressView = null;
 
@@ -959,6 +1052,7 @@ public class RoundVideoController extends BasePlaybackController implements
   public void onRenderedFirstFrame () {
     Log.i(Log.TAG_VIDEO, "onRenderedFirstFrame");
     this.hasRenderedAnyFrame = true;
+    glassFrameUpdate.run();
     setRendered(true, true);
   }
 
@@ -1331,11 +1425,6 @@ public class RoundVideoController extends BasePlaybackController implements
     float totalX = targetView.getLeft() + translationX;
     float totalY = targetView.getTop();
 
-    ViewParent parent = targetView.getParent();
-    if (parent != null) {
-      totalY += ((ViewGroup) parent).getTranslationY();
-    }
-
     NavigationController navigation = context.navigation();
     final boolean isAnimatingBackward = navigation.isAnimatingBackward();
     ViewController<?> current = navigation.getCurrentStackItem();
@@ -1351,25 +1440,14 @@ public class RoundVideoController extends BasePlaybackController implements
       m = null;
     }
     boolean abort = false;
-    if (m != null) {
-      int bottomOffset = m.getInputOffset(true);
-      if (!m.isFocused()) {
-        totalX += m.getValue().getTranslationX();
-        abort = m.getValue().getAlpha() == 0f;
-      }
-      if (m.needTabs()) {
-        totalX -= m.getPagerScrollOffsetInPixels();
-        abort = m.getPagerScrollOffset() >= 1f;
-      }
-      MessagesRecyclerView recyclerView = m.getMessagesView();
-      int translationY = (int) recyclerView.getTranslationY() - Views.getBottomMargin(recyclerView);
-      // The recycler can extend above the controller under the floating header.
-      // Its children are in recycler coordinates; the video layer starts below the header.
-      totalY += recyclerView.getTop();
-      int topOffset = m.getTopOffset() + recyclerView.getTop();
-      topOffset += UI.getContext(context).navigation().getHeaderView().getFilling().getPlayerOffset();
-      setMargins(topOffset + Math.max(0, translationY), bottomOffset + Math.max(-translationY, 0));
-      abort = abort || !m.isFocused() && isAnimatingBackward;
+    if (m != null && m.videoLayer() != null) {
+      attachVideoLayer(m);
+      targetView.getLocationInWindow(messageLocation);
+      m.videoLayer().getLocationInWindow(layerLocation);
+      totalX = messageLocation[0] - layerLocation[0] + translationX;
+      totalY = messageLocation[1] - layerLocation[1];
+      setMargins(m.videoClipTop(), m.videoClipBottom());
+      abort = m.getValue().getAlpha() == 0f || (m.needTabs() && m.getPagerScrollOffset() >= 1f) || (!m.isFocused() && isAnimatingBackward);
     } else {
       // setBottomMargin(0);
       abort = true;
@@ -1400,10 +1478,9 @@ public class RoundVideoController extends BasePlaybackController implements
 
     float playerSize = TGMessageVideo.getVideoSize() * scale;
 
-    int navigationWidth = navigation.getValue().getMeasuredWidth();
-    int navigationHeight = navigation.getValue().getMeasuredHeight();
-
-    return totalX > -playerSize && totalX < navigationWidth && totalY >= -playerSize + HeaderView.getPlayerSize() && totalY < navigationHeight;
+    int viewportWidth = videoController != null ? videoController.videoLayer().getWidth() : navigation.getValue().getMeasuredWidth();
+    int viewportHeight = videoController != null ? videoController.videoLayer().getHeight() : navigation.getValue().getMeasuredHeight();
+    return totalX > -playerSize && totalX < viewportWidth && totalY > -playerSize && totalY < viewportHeight;
   }
 
   private void setMargins (int top, int bottom) {

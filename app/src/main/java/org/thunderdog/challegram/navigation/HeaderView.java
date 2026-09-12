@@ -290,6 +290,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   }
 
   public void resetColors (ViewController<?> c, ViewController<?> preview) {
+    updateControlInsets();
     boolean animating = (navigation != null && navigation.isAnimating());
     if (animating) {
       if (previewOpened) {
@@ -425,6 +426,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   @Override
   protected void onLayout (boolean changed, int left, int top, int right, int bottom) {
     super.onLayout(changed, left, top, right, bottom);
+    updateControlInsets();
     if (changed) {
       filling.layout(getMeasuredWidth(), (int) height, getHeightFactor());
       invalidate();
@@ -1190,6 +1192,64 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     }
   }
 
+  private static int controlsInset (ViewController<?> controller) {
+    return controller != null ? controller.getHeaderControlsInset() : 0;
+  }
+
+  private void updateControlInsets () {
+    ViewController<?> current = stack != null ? stack.getCurrent() : null;
+    int base = controlsInset(previewOpened ? baseItem : current);
+    int next = controlsInset(previewItem);
+    float progress = previewOpened ? (translateForward ? 1f - translationFactor : translationFactor) : 0f;
+    Views.setTopMargin(backButton, getEffectiveTopOffset() + Math.round(base + (next - base) * progress));
+    Views.setTopMargin(menu, getEffectiveTopOffset() + base);
+    Views.setTopMargin(menuPreview, getEffectiveTopOffset() + next);
+  }
+
+  private final int[] surfaceLocation = new int[2], headerLocation = new int[2];
+
+  public boolean drawFloatingHeaderTransition (Canvas canvas, int width, int height) {
+    if (navigation == null || !navigation.isAnimating() || !previewOpened ||
+        !((baseItem != null && baseItem.hasFloatingHeader()) || (previewItem != null && previewItem.hasFloatingHeader()))) return false;
+    ViewController<?> front = translateForward ? previewItem : baseItem;
+    ViewController<?> back = translateForward ? baseItem : previewItem;
+    drawControllerSurface(canvas, back, front, width, height);
+    drawControllerSurface(canvas, front, null, width, height);
+    return true;
+  }
+
+  @SuppressWarnings("deprecation")
+  private void drawControllerSurface (Canvas canvas, ViewController<?> controller, ViewController<?> covering, int width, int height) {
+    if (controller == null) return;
+    View view = controller.getValue();
+    view.getLocationInWindow(surfaceLocation);
+    getLocationInWindow(headerLocation);
+    int x = surfaceLocation[0] - headerLocation[0];
+    int y = Math.round(view.getTranslationY());
+    int save = canvas.save();
+    canvas.clipRect(x, y, x + view.getWidth(), y + height);
+    float alpha = view.getAlpha();
+    if (covering != null) {
+      View front = covering.getValue();
+      front.getLocationInWindow(surfaceLocation);
+      int frontX = surfaceLocation[0] - headerLocation[0];
+      int frontY = Math.round(front.getTranslationY());
+      // Transparent glass must reveal the moving chat, not the previous page's header fill.
+      if (front.getAlpha() >= 1f) {
+        canvas.clipRect(frontX, frontY, frontX + front.getWidth(), frontY + height, android.graphics.Region.Op.DIFFERENCE);
+      } else {
+        alpha = Math.min(alpha, 1f - front.getAlpha());
+      }
+    }
+    if (alpha < 1f) canvas.saveLayerAlpha(0, 0, width, getHeight(), Math.round(255f * alpha));
+    canvas.translate(x, y);
+    int color = Theme.getColor(controller.getHeaderColorId());
+    if (!controller.hasFloatingHeader() || !controller.drawHeaderBackground(canvas, this, width, height, color)) {
+      canvas.drawRect(0, 0, width, height, Paints.fillingPaint(color));
+    }
+    canvas.restoreToCount(save);
+  }
+
   // Internal stuff
 
   private static void updateTextMargins (View textTitle, ViewController<?> item, int menuWidth, int currentHeaderOffset) {
@@ -1433,6 +1493,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
 
   public void setTranslation (float raptor) {
     this.translationFactor = raptor;
+    updateControlInsets();
 
     if (translateForward) {
       raptor = 1f - raptor;

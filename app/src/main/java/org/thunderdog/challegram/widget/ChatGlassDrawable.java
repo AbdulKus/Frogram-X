@@ -35,6 +35,18 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private final int[] hostPosition = new int[2];
   private final int[] wallpaperPosition = new int[2];
   private MessagesRecyclerView messages;
+  public interface VideoLayer { void draw (Canvas canvas); }
+  private VideoLayer videoLayer;
+
+  public void setVideoLayer (VideoLayer layer) { videoLayer = layer; }
+
+  public void refresh () {
+    if (released) return;
+    onViewDetachedFromWindow(host);
+    if (host.getWindowToken() != null) onViewAttachedToWindow(host);
+    backdropDirty = true;
+    host.invalidate();
+  }
   private boolean backdropDirty = true;
   private boolean released;
   private int lastX = Integer.MIN_VALUE, lastY, lastColor;
@@ -52,15 +64,16 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     this.host = host;
     this.colorId = colorId;
     prepareFrame = () -> {
-      if (!released && enabled && host.isShown()) prepareBackdrop();
+      if (!released && enabled && host.isShown() && prepareBackdrop()) host.invalidate();
       return true;
     };
     host.addOnAttachStateChangeListener(this);
-    if (host.isAttachedToWindow()) onViewAttachedToWindow(host);
+    if (host.getWindowToken() != null) onViewAttachedToWindow(host);
   }
 
   @Override public void onViewAttachedToWindow (View view) {
     if (released) return;
+    if (observer != null && observer.isAlive()) observer.removeOnPreDrawListener(prepareFrame);
     observer = host.getViewTreeObserver();
     observer.addOnPreDrawListener(prepareFrame);
     invalidateBackdrop();
@@ -102,7 +115,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     canvas.drawRect(panel, paint);
 
     // Normally prepared by pre-draw. The fallback covers the very first bounds assignment.
-    if (sample == null) prepareBackdrop();
+    if (sample == null || backdropDirty) prepareBackdrop();
     if (sample != null) {
       paint.setColor(Color.WHITE);
       paint.setAlpha(alpha);
@@ -133,14 +146,14 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     }
   }
 
-  private void prepareBackdrop () {
-    if (released || panel.isEmpty() || wallpaper.getWidth() == 0 || wallpaper.getHeight() == 0) return;
+  private boolean prepareBackdrop () {
+    if (released || panel.isEmpty() || wallpaper.getWidth() == 0 || wallpaper.getHeight() == 0) return false;
     host.getLocationInWindow(hostPosition);
     wallpaper.getLocationInWindow(wallpaperPosition);
     int relativeX = hostPosition[0] - wallpaperPosition[0];
     int relativeY = hostPosition[1] - wallpaperPosition[1];
     int color = Theme.getColor(colorId);
-    if (!backdropDirty && relativeX == lastX && relativeY == lastY && lastColor == color) return;
+    if (!backdropDirty && relativeX == lastX && relativeY == lastY && lastColor == color) return false;
     backdropDirty = false;
     lastX = relativeX;
     lastY = relativeY;
@@ -167,10 +180,11 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       messages.getLocationInWindow(messagesPosition);
       sampleCanvas.translate(messagesPosition[0] - wallpaperPosition[0], messagesPosition[1] - wallpaperPosition[1]);
       messages.drawForGlass(sampleCanvas);
+      if (videoLayer != null) videoLayer.draw(sampleCanvas);
     }
     sampleCanvas.restoreToCount(sampleSave);
     U.blurBitmap(sample, 3, 1);
-    host.invalidate();
+    return true;
   }
 
   public void release () {

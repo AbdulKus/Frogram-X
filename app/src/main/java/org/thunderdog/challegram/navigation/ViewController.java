@@ -1262,6 +1262,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
     return true;
   }
 
+  public boolean hasFloatingHeader () { return false; }
+
+  public int getHeaderControlsInset () { return 0; }
+
   public boolean hasFloatingPlayer () { return false; }
 
   public void invalidateFloatingPlayer () { }
