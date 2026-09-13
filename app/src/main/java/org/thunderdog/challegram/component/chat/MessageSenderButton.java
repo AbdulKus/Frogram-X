@@ -90,6 +90,12 @@ public class MessageSenderButton extends FrameLayout implements ReplaceAnimator.
     return currentButtonView;
   }
 
+  public void setGlassMode (boolean enabled) {
+    currentButtonView.glassMode = oldButtonView.glassMode = enabled;
+    currentButtonView.invalidate();
+    oldButtonView.invalidate();
+  }
+
   @Override
   protected void onDraw (Canvas c) {
     float cx = getButtonCenterX();
@@ -296,6 +302,7 @@ public class MessageSenderButton extends FrameLayout implements ReplaceAnimator.
   public static final int MODE_CHAT_BUTTON = 2;
 
   private static class ButtonView extends FrameLayout {
+    private boolean glassMode;
     private final AvatarView avatarView;
 
     private TdApi.MessageSender sender;
@@ -352,7 +359,8 @@ public class MessageSenderButton extends FrameLayout implements ReplaceAnimator.
 
       if (mode != MODE_CHAT_BUTTON) {
         if (sendModeFactor != 1f) {
-          int color = ColorUtils.alphaColor(1f - sendModeFactor, ColorUtils.fromToArgb(Theme.iconColor(), Theme.radioFillingColor(), quickSelectFactor));
+          int iconColor = glassMode ? Theme.getColor(MessagesController.getGlassIconColorId()) : Theme.iconColor();
+          int color = ColorUtils.alphaColor(1f - sendModeFactor, ColorUtils.fromToArgb(iconColor, Theme.radioFillingColor(), quickSelectFactor));
 
           Drawable drawable = Drawables.get(getResources(), mode == MODE_ANONYMOUS_BUTTON ? R.drawable.dot_baseline_acc_anon_24 : R.drawable.dot_baseline_acc_personal_24);
           Drawables.draw(c, drawable, cx - r, cy - r, Paints.getPorterDuffPaint(color));

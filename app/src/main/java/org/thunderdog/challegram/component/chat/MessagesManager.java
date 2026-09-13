@@ -2980,7 +2980,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
 
   public int getRecyclerHeight () {
     int height = manager.getHeight();
-    if (height != 0 && controller.isFocused()) {
+    if (height != 0) {
       return Math.max(0, height - controller.getFloatingBottomInset());
     }
     return controller.makeGuessAboutHeight();
@@ -3123,6 +3123,9 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       final int accountId = tdlib.id();
       Settings.SavedMessageId messageId = Settings.instance().getScrollMessageId(accountId, loader.getChatId(), loader.getMessageTopicId());
       int offset = messageId != null ? messageId.offsetPixels - scrollMessage.getExtraPadding() : 0;
+      // Older floating-composer builds could save the last short message below
+      // the viewport. Preserve reading positions inside genuinely tall messages.
+      if (index == 0 && scrollMessage.getHeight() <= getTargetHeight()) offset = Math.max(0, offset);
       this.returnToMessageIds = messageId != null ? messageId.returnToMessageIds : null;
       scrollToPositionWithOffset(index, offset, false);
       checkScrollToBottomButton();

@@ -75,6 +75,11 @@ public class MessagesLayout extends RelativeLayout implements Animated {
 
     int height = getMeasuredHeight();
     super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    if (controller.updateMeasuredFloatingInsets()) {
+      // Input height is now known. Remeasure once with the final viewport, before
+      // any pending RecyclerView scroll is consumed by its first layout.
+      super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
     changedMin = height > getMeasuredHeight() && ((emojiState && emojiLayout != null) || (commandsState && keyboardLayout != null)) && getMeasuredWidth() == lastMeasuredWidth;
     lastMeasuredWidth = getMeasuredWidth();
   }

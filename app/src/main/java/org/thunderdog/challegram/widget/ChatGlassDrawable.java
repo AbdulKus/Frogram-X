@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.thunderdog.challegram.util.GlassFrameCache;
+import org.thunderdog.challegram.util.GlassSampling;
 import me.vkryl.core.ColorUtils;
 import org.thunderdog.challegram.component.chat.WallpaperView;
 import org.thunderdog.challegram.theme.Theme;
@@ -32,6 +33,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private final int colorId;
   private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
   private final RectF panel = new RectF();
+  private final RectF sampleBounds = new RectF();
   private final Path clip = new Path();
   private final int[] hostPosition = new int[2];
   private final int[] wallpaperPosition = new int[2];
@@ -50,8 +52,10 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     host.invalidate();
   }
   private boolean backdropDirty = true;
+  private boolean geometryDirty = true;
   private boolean released;
   private int lastX = Integer.MIN_VALUE, lastY, lastColor;
+  private int lastMessagesX, lastMessagesY;
   private boolean enabled = true;
   private ViewTreeObserver observer;
   private final ViewTreeObserver.OnPreDrawListener prepareFrame;
@@ -68,6 +72,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     }
   }
   private int[] pixels = new int[0];
+  private int[] capturePixels = new int[0];
   private Bitmap sample, capture;
   private boolean customShape;
 
@@ -91,11 +96,20 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     this.host = host;
     this.colorId = colorId;
     prepareFrame = () -> {
-      if (!released && enabled && host.isShown() && host.getAlpha() > 0f && prepareBackdrop()) host.invalidate();
+      if (!released && enabled && host.isShown() && hasVisibleAlpha() && prepareBackdrop()) host.invalidate();
       return true;
     };
     host.addOnAttachStateChangeListener(this);
     if (host.getWindowToken() != null) onViewAttachedToWindow(host);
+  }
+
+  private boolean hasVisibleAlpha () {
+    View view = host;
+    while (true) {
+      if (view.getAlpha() <= 0f) return false;
+      if (!(view.getParent() instanceof View)) return true;
+      view = (View) view.getParent();
+    }
   }
 
   @Override public void onViewAttachedToWindow (View view) {
@@ -126,6 +140,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
   @Override protected void onBoundsChange (Rect bounds) {
     backdropDirty = true;
+    geometryDirty = true;
     customShape = false;
     panel.set(bounds);
     panel.top = Math.min(panel.bottom, panel.top + topInset);
@@ -144,15 +159,17 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     canvas.clipPath(clip);
     paint.setShader(null);
     // Normally prepared by pre-draw. The fallback covers the very first bounds assignment.
-    if (sample == null || backdropDirty) prepareBackdrop();
+    // Source invalidation during this draw belongs to the next pre-draw; never
+    // replay the message list twice in the same frame.
+    if (sample == null || geometryDirty) prepareBackdrop();
     if (sample != null) {
       paint.setColor(Color.WHITE);
       paint.setAlpha(alpha);
-      canvas.drawBitmap(sample, null, panel, paint);
+      canvas.drawBitmap(sample, null, sampleBounds, paint);
     }
     // Keep theme foreground colours legible even over a high-contrast photo.
     paint.setColor(surfaceColor(colorId));
-    paint.setAlpha(Math.round(alpha * (sample != null ? (Theme.isDark() ? .46f : .52f) : .82f)));
+    paint.setAlpha(Math.round(alpha * (sample != null ? (Theme.isDark() ? .54f : .58f) : .82f)));
     canvas.drawRect(panel, paint);
     paint.setShader(sheen);
     paint.setAlpha(alpha);
@@ -182,39 +199,56 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     int relativeX = hostPosition[0] - wallpaperPosition[0];
     int relativeY = hostPosition[1] - wallpaperPosition[1];
     int color = Theme.getColor(colorId);
-    boolean geometryChanged = backdropDirty || relativeX != lastX || relativeY != lastY || lastColor != color;
+    int messagesX = 0, messagesY = 0;
+    if (messages != null) {
+      messages.getLocationInWindow(messagesPosition);
+      messagesX = messagesPosition[0] - wallpaperPosition[0];
+      messagesY = messagesPosition[1] - wallpaperPosition[1];
+    }
+    if (sample != null && !backdropDirty && relativeX == lastX && relativeY == lastY && lastColor == color &&
+        messagesX == lastMessagesX && messagesY == lastMessagesY) return false;
     backdropDirty = false;
+    geometryDirty = false;
     lastX = relativeX;
     lastY = relativeY;
     lastColor = color;
-    // At most 96 pixels on either axis; two box passes give a broad, stable blur.
-    float scale = Math.max(Screen.dp(7f), Math.max(panel.width(), panel.height()) / 96f);
-    int width = Math.max(1, Math.min(96, (int) Math.ceil(panel.width() / scale)));
-    int height = Math.max(1, Math.min(96, (int) Math.ceil(panel.height() / scale)));
+    lastMessagesX = messagesX;
+    lastMessagesY = messagesY;
+    // Include the full blur kernel outside the visible edge. Otherwise a glyph
+    // entering the island is clamped across the kernel and abruptly turns it dark.
+    // Capture the reserved composer bounds, independent of its animated reply inset.
+    Rect bounds = getBounds();
+    float scale = Math.max(Screen.dp(7f), Math.max(bounds.width(), bounds.height()) / 84f);
+    int innerWidth = Math.max(1, Math.min(84, (int) Math.ceil(bounds.width() / scale)));
+    int innerHeight = Math.max(1, Math.min(84, (int) Math.ceil(bounds.height() / scale)));
+    int width = innerWidth + 12, height = innerHeight + 12;
+    sampleBounds.set(bounds);
+    sampleBounds.inset(-6f * bounds.width() / innerWidth, -6f * bounds.height() / innerHeight);
     if (sample == null || sample.getWidth() != width || sample.getHeight() != height) {
       sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-      capture = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+      capture = Bitmap.createBitmap(width * 2, height * 2, Bitmap.Config.ARGB_8888);
       sampleCanvas = new Canvas(capture);
       frames.clear();
     }
     capture.eraseColor(Theme.getColor(colorId));
 
-    float x = hostPosition[0] - wallpaperPosition[0] + panel.left;
-    float y = hostPosition[1] - wallpaperPosition[1] + panel.top;
+    float x = relativeX + sampleBounds.left;
+    float y = relativeY + sampleBounds.top;
     int sampleSave = sampleCanvas.save();
-    sampleCanvas.scale(width / panel.width(), height / panel.height());
+    sampleCanvas.scale(capture.getWidth() / sampleBounds.width(), capture.getHeight() / sampleBounds.height());
     sampleCanvas.translate(-x, -y);
     wallpaper.drawForGlass(sampleCanvas);
     if (messages != null && messages.getWidth() > 0) {
-      messages.getLocationInWindow(messagesPosition);
-      sampleCanvas.translate(messagesPosition[0] - wallpaperPosition[0], messagesPosition[1] - wallpaperPosition[1]);
+      sampleCanvas.translate(messagesX, messagesY);
       messages.drawForGlass(sampleCanvas);
       if (videoLayer != null) videoLayer.draw(sampleCanvas);
     }
     sampleCanvas.restoreToCount(sampleSave);
     if (pixels.length < width * height) pixels = new int[width * height];
-    capture.getPixels(pixels, 0, width, 0, 0, width, height);
-    if (!frames.update(pixels, width, height, geometryChanged)) return false;
+    if (capturePixels.length < width * height * 4) capturePixels = new int[width * height * 4];
+    capture.getPixels(capturePixels, 0, width * 2, 0, 0, width * 2, height * 2);
+    GlassSampling.downsample2x(capturePixels, pixels, width, height);
+    if (!frames.update(pixels, width, height, false)) return false;
     sample.setPixels(frames.pixels(), 0, width, 0, 0, width, height);
     return true;
   }

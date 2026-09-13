@@ -75,6 +75,7 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
     final BoolAnimator isVisible;
 
     int height;
+    float slotTop, visibleHeight;
 
     public Entry (Item item, View view, ShadowView shadowView, FactorAnimator.Target target) {
       this.item = item;
@@ -106,12 +107,29 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
       return;
     }
     int save = canvas.save();
+    // The expanding row belongs below the main header, including its first frame.
+    canvas.clipRect(0, 0, getWidth(), getTotalVisualHeight() + Screen.dp(6f));
     surfaceBounds.set(0, -Screen.dp(56f), getWidth(), getTotalVisualHeight() + Screen.dp(6f));
     surfaceClip.reset();
     surfaceClip.addRoundRect(surfaceBounds, Screen.dp(26f), Screen.dp(26f), Path.Direction.CW);
     canvas.clipPath(surfaceClip);
     super.dispatchDraw(canvas);
     canvas.restoreToCount(save);
+  }
+
+  @Override protected boolean drawChild (Canvas canvas, View child, long drawingTime) {
+    if (floatingSurface) {
+      for (Entry entry : entries) {
+        if (entry.view == child) {
+          int save = canvas.save();
+          canvas.clipRect(0, entry.slotTop, getWidth(), entry.slotTop + entry.visibleHeight);
+          boolean result = super.drawChild(canvas, child, drawingTime);
+          canvas.restoreToCount(save);
+          return result;
+        }
+      }
+    }
+    return super.drawChild(canvas, child, drawingTime);
   }
 
   private final ArrayList<Entry> entries = new ArrayList<>();
@@ -238,11 +256,14 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
       }
       int height = entry.height;
 
-      float positionY = y - (float) height * (1f - visibility);
+      entry.slotTop = y;
+      entry.visibleHeight = height * visibility;
+      float positionY = floatingSurface ? y + Screen.dp(8f) * (1f - visibility) : y - (float) height * (1f - visibility);
 
       int viewVisibility = visibility > 0f ? View.VISIBLE : View.GONE;
 
       entry.view.setTranslationY(positionY);
+      entry.view.setAlpha(floatingSurface ? visibility : 1f);
       if (entry.view.getVisibility() != viewVisibility) {
         entry.view.setVisibility(viewVisibility);
       }

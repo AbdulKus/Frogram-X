@@ -2,6 +2,7 @@ import java.util.Arrays;
 import java.util.Random;
 import org.thunderdog.challegram.util.GlassBlur;
 import org.thunderdog.challegram.util.GlassFrameCache;
+import org.thunderdog.challegram.util.GlassSampling;
 import org.thunderdog.challegram.util.DampedSpring;
 import org.thunderdog.challegram.util.ThreadHeaderVisibility;
 
@@ -27,6 +28,26 @@ public final class GlassMathTest {
   }
   public static void main(String[] args) {
     GlassBlur blur = new GlassBlur();
+    int[] fine = new int[96 * 24 * 4], coarse = new int[96 * 24];
+    for (int phase = 0; phase < 2; phase++) {
+      for (int y = 0; y < 48; y++) for (int x = 0; x < 192; x++) {
+        fine[y * 192 + x] = ((x + y + phase) & 1) == 0 ? 0xff000000 : 0xffffffff;
+      }
+      GlassSampling.downsample2x(fine, coarse, 96, 24);
+      for (int pixel : coarse) check(pixel == 0xff7f7f7f, "subpixel phase changed the glass brightness");
+    }
+    int[] tiny = new int[1];
+    GlassSampling.downsample2x(new int[] {0xffff0000, 0xff00ff00, 0xff0000ff, 0xffffffff}, tiny, 1, 1);
+    check(tiny[0] == 0xff7f7f7f, "RGB area averaging mixed channels");
+    int previous = 255;
+    for (int line = -2; line <= 20; line++) {
+      Arrays.fill(coarse, 0xffffffff);
+      for (int y = Math.max(0, line); y < Math.min(24, line + 2); y++) Arrays.fill(coarse, y * 96, (y + 1) * 96, 0xff000000);
+      blur.blur(coarse, 96, 24);
+      int edge = coarse[6 * 96 + 48] & 255;
+      check(Math.abs(edge - previous) <= 37, "glyph entering overscan caused a dark flash");
+      previous = edge;
+    }
     Random random = new Random(42);
     int cases = 0;
     // Reuse one blur instance across thin composers, tall menus and differently sized chats.
@@ -96,6 +117,6 @@ public final class GlassMathTest {
       spring.target = -50; spring.step(4f); check(Float.isFinite(spring.value), "long frame");
       spring.reset(0f); check(!spring.isMoving(), "callback would continue after close");
     }
-    System.out.println("Glass blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; thread post: forward/return, stationary frames and edge jitter; spring: 30/60/90/120 Hz, return and teardown passed");
+    System.out.println("Glass sampling: phase stability, RGB averaging, overscan edge; blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; thread post: forward/return, stationary frames and edge jitter; spring: 30/60/90/120 Hz, return and teardown passed");
   }
 }

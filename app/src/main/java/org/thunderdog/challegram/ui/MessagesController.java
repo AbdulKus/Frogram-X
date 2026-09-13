@@ -438,6 +438,21 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private int floatingOverlayTop, glassControlsColor;
   public static int getGlassIconColorId () { return Theme.isDark() ? ColorId.icon : ColorId.text; }
 
+  /** Establish the viewport before RecyclerView lays out a pending unread/history jump. */
+  public boolean updateMeasuredFloatingInsets () {
+    if (!newChatInput || inputView == null || inputView.getParent() != bottomWrap || inPreviewMode || isInForceTouchMode()) return false;
+    int bottom = extraBottomInset;
+    if (bottomWrap.getVisibility() == View.VISIBLE) {
+      LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
+      RelativeLayout.LayoutParams wrapParams = (RelativeLayout.LayoutParams) bottomWrap.getLayoutParams();
+      int inputTop = bottomWrap.getPaddingTop() + inputParams.topMargin;
+      float shown = replyBarVisible.getFloatValue() * (1f - getSearchTransformFactor());
+      bottom = Math.max(0, Math.round(bottomWrap.getMeasuredHeight() + wrapParams.bottomMargin + getKeyboardOffset() +
+        getReplyOffset() - inputTop * (1f - shown) + getAttachedFilesOffset() + Screen.dp(6f)));
+    }
+    return messagesView.setOverlayPadding(floatingOverlayTop, bottom);
+  }
+
   private boolean syncFloatingLayout () {
     if (messagesView == null || inputView == null || inPreviewMode || isInForceTouchMode() || isDestroyed() || !contentView.isShown()) return true;
     if (newChatInput) {
@@ -461,7 +476,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       composerGlassView.setTranslationY(inputTop - reserve);
       inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
       // Actual laid-out coordinates include IME/emoji translation exactly once.
-      bottom = Math.max(0, Math.round(messagesView.getBottom() + messagesView.getTranslationY() - top + getAttachedFilesOffset()));
+      bottom = Math.max(0, Math.round(messagesView.getBottom() + messagesView.getTranslationY() - top + getAttachedFilesOffset() + Screen.dp(6f)));
     }
     messagesView.setOverlayPadding(floatingOverlayTop, bottom);
     // A pre-draw veto blocks the ENTIRE window, including another chat entering above us.
@@ -550,6 +565,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
     newChatInput = enabled;
     recordButton.setGlassMode(enabled);
+    messageSenderButton.setGlassMode(enabled);
     composerGlassView.setBackground(enabled ? inputGlass : null);
     bottomBar.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
     for (CircleButton button : new CircleButton[] {scrollToBottomButton, mentionButton, reactionsButton}) {

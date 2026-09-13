@@ -96,9 +96,21 @@ public class MessagesRecyclerView extends RecyclerView implements FactorAnimator
     invalidateBackdrop();
   }
 
-  public void setOverlayPadding (int top, int bottom) {
-    if (getPaddingTop() == top && getPaddingBottom() == bottom) return;
+  public boolean setOverlayPadding (int top, int bottom) {
+    if (getPaddingTop() == top && getPaddingBottom() == bottom) return false;
+    LayoutManager layout = getLayoutManager();
+    boolean keepBottom = false;
+    if (bottom != getPaddingBottom() && layout instanceof MessagesLayoutManager && !isComputingLayout() && getScrollState() == SCROLL_STATE_IDLE) {
+      MessagesLayoutManager messagesLayout = (MessagesLayoutManager) layout;
+      View lastMessage = messagesLayout.findViewByPosition(0);
+      keepBottom = !messagesLayout.hasPendingScroll() && lastMessage != null &&
+        Math.abs(messagesLayout.getDecoratedBottom(lastMessage) - (getHeight() - getPaddingBottom())) <= Screen.dp(2f);
+    }
     setPadding(getPaddingLeft(), top, getPaddingRight(), bottom);
+    // Keep an already bottom-aligned conversation above the composer as its
+    // height changes. Never overwrite an explicit unread/search/history target.
+    if (keepBottom) ((MessagesLayoutManager) layout).scrollToPositionWithOffset(0, 0);
+    return true;
   }
 
   private MessagesManager manager;
