@@ -51,6 +51,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/glass-tests"
           javac -d "$RUNNER_TEMP/glass-tests" \
             app/src/main/java/org/thunderdog/challegram/util/GlassBlur.java \
+            app/src/main/java/org/thunderdog/challegram/util/GlassFrameCache.java \
             app/src/main/java/org/thunderdog/challegram/util/DampedSpring.java \
             tests/graphics/GlassMathTest.java
           java -cp "$RUNNER_TEMP/glass-tests" GlassMathTest

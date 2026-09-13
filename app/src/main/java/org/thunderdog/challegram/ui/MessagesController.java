@@ -439,7 +439,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public static int getGlassIconColorId () { return Theme.isDark() ? ColorId.icon : ColorId.text; }
 
   private boolean syncFloatingLayout () {
-    if (messagesView == null || inputView == null || inPreviewMode || isInForceTouchMode()) return true;
+    if (messagesView == null || inputView == null || inPreviewMode || isInForceTouchMode() || isDestroyed() || !contentView.isShown()) return true;
     if (newChatInput) {
       int icon = Theme.getColor(getGlassIconColorId());
       if (glassControlsColor != icon) {
@@ -449,24 +449,24 @@ public class MessagesController extends ViewController<MessagesController.Argume
         }
       }
     }
-    boolean surfaceLayoutChanged = false;
     int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
     if (composerGlassView != null) composerGlassView.setVisibility(newChatInput && bottomWrap.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
     if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
       float top = bottomWrap.getY() + inputView.getTop();
-      float end = top + inputView.getHeight();
       if (getReplyOffset() > 0f) top = Math.min(top, replyBarView.getY());
-      int height = Math.max(0, Math.round(end - top));
-      surfaceLayoutChanged = composerGlassView.getHeight() != height;
-      Views.setLayoutHeight(composerGlassView, height);
-      composerGlassView.setTranslationY(top);
+      // Reserve the reply row once; animate the drawable inset, never the View height.
+      float inputTop = bottomWrap.getY() + inputView.getTop();
+      int reserve = replyBarView != null ? replyBarView.getLayoutParams().height : 0;
+      Views.setLayoutHeight(composerGlassView, inputView.getHeight() + reserve);
+      composerGlassView.setTranslationY(inputTop - reserve);
+      inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
       // Actual laid-out coordinates include IME/emoji translation exactly once.
       bottom = Math.max(0, Math.round(messagesView.getBottom() + messagesView.getTranslationY() - top + getAttachedFilesOffset()));
     }
-    boolean changed = messagesView.getPaddingTop() != floatingOverlayTop || messagesView.getPaddingBottom() != bottom;
     messagesView.setOverlayPadding(floatingOverlayTop, bottom);
-    // Do not display a frame with old item positions and new padding.
-    return !changed && !surfaceLayoutChanged;
+    // A pre-draw veto blocks the ENTIRE window, including another chat entering above us.
+    // Insets may request the next layout, but must never cancel a navigation/IME/animator frame.
+    return true;
   }
 
   private boolean updatingFloatingInsets;
@@ -558,6 +558,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     inputView.setBackground(enabled ? null : classicInputBackground);
     replyBarView.setBackground(enabled ? null : classicReplyBackground);
     replyBarView.setFloatingSurface(enabled);
+    replyBarView.setAlpha(enabled ? replyBarVisible.getFloatValue() : 1f);
     RelativeLayout.LayoutParams replyParams = (RelativeLayout.LayoutParams) replyBarView.getLayoutParams();
     replyParams.leftMargin = replyParams.rightMargin = enabled ? Screen.dp(8f) : 0;
     replyBarView.setLayoutParams(replyParams);
@@ -7898,6 +7899,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         replyBarView.setAnimationsDisabled(factor == 0f);
       }
       updateReplyView();
+      if (newChatInput && replyBarView != null) replyBarView.setAlpha(factor);
     }
 
     @Override
@@ -7981,6 +7983,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       replyBarView.setTranslationY(y + keyboardOffset);
     }
     checkScrollButtonOffsets();
+    syncFloatingLayout();
     onMessagesFrameChanged();
   }
 

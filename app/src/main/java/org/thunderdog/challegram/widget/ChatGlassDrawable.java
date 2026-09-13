@@ -18,7 +18,7 @@ import android.view.ViewTreeObserver;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.thunderdog.challegram.util.GlassBlur;
+import org.thunderdog.challegram.util.GlassFrameCache;
 import me.vkryl.core.ColorUtils;
 import org.thunderdog.challegram.component.chat.WallpaperView;
 import org.thunderdog.challegram.theme.Theme;
@@ -52,13 +52,21 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private boolean backdropDirty = true;
   private boolean released;
   private int lastX = Integer.MIN_VALUE, lastY, lastColor;
-  private long lastFingerprint;
-  private boolean hasFingerprint;
   private boolean enabled = true;
   private ViewTreeObserver observer;
   private final ViewTreeObserver.OnPreDrawListener prepareFrame;
   private final int[] messagesPosition = new int[2];
-  private final GlassBlur blur = new GlassBlur();
+  private final GlassFrameCache frames = new GlassFrameCache();
+  private float topInset;
+
+  public void setTopInset (float inset) {
+    if (topInset != inset) {
+      topInset = inset;
+      onBoundsChange(getBounds());
+      invalidateSelf();
+      host.invalidate();
+    }
+  }
   private int[] pixels = new int[0];
   private Bitmap sample, capture;
   private boolean customShape;
@@ -94,7 +102,9 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     if (released) return;
     if (observer != null && observer.isAlive()) observer.removeOnPreDrawListener(prepareFrame);
     sample = null;
+    capture = null;
     sampleCanvas = null;
+    frames.clear();
     observer = host.getViewTreeObserver();
     observer.addOnPreDrawListener(prepareFrame);
     invalidateBackdrop();
@@ -118,6 +128,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     backdropDirty = true;
     customShape = false;
     panel.set(bounds);
+    panel.top = Math.min(panel.bottom, panel.top + topInset);
     panel.inset(Screen.dp(.5f), Screen.dp(.5f));
     clip.reset();
     float radius = Math.min(Screen.dp(26f), panel.height() / 2f);
@@ -184,6 +195,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
       capture = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
       sampleCanvas = new Canvas(capture);
+      frames.clear();
     }
     capture.eraseColor(Theme.getColor(colorId));
 
@@ -202,15 +214,9 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     sampleCanvas.restoreToCount(sampleSave);
     if (pixels.length < width * height) pixels = new int[width * height];
     capture.getPixels(pixels, 0, width, 0, 0, width, height);
-    long fingerprint = 0xcbf29ce484222325L;
-    for (int i = 0; i < width * height; i++) fingerprint = (fingerprint ^ pixels[i]) * 0x100000001b3L;
-    boolean changed = geometryChanged || !hasFingerprint || fingerprint != lastFingerprint;
-    if (!changed) return false;
-    hasFingerprint = true;
-    lastFingerprint = fingerprint;
-    blur.blur(pixels, width, height);
-    sample.setPixels(pixels, 0, width, 0, 0, width, height);
-    return changed;
+    if (!frames.update(pixels, width, height, geometryChanged)) return false;
+    sample.setPixels(frames.pixels(), 0, width, 0, 0, width, height);
+    return true;
   }
 
   public void release () {

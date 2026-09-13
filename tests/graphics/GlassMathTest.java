@@ -1,6 +1,7 @@
 import java.util.Arrays;
 import java.util.Random;
 import org.thunderdog.challegram.util.GlassBlur;
+import org.thunderdog.challegram.util.GlassFrameCache;
 import org.thunderdog.challegram.util.DampedSpring;
 
 public final class GlassMathTest {
@@ -39,6 +40,23 @@ public final class GlassMathTest {
       for (int color : input) check(color == 0xff38a761, "solid theme color changed");
       cases++;
     }
+    GlassFrameCache cache = new GlassFrameCache();
+    int[] raw = new int[48 * 14];
+    for (int i = 0; i < raw.length; i++) raw[i] = i % 2 == 0 ? 0xff000000 : 0xffffffff;
+    int[] original = raw.clone();
+    for (int reopen = 0; reopen < 20; reopen++) {
+      cache.clear();
+      check(cache.update(raw, 48, 14, false), "reopened surface skipped its first upload");
+      check(Arrays.equals(cache.pixels(), reference(raw, 48, 14)), "reopened surface lost its blur");
+      check(!cache.update(raw, 48, 14, false), "idle scene keeps uploading");
+      check(Arrays.equals(raw, original), "capture buffer modified by display blur");
+      check(cache.update(raw, 24, 28, false), "same pixels with new dimensions reused stale geometry");
+      check(Arrays.equals(cache.pixels(), reference(raw, 24, 28)), "resize reused old blur");
+      check(cache.update(raw, 24, 28, true), "geometry refresh ignored");
+    }
+    raw[0] = 0xffff0000;
+    check(cache.update(raw, 24, 28, false), "new message pixels ignored");
+    check(Arrays.equals(cache.pixels(), reference(raw, 24, 28)), "changed scene not blurred");
     for (int fps : new int[] {30,60,90,120}) {
       DampedSpring spring = new DampedSpring(); spring.target = -198f;
       for (int i = 0; i < fps * 2; i++) {
@@ -52,6 +70,6 @@ public final class GlassMathTest {
       spring.target = -50; spring.step(4f); check(Float.isFinite(spring.value), "long frame");
       spring.reset(0f); check(!spring.isMoving(), "callback would continue after close");
     }
-    System.out.println("Glass blur: " + cases + " sizes, solid colors, reuse; spring: 30/60/90/120 Hz, return and teardown passed");
+    System.out.println("Glass blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; spring: 30/60/90/120 Hz, return and teardown passed");
   }
 }
