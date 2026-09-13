@@ -116,7 +116,7 @@ public class VoiceVideoButtonView extends View implements FactorAnimator.Target,
   private Paint paint;
 
   private Paint getIconPaint () {
-    int color = Theme.getColor(glassMode ? ColorId.icon : ColorId.circleButtonRegularIcon);
+    int color = Theme.getColor(glassMode ? org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId() : ColorId.circleButtonRegularIcon);
     if (paint == null || paint.getColor() != color)
       paint = Paints.createPorterDuffPaint(paint, color);
     return paint;

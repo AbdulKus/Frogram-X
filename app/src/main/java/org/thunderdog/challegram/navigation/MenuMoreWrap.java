@@ -83,6 +83,10 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   private Drawable classicBackground;
   private final android.graphics.Rect classicPadding = new android.graphics.Rect();
   private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
+
+  private int glassIconColorId () {
+    return glass != null ? org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId() : ColorId.icon;
+  }
   private final android.graphics.Path surfaceClip = new android.graphics.Path();
 
   public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
@@ -212,9 +216,9 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
     menuItem.setGravity(Gravity.CENTER_VERTICAL | Lang.gravity());
     menuItem.setVisibility(View.VISIBLE);
     if (drawable != null) {
-      drawable.setColorFilter(Paints.getColorFilter(Theme.getColor(ColorId.icon)));
+      drawable.setColorFilter(Paints.getColorFilter(Theme.getColor(glassIconColorId())));
       if (themeProvider != null) {
-        themeProvider.addThemeFilterListener(drawable, ColorId.icon);
+        themeProvider.addThemeFilterListener(drawable, glassIconColorId());
       }
       if (Drawables.needMirror(icon)) {
         // TODO
@@ -269,11 +273,11 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
           if (forcedTheme != null) {
             fillingColor = forcedTheme.getColor(ColorId.checkActive);
             checkColor = forcedTheme.getColor(ColorId.checkContent);
-            outlineColor = forcedTheme.getColor(ColorId.icon);
+            outlineColor = forcedTheme.getColor(glassIconColorId());
           } else {
             fillingColor = Theme.checkFillingColor();
             checkColor = Theme.checkCheckColor();
-            outlineColor = Theme.getColor(ColorId.icon);
+            outlineColor = Theme.getColor(glassIconColorId());
           }
 
           // TODO move into SimplestCheckbox
@@ -304,7 +308,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
           if (menuItem.iconResId == 0) {
             finalIcon.draw(canvas);
           } else {
-            Drawables.draw(canvas, finalIcon, 0, 0, PorterDuffPaint.get(ColorId.icon));
+            Drawables.draw(canvas, finalIcon, 0, 0, PorterDuffPaint.get(glassIconColorId()));
           }
           canvas.restore();
         }
@@ -420,11 +424,11 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
     icon = iconRes != 0 ? Drawables.get(getResources(), iconRes) : icon;
     if (icon != null) {
       if (forcedTheme != null) {
-        icon.setColorFilter(Paints.getColorFilter(forcedTheme.getColor(ColorId.icon)));
+        icon.setColorFilter(Paints.getColorFilter(forcedTheme.getColor(glassIconColorId())));
       } else {
-        icon.setColorFilter(Paints.getColorFilter(Theme.getColor(ColorId.icon)));
+        icon.setColorFilter(Paints.getColorFilter(Theme.getColor(glassIconColorId())));
         if (themeListeners != null) {
-          themeListeners.addThemeFilterListener(icon, ColorId.icon);
+          themeListeners.addThemeFilterListener(icon, glassIconColorId());
         }
       }
       if (Drawables.needMirror(iconRes)) {

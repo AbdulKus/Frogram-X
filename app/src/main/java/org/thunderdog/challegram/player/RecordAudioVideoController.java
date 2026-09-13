@@ -212,6 +212,7 @@ public class RecordAudioVideoController implements
       voiceVideoButtonView.setGlassMode(inputGlass != null);
       lockView.setGlassMode(inputGlass != null);
       switchCameraButtonWrap.setGlassSurface(controller);
+      switchCameraButton.setGlassMode(controller != null);
       disposableSwitchButton.setGlassSurface(controller);
       stopGlassSpring();
       FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) inputOverlayView.getLayoutParams();

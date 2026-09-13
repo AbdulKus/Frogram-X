@@ -158,7 +158,7 @@ public class RecordLockView extends View {
     int cx = viewWidth / 2;
     int cy = Screen.dp(BUTTON_SIZE) / 2;
 
-    final int grayColor = Theme.iconColor();
+    final int grayColor = glassMode ? Theme.getColor(org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId()) : Theme.iconColor();
     final int redColor = Theme.getColor(ColorId.iconNegative);
 
     int totalDy = (int) (Screen.dp(2f) * collapseFactor * (1f - sendFactor));
@@ -184,7 +184,7 @@ public class RecordLockView extends View {
       }
 
       if (editFactor > 0f) {
-        Drawables.drawCentered(c, mode == MODE_VIDEO ? drawableRound : drawableVoice, rectF.centerX(), rectF.centerY(), PorterDuffPaint.get(ColorId.icon, alpha));
+        Drawables.drawCentered(c, mode == MODE_VIDEO ? drawableRound : drawableVoice, rectF.centerX(), rectF.centerY(), PorterDuffPaint.get(glassMode ? org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId() : ColorId.icon, alpha));
       }
     }
 

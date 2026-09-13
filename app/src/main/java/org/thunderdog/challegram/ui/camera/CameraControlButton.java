@@ -40,7 +40,9 @@ public class CameraControlButton extends View implements FactorAnimator.Target {
 
   private Drawable icon, toIcon;
 
-  private boolean isSmall;
+  private boolean isSmall, glassMode;
+
+  public void setGlassMode (boolean enabled) { glassMode = enabled; invalidate(); }
 
   public CameraControlButton (Context context) {
     super(context);
@@ -283,7 +285,7 @@ public class CameraControlButton extends View implements FactorAnimator.Target {
       }
     }
 
-    Paint paint = isSmall ? Paints.getIconGrayPorterDuffPaint() : Paints.whitePorterDuffPaint();
+    Paint paint = glassMode ? Paints.getPorterDuffPaint(org.thunderdog.challegram.theme.Theme.getColor(org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId())) : isSmall ? Paints.getIconGrayPorterDuffPaint() : Paints.whitePorterDuffPaint();
     if (changeFactor == 0f) {
       Drawables.draw(c, icon, cx - icon.getMinimumWidth() / 2, cy - icon.getMinimumHeight() / 2, paint);
     } else {

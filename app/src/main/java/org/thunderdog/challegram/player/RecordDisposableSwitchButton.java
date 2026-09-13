@@ -44,14 +44,15 @@ public class RecordDisposableSwitchButton extends RecordControllerButton {
     final float cx = getMeasuredWidth() / 2f;
     final float cy = getMeasuredHeight() / 2f;
     final float active = getActiveFactor();
+    final int iconColorId = hasGlassSurface() ? org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId() : ColorId.icon;
 
     if (active == 0f) {
-      Drawables.drawCentered(canvas, drawable, cx, cy, PorterDuffPaint.get(ColorId.icon));
+      Drawables.drawCentered(canvas, drawable, cx, cy, PorterDuffPaint.get(iconColorId));
     } else if (active == 1f) {
       Drawables.drawCentered(canvas, drawable, cx, cy, PorterDuffPaint.get((hasGlassSurface() ? ColorId.textLink : ColorId.fillingPositiveContent)));
     } else {
       Drawables.drawCentered(canvas, drawable, cx, cy, Paints.getPorterDuffPaint(
-        ColorUtils.fromToArgb(Theme.getColor(ColorId.icon), Theme.getColor((hasGlassSurface() ? ColorId.textLink : ColorId.fillingPositiveContent)), active)
+        ColorUtils.fromToArgb(Theme.getColor(iconColorId), Theme.getColor((hasGlassSurface() ? ColorId.textLink : ColorId.fillingPositiveContent)), active)
       ));
     }
   }
