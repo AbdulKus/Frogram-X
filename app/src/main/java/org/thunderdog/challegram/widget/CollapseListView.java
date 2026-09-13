@@ -202,6 +202,11 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
     return i != -1 && entries.get(i).isVisible.getFloatValue() > 0f;
   }
 
+  public boolean isVisibilityRequested (Item item) {
+    int i = indexOf(item);
+    return i != -1 && entries.get(i).isVisible.getValue();
+  }
+
   public void notifyItemHeightChanged (Item item) {
     int i = indexOf(item);
     if (i != -1) {
@@ -258,16 +263,21 @@ public class CollapseListView extends FrameLayoutFix implements Destroyable {
   private int lastHeight;
 
   public int getTotalVisualHeight () {
-    int height = 0;
+    return lastHeight;
+  }
+
+  /** A geometry query must not notify listeners or restart a layout/animation. */
+  public int getTotalVisualHeightExcluding (Item excluded) {
+    float height = 0f;
     for (Entry entry : entries) {
+      if (entry.item == excluded) continue;
       float visibility = entry.isVisible.getFloatValue();
       if (entry.item.allowCollapse()) {
         visibility *= globalVisibility.getFactor();
       }
       height += entry.height * visibility;
     }
-    notifyTotalHeightChanged(height);
-    return height;
+    return Math.round(height);
   }
 
   public interface TotalHeightChangeListener {

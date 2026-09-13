@@ -496,7 +496,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
     try {
       int header = useFloatingChatHeader() ? getGlassTopExtension() : 0;
       contentView.setTopOverflow(header);
-      int top = header > 0 ? header + topBar.getTotalVisualHeight() + Screen.dp(6f) + getFloatingPlayerInset() : 0;
+      // The thread preview overlays the post. Its animation must not move the list
+      // that determines whether that same post has scrolled out of view.
+      int listBarHeight = manager.shouldShowThreadHeaderPreview() ? topBar.getTotalVisualHeightExcluding(pinnedMessagesItem) : topBar.getTotalVisualHeight();
+      int top = header > 0 ? header + listBarHeight + Screen.dp(6f) + getFloatingPlayerInset() : 0;
       int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
       floatingOverlayTop = top;
       if (!newChatInput && !useFloatingChatHeader()) messagesView.setOverlayPadding(top, bottom);
@@ -4715,16 +4718,20 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void destroy () {
     context().getRoundVideoController().detachVideoLayer(this);
-    if (wallpaperView != null) wallpaperView.setGlassInvalidationListener(null);
-    if (messagesView != null) messagesView.setBackdropInvalidationListener(null);
-    if (inputGlass != null) inputGlass.release();
-    if (headerGlass != null) headerGlass.release();
-    if (playerGlass != null) playerGlass.release();
-    for (java.lang.ref.WeakReference<ChatGlassDrawable> reference : extraGlass) {
-      ChatGlassDrawable glass = reference.get();
-      if (glass != null) glass.release();
+    // MainActivity caches this controller per account. Ordinary chat close also
+    // calls destroy(), but keeps its Views for the next chat. release() is terminal.
+    if (destroyInstance || !reuseEnabled) {
+      if (wallpaperView != null) wallpaperView.setGlassInvalidationListener(null);
+      if (messagesView != null) messagesView.setBackdropInvalidationListener(null);
+      if (inputGlass != null) inputGlass.release();
+      if (headerGlass != null) headerGlass.release();
+      if (playerGlass != null) playerGlass.release();
+      for (java.lang.ref.WeakReference<ChatGlassDrawable> reference : extraGlass) {
+        ChatGlassDrawable glass = reference.get();
+        if (glass != null) glass.release();
+      }
+      extraGlass.clear();
     }
-    extraGlass.clear();
     resetSelectableControl();
 
     discardAttachedFiles(false);
@@ -9116,6 +9123,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
         tdlib.send(new TdApi.PinChatMessage(chatId, m.getSmallestId(), disableNotification, onlyForSelf), tdlib.typedOkHandler());
       })
     .setRawItems(new ListItem[] {item}).setSaveStr(R.string.Pin));
+  }
+
+  public int getThreadHeaderPreviewBoundary () {
+    return topBar.getTotalVisualHeightExcluding(pinnedMessagesItem) +
+      (useFloatingChatHeader() ? getGlassTopExtension() + Screen.dp(6f) + getFloatingPlayerInset() : 0);
+  }
+
+  public boolean isThreadHeaderPreviewRequested () {
+    return topBar.isVisibilityRequested(pinnedMessagesItem);
   }
 
   public void showHidePinnedMessage (boolean show, @Nullable TdApi.Message message) {

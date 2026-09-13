@@ -3,6 +3,7 @@ import java.util.Random;
 import org.thunderdog.challegram.util.GlassBlur;
 import org.thunderdog.challegram.util.GlassFrameCache;
 import org.thunderdog.challegram.util.DampedSpring;
+import org.thunderdog.challegram.util.ThreadHeaderVisibility;
 
 public final class GlassMathTest {
   private static void check(boolean ok, String text) { if (!ok) throw new AssertionError(text); }
@@ -57,6 +58,31 @@ public final class GlassMathTest {
     raw[0] = 0xffff0000;
     check(cache.update(raw, 24, 28, false), "new message pixels ignored");
     check(Arrays.equals(cache.pixels(), reference(raw, 24, 28)), "changed scene not blurred");
+    // The post crosses a fixed edge, then the preview animates without another
+    // scroll. It must never toggle just because a different row becomes 'last visible'.
+    boolean preview = false;
+    int transitions = 0;
+    for (int bottom = 180; bottom >= -60; bottom--) {
+      boolean next = ThreadHeaderVisibility.shouldShow(preview, bottom >= 80, bottom, 80, 8);
+      if (next != preview) transitions++;
+      preview = next;
+      for (int frame = 0; frame < 24; frame++) {
+        check(ThreadHeaderVisibility.shouldShow(preview, bottom >= 80, bottom, 80, 8) == preview,
+          "stationary post oscillates during preview animation");
+      }
+    }
+    check(preview && transitions == 1, "post did not pin exactly once");
+    for (int bottom : new int[] {79, 81, 80, 83, 79, 87, 82}) {
+      check(ThreadHeaderVisibility.shouldShow(true, true, bottom, 80, 8), "edge rounding unpinned post");
+    }
+    transitions = 0;
+    for (int bottom = -60; bottom <= 180; bottom++) {
+      boolean next = ThreadHeaderVisibility.shouldShow(preview, bottom >= 80, bottom, 80, 8);
+      if (next != preview) transitions++;
+      preview = next;
+    }
+    check(!preview && transitions == 1, "return scroll did not unpin exactly once");
+    check(!ThreadHeaderVisibility.shouldShow(false, true, 400, 0, 8), "visible large post was pinned");
     for (int fps : new int[] {30,60,90,120}) {
       DampedSpring spring = new DampedSpring(); spring.target = -198f;
       for (int i = 0; i < fps * 2; i++) {
@@ -70,6 +96,6 @@ public final class GlassMathTest {
       spring.target = -50; spring.step(4f); check(Float.isFinite(spring.value), "long frame");
       spring.reset(0f); check(!spring.isMoving(), "callback would continue after close");
     }
-    System.out.println("Glass blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; spring: 30/60/90/120 Hz, return and teardown passed");
+    System.out.println("Glass blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; thread post: forward/return, stationary frames and edge jitter; spring: 30/60/90/120 Hz, return and teardown passed");
   }
 }

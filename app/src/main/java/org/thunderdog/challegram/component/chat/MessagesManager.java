@@ -63,6 +63,7 @@ import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Strings;
 import org.thunderdog.challegram.tool.UI;
+import org.thunderdog.challegram.util.ThreadHeaderVisibility;
 import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.ui.FeatureToggles;
 import org.thunderdog.challegram.ui.ListItem;
@@ -465,15 +466,24 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       controller.showHidePinnedMessage(false, null);
       return;
     }
-    int messagePreviewHeight = SettingHolder.measureHeightForType(ListItem.TYPE_MESSAGE_PREVIEW);
-    View view = manager.findViewByPosition(last);
-    if (view == null || view.getTop() > messagePreviewHeight) {
-      controller.showHidePinnedMessage(false, null);
-      return;
+    MessagesRecyclerView recycler = controller.getMessagesView();
+    if (recycler.hasPendingAdapterUpdates() || recycler.getChildCount() == 0) return;
+    // findLastVisibleItemPosition() is relative to RecyclerView padding. That
+    // padding used to animate with the preview, alternately selecting the post
+    // and a comment. Inspect the actual attached post at a fixed boundary instead.
+    View headerView = null;
+    for (int i = 0; i < recycler.getChildCount(); i++) {
+      View child = recycler.getChildAt(i);
+      TGMessage msg = child instanceof MessageProvider ? ((MessageProvider) child).getMessage() : null;
+      if (isHeaderMessage(msg)) {
+        headerView = child;
+        break;
+      }
     }
-    TGMessage msg = view instanceof MessageProvider ? ((MessageProvider) view).getMessage() : null;
-    int headerBottom = isHeaderMessage(msg) ? view.getBottom() : Integer.MIN_VALUE;
-    boolean showHeaderPreview = headerBottom <= messagePreviewHeight;
+    boolean showHeaderPreview = ThreadHeaderVisibility.shouldShow(
+      controller.isThreadHeaderPreviewRequested(), headerView != null,
+      headerView != null ? headerView.getBottom() + headerView.getTranslationY() : 0f,
+      controller.getThreadHeaderPreviewBoundary(), Screen.dp(8f));
     controller.showHidePinnedMessage(showHeaderPreview, messageThread.getOldestMessage());
   }
 
