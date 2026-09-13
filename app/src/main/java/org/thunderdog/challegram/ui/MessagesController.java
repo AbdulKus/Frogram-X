@@ -7540,6 +7540,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private CollapseListView.Item toastAlertItem;
 
   private PinnedMessagesBar pinnedMessagesBar;
+  private TdApi.Message threadHeaderPreviewMessage;
   private CollapseListView.Item pinnedMessagesItem;
 
   private JoinRequestsView requestsView;
@@ -9135,7 +9136,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   public void showHidePinnedMessage (boolean show, @Nullable TdApi.Message message) {
-    if (show) {
+    // Viewport checks also run on every header animation frame. Rebinding the
+    // same post resets PinnedMessagesBar's adapter and requests another layout.
+    if (show && (!isThreadHeaderPreviewRequested() || threadHeaderPreviewMessage != message)) {
+      threadHeaderPreviewMessage = message;
       pinnedMessagesBar.setCollapseButtonVisible(false);
       pinnedMessagesBar.setContextChatId(getChatId() != getHeaderChatId() ? getHeaderChatId() : 0);
       pinnedMessagesBar.setMessage(tdlib, message);
