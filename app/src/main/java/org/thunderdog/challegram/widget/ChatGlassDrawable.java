@@ -52,13 +52,15 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private boolean backdropDirty = true;
   private boolean released;
   private int lastX = Integer.MIN_VALUE, lastY, lastColor;
+  private long lastFingerprint;
+  private boolean hasFingerprint;
   private boolean enabled = true;
   private ViewTreeObserver observer;
   private final ViewTreeObserver.OnPreDrawListener prepareFrame;
   private final int[] messagesPosition = new int[2];
   private final GlassBlur blur = new GlassBlur();
   private int[] pixels = new int[0];
-  private Bitmap sample;
+  private Bitmap sample, capture;
   private boolean customShape;
 
   public void setShape (Path path) {
@@ -169,7 +171,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     int relativeX = hostPosition[0] - wallpaperPosition[0];
     int relativeY = hostPosition[1] - wallpaperPosition[1];
     int color = Theme.getColor(colorId);
-    if (!backdropDirty && relativeX == lastX && relativeY == lastY && lastColor == color) return false;
+    boolean geometryChanged = backdropDirty || relativeX != lastX || relativeY != lastY || lastColor != color;
     backdropDirty = false;
     lastX = relativeX;
     lastY = relativeY;
@@ -180,9 +182,10 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     int height = Math.max(1, Math.min(96, (int) Math.ceil(panel.height() / scale)));
     if (sample == null || sample.getWidth() != width || sample.getHeight() != height) {
       sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-      sampleCanvas = new Canvas(sample);
+      capture = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+      sampleCanvas = new Canvas(capture);
     }
-    sample.eraseColor(Theme.getColor(colorId));
+    capture.eraseColor(Theme.getColor(colorId));
 
     float x = hostPosition[0] - wallpaperPosition[0] + panel.left;
     float y = hostPosition[1] - wallpaperPosition[1] + panel.top;
@@ -198,10 +201,16 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     }
     sampleCanvas.restoreToCount(sampleSave);
     if (pixels.length < width * height) pixels = new int[width * height];
-    sample.getPixels(pixels, 0, width, 0, 0, width, height);
+    capture.getPixels(pixels, 0, width, 0, 0, width, height);
+    long fingerprint = 0xcbf29ce484222325L;
+    for (int i = 0; i < width * height; i++) fingerprint = (fingerprint ^ pixels[i]) * 0x100000001b3L;
+    boolean changed = geometryChanged || !hasFingerprint || fingerprint != lastFingerprint;
+    if (!changed) return false;
+    hasFingerprint = true;
+    lastFingerprint = fingerprint;
     blur.blur(pixels, width, height);
     sample.setPixels(pixels, 0, width, 0, 0, width, height);
-    return true;
+    return changed;
   }
 
   public void release () {
@@ -211,6 +220,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     // Do not recycle a bitmap that may still be referenced by a display list.
     sampleCanvas = null;
     sample = null;
+    capture = null;
   }
 
   @Override public void setAlpha (int alpha) { this.alpha = alpha; invalidateSelf(); }

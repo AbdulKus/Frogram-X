@@ -47,6 +47,8 @@ import me.vkryl.core.ColorUtils;
 import me.vkryl.core.MathUtils;
 
 public class ChatBottomBarView extends BaseView {
+  private android.animation.StateListAnimator classicAnimator;
+  private float classicElevation;
   private Drawable drawable;
   private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
   private org.thunderdog.challegram.ui.MessagesController glassController;
@@ -54,6 +56,12 @@ public class ChatBottomBarView extends BaseView {
   public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
     if (glassController == controller) return;
     if (glass != null) glass.release();
+    if (controller != null && glassController == null) {
+      classicAnimator = getStateListAnimator(); classicElevation = getElevation();
+      setStateListAnimator(null); setElevation(0f); setTranslationZ(0f);
+    } else if (controller == null) {
+      setElevation(classicElevation); setStateListAnimator(classicAnimator);
+    }
     glassController = controller;
     glass = controller != null ? controller.createGlassSurface(this, ColorId.filling) : null;
     update();
@@ -85,7 +93,7 @@ public class ChatBottomBarView extends BaseView {
       public void draw (@NonNull Canvas c) {
         RectF rectF = buildRectF();
         int radius = calculateRadius();
-        int color = Theme.getColor(ColorId.fillingPressed);
+        int color = glass != null ? ColorUtils.alphaColor(.12f, Theme.textAccentColor()) : Theme.getColor(ColorId.fillingPressed);
         if (radius == 0) {
           c.drawRect(rectF.left, rectF.top, rectF.right, rectF.bottom, Paints.fillingPaint(color));
         } else {
@@ -211,7 +219,7 @@ public class ChatBottomBarView extends BaseView {
         drawingText.draw(c, (int) (cx - drawingText.getWidth() / 2f), (int) (cy - drawingText.getHeight() / 2f), null, factor * (1f - collapseFactor));
       }
       if (collapseFactor > 0f && drawable != null) {
-        Paint paint = PorterDuffPaint.get(((ChatBottomBarView) view).glass != null ? ColorId.textNeutral : ColorId.circleButtonChatIcon, factor * collapseFactor);
+        Paint paint = PorterDuffPaint.get(((ChatBottomBarView) view).glass != null ? ColorId.text : ColorId.circleButtonChatIcon, factor * collapseFactor);
         Drawables.drawCentered(c, drawable, cx, cy, paint);
       }
       if (needScale) {

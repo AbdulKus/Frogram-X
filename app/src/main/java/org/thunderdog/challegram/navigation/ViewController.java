@@ -1376,7 +1376,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   protected final int getNewStatusBarColor () {
-    return HeaderView.DEFAULT_STATUS_COLOR;
+    return hasFloatingHeader() ? android.graphics.Color.TRANSPARENT : HeaderView.DEFAULT_STATUS_COLOR;
   }
 
   protected int getFloatingButtonId () {

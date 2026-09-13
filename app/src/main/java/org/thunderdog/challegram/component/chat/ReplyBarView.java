@@ -181,6 +181,26 @@ public class ReplyBarView extends FrameLayoutFix implements View.OnClickListener
     addView(linkPreviewToggleView);
   }
 
+  private boolean floatingSurface;
+  private int floatingIconColor;
+  public void setFloatingSurface (boolean enabled) {
+    floatingSurface = enabled;
+    floatingIconColor = 0;
+    pinnedMessagesBar.setFloatingSurface(enabled);
+    invalidate();
+  }
+
+  @Override protected void dispatchDraw (android.graphics.Canvas canvas) {
+    if (floatingSurface) {
+      int color = Theme.isDark() ? Theme.iconColor() : Theme.textAccentColor();
+      if (floatingIconColor != color) {
+        floatingIconColor = color;
+        closeView.setColorFilter(color); replaceMediaView.setColorFilter(color); editMediaView.setColorFilter(color);
+      }
+    }
+    super.dispatchDraw(canvas);
+  }
+
   private boolean animationsDisabled;
 
   public void setAnimationsDisabled (boolean animationsDisabled) {

@@ -57,15 +57,24 @@ public class CircleButton extends View implements FactorAnimator.Target, Reactio
   private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
   private org.thunderdog.challegram.ui.MessagesController glassController;
   private int classicIconColor;
+  private android.animation.StateListAnimator classicStateAnimator;
+  private android.view.ViewOutlineProvider classicOutline;
+  private float classicElevation;
 
   public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
     if (glassController == controller) return;
     if (classicBackground == null) { classicBackground = getBackground(); classicIconColor = iconColor; }
     if (glass != null) glass.release();
+    if (controller != null && glassController == null) {
+      classicStateAnimator = getStateListAnimator(); classicOutline = getOutlineProvider(); classicElevation = getElevation();
+      setStateListAnimator(null); setOutlineProvider(null); setElevation(0f); setTranslationZ(0f);
+    } else if (controller == null) {
+      setOutlineProvider(classicOutline); setElevation(classicElevation); setStateListAnimator(classicStateAnimator);
+    }
     glassController = controller;
     glass = controller != null ? controller.createGlassSurface(this, ColorId.filling) : null;
     setBackground(glass != null ? glass : classicBackground);
-    setIconColorId(glass != null ? ColorId.icon : classicIconColor);
+    setIconColorId(glass != null ? org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId() : classicIconColor);
   }
 
   private int offsetLeft;
@@ -476,8 +485,8 @@ public class CircleButton extends View implements FactorAnimator.Target, Reactio
         Views.restore(c, restoreToCount);
       }
     } else if (icon != null) {
-      final int iconColor = iconColorIsId ? Theme.getColor(this.iconColor) : this.iconColor;
-      final int crossIconColor = glass != null ? Theme.iconColor() : ColorUtils.fromToArgb(iconColor, crossIconColorId != 0 ? Theme.getColor(crossIconColorId) : iconColor, factor);
+      final int iconColor = glass != null ? Theme.getColor(org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId()) : iconColorIsId ? Theme.getColor(this.iconColor) : this.iconColor;
+      final int crossIconColor = glass != null ? iconColor : ColorUtils.fromToArgb(iconColor, crossIconColorId != 0 ? Theme.getColor(crossIconColorId) : iconColor, factor);
       final Paint bitmapPaint = getIconPaint(iconColor);
       final int sourceAlpha = bitmapPaint.getAlpha();
 
