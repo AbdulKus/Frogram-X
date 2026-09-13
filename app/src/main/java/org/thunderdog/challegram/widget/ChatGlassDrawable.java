@@ -18,7 +18,8 @@ import android.view.ViewTreeObserver;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.thunderdog.challegram.U;
+import org.thunderdog.challegram.util.GlassBlur;
+import me.vkryl.core.ColorUtils;
 import org.thunderdog.challegram.component.chat.WallpaperView;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Screen;
@@ -55,7 +56,22 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private ViewTreeObserver observer;
   private final ViewTreeObserver.OnPreDrawListener prepareFrame;
   private final int[] messagesPosition = new int[2];
+  private final GlassBlur blur = new GlassBlur();
+  private int[] pixels = new int[0];
   private Bitmap sample;
+  private boolean customShape;
+
+  public void setShape (Path path) {
+    clip.set(path);
+    customShape = true;
+    host.invalidate();
+  }
+
+  public static int surfaceColor (int colorId) {
+    int color = Theme.getColor(colorId);
+    return Theme.isDark() ? color : ColorUtils.fromToArgb(color, Theme.headerColor(), .18f);
+  }
+
   private Canvas sampleCanvas;
   private Shader sheen;
   private int alpha = 255;
@@ -98,6 +114,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
   @Override protected void onBoundsChange (Rect bounds) {
     backdropDirty = true;
+    customShape = false;
     panel.set(bounds);
     panel.inset(Screen.dp(.5f), Screen.dp(.5f));
     clip.reset();
@@ -121,7 +138,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       canvas.drawBitmap(sample, null, panel, paint);
     }
     // Keep theme foreground colours legible even over a high-contrast photo.
-    paint.setColor(Theme.getColor(colorId));
+    paint.setColor(surfaceColor(colorId));
     paint.setAlpha(Math.round(alpha * (sample != null ? (Theme.isDark() ? .46f : .52f) : .82f)));
     canvas.drawRect(panel, paint);
     paint.setShader(sheen);
@@ -132,9 +149,9 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
     paint.setStyle(Paint.Style.STROKE);
     paint.setStrokeWidth(Screen.dp(1f));
-    paint.setColor(Theme.isDark() ? 0x38ffffff : 0x90ffffff);
+    paint.setColor(Theme.isDark() ? 0x38ffffff : ColorUtils.alphaColor(.28f, ColorUtils.fromToArgb(Theme.headerColor(), Theme.textAccentColor(), .25f)));
     paint.setAlpha(Math.round(Color.alpha(paint.getColor()) * alpha / 255f));
-    canvas.drawRoundRect(panel, radius, radius, paint);
+    if (customShape) canvas.drawPath(clip, paint); else canvas.drawRoundRect(panel, radius, radius, paint);
     paint.setStyle(Paint.Style.FILL);
   }
 
@@ -146,7 +163,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   }
 
   private boolean prepareBackdrop () {
-    if (released || !enabled || panel.isEmpty() || wallpaper.getWidth() == 0 || wallpaper.getHeight() == 0) return false;
+    if (released || !enabled || panel.isEmpty() || (wallpaper.getWidth() == 0 && (messages == null || messages.getWidth() == 0))) return false;
     host.getLocationInWindow(hostPosition);
     wallpaper.getLocationInWindow(wallpaperPosition);
     int relativeX = hostPosition[0] - wallpaperPosition[0];
@@ -157,12 +174,10 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     lastX = relativeX;
     lastY = relativeY;
     lastColor = color;
-    // Capture only the panel region, once before the hardware frame is recorded.
-    // The existing native blur works on every supported Android version.
-    // Native fastBlur accepts at most 160 * 160 pixels, including on tablets.
-    float scale = Math.max(8f, Math.max(panel.width(), panel.height()) / 160f);
-    int width = Math.max(8, Math.min(160, (int) Math.ceil(panel.width() / scale)));
-    int height = Math.max(8, Math.min(160, (int) Math.ceil(panel.height() / scale)));
+    // At most 96 pixels on either axis; two box passes give a broad, stable blur.
+    float scale = Math.max(Screen.dp(7f), Math.max(panel.width(), panel.height()) / 96f);
+    int width = Math.max(1, Math.min(96, (int) Math.ceil(panel.width() / scale)));
+    int height = Math.max(1, Math.min(96, (int) Math.ceil(panel.height() / scale)));
     if (sample == null || sample.getWidth() != width || sample.getHeight() != height) {
       sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
       sampleCanvas = new Canvas(sample);
@@ -182,7 +197,10 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       if (videoLayer != null) videoLayer.draw(sampleCanvas);
     }
     sampleCanvas.restoreToCount(sampleSave);
-    U.blurBitmap(sample, 3, 1);
+    if (pixels.length < width * height) pixels = new int[width * height];
+    sample.getPixels(pixels, 0, width, 0, 0, width, height);
+    blur.blur(pixels, width, height);
+    sample.setPixels(pixels, 0, width, 0, 0, width, height);
     return true;
   }
 

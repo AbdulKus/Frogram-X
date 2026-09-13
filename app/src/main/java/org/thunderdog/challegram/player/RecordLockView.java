@@ -87,6 +87,17 @@ public class RecordLockView extends View {
     return (int) (getMeasuredHeight() - Screen.dp(BUTTON_EXPANDED) * collapseFactor) - Screen.dp(BUTTON_SIZE / 2f);
   }
 
+  private boolean glassMode;
+  private android.animation.StateListAnimator classicAnimator;
+  public void setGlassMode (boolean enabled) {
+    if (glassMode == enabled) return;
+    if (enabled) { classicAnimator = getStateListAnimator(); setStateListAnimator(null); }
+    else setStateListAnimator(classicAnimator);
+    glassMode = enabled;
+    setElevation(enabled ? 0f : Screen.dp(1f)); setTranslationZ(0f); invalidate();
+  }
+  public float getSurfaceHeight () { return getHeight() - Screen.dp(BUTTON_EXPANDED) * collapseFactor; }
+
   private float collapseFactor;
 
   public void setCollapseFactor (float factor) {
@@ -133,14 +144,14 @@ public class RecordLockView extends View {
 
   @Override
   protected void onDraw (Canvas c) {
-    int fillingColor = Theme.fillingColor();
+    int fillingColor = glassMode ? org.thunderdog.challegram.widget.ChatGlassDrawable.surfaceColor(ColorId.filling) : Theme.fillingColor();
 
     RectF rectF = Paints.getRectF();
     final int viewWidth = getMeasuredWidth();
     final int viewHeight = getMeasuredHeight();
     rectF.set(0, 0, viewWidth, viewHeight - Screen.dp(BUTTON_EXPANDED) * collapseFactor);
     int radius = Screen.dp(BUTTON_SIZE) / 2;
-    c.drawRoundRect(rectF, radius, radius, Paints.fillingPaint(fillingColor));
+    if (!glassMode) c.drawRoundRect(rectF, radius, radius, Paints.fillingPaint(fillingColor));
 
     int bottomCy = (int) rectF.bottom - radius;
 

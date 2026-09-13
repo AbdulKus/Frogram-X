@@ -160,15 +160,60 @@ public class RecordAudioVideoController implements
   }
 
   private org.thunderdog.challegram.widget.ChatGlassDrawable inputGlass;
+  private org.thunderdog.challegram.widget.RecordingGlassView recordingSurface;
+  private final android.graphics.RectF recordingIsland = new android.graphics.RectF(), recordingLock = new android.graphics.RectF();
+  private final org.thunderdog.challegram.util.DampedSpring dragSpring = new org.thunderdog.challegram.util.DampedSpring();
+  private boolean springPosted;
+  private long springTime;
+  private final android.view.Choreographer.FrameCallback springFrame = this::onSpringFrame;
+
+  private void onSpringFrame (long time) {
+    float dt = springTime == 0 ? 1f / 60f : (time - springTime) / 1000000000f;
+    springTime = time;
+    boolean moving = dragSpring.step(dt);
+    updateTranslations();
+    if (moving && inputGlass != null && isOpen()) android.view.Choreographer.getInstance().postFrameCallback(springFrame);
+    else { springPosted = false; springTime = 0; }
+  }
+
+  private void stopGlassSpring () {
+    android.view.Choreographer.getInstance().removeFrameCallback(springFrame);
+    springPosted = false; springTime = 0; dragSpring.reset(0f);
+  }
+
+  private void updateRecordingGeometry () {
+    if (recordingSurface == null || inputGlass == null || inputOverlayView.getWidth() == 0) return;
+    recordingIsland.set(inputOverlayView.getX(), inputOverlayView.getY(), inputOverlayView.getX() + inputOverlayView.getWidth(), inputOverlayView.getY() + inputOverlayView.getHeight());
+    float cx = voiceVideoButtonView.getX() + voiceVideoButtonView.getWidth() / 2f;
+    float cy = voiceVideoButtonView.getY() + voiceVideoButtonView.getHeight() / 2f;
+    float radius = Math.min(Screen.dp(31f), Screen.dp(24.5f + 6f * recordFactor + Math.min(1f, recordBackground.getGlassPulse()) * 2f));
+    radius *= MathUtils.clamp(recordFactor);
+    float scale = lockView.getScaleX();
+    float left = lockView.getX() + lockView.getPivotX() * (1f - scale);
+    float top = lockView.getY() + lockView.getPivotY() * (1f - scale);
+    recordingLock.set(left, top, left + lockView.getWidth() * scale, top + lockView.getSurfaceHeight() * scale);
+    recordingSurface.setGeometry(recordingIsland, cx, cy, radius, lockView.getAlpha() > 0f ? recordingLock : null);
+    recordingSurface.setAlpha(inputOverlayView.getAlpha());
+  }
+
   private MessagesController glassController;
 
   private void updateInputSurface (MessagesController controller) {
+    if (inputOverlayView == null) return;
     if (controller != null && !controller.useFloatingInput()) controller = null;
     if (glassController != controller) {
       if (inputGlass != null) inputGlass.release();
       glassController = controller;
-      inputGlass = controller != null ? controller.createGlassSurface(inputOverlayView, ColorId.filling) : null;
-      inputOverlayView.setBackground(inputGlass);
+      inputGlass = controller != null ? controller.createGlassSurface(recordingSurface, ColorId.filling) : null;
+      inputOverlayView.setBackground(null);
+      recordingSurface.setGlass(inputGlass);
+      recordingSurface.setVisibility(inputGlass != null ? View.VISIBLE : View.GONE);
+      recordBackground.setGlassMode(inputGlass != null);
+      voiceVideoButtonView.setGlassMode(inputGlass != null);
+      lockView.setGlassMode(inputGlass != null);
+      switchCameraButtonWrap.setGlassSurface(controller);
+      disposableSwitchButton.setGlassSurface(controller);
+      stopGlassSpring();
       FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) inputOverlayView.getLayoutParams();
       params.leftMargin = params.rightMargin = controller != null ? Screen.dp(8f) : 0;
       inputOverlayView.setLayoutParams(params);
@@ -234,7 +279,9 @@ public class RecordAudioVideoController implements
 
   @Override
   public void onActivityDestroy () {
-    videoPreviewView.setActivityPaused(true);
+    stopGlassSpring();
+    updateInputSurface(null);
+    if (videoPreviewView != null) videoPreviewView.setActivityPaused(true);
     if (isOpen()) {
       if (recordMode == RECORD_MODE_VIDEO_EDIT) {
         closeVideoEditMode(null);
@@ -276,6 +323,9 @@ public class RecordAudioVideoController implements
       this.videoBackgroundView = new RecordBackgroundView(context);
       this.videoBackgroundView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
       this.rootLayout.addView(videoBackgroundView);
+      this.recordingSurface = new org.thunderdog.challegram.widget.RecordingGlassView(context);
+      this.recordingSurface.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+      this.rootLayout.addView(recordingSurface);
 
       this.inputOverlayView = new FrameLayoutFix(context) {
         @Override
@@ -356,6 +406,7 @@ public class RecordAudioVideoController implements
       this.rootLayout.addView(durationView);
 
       this.recordBackground = new RecordButton(context);
+      this.recordBackground.setSurfaceUpdateListener(this::updateRecordingGeometry);
       this.recordBackground.setOnClickListener(v -> {
         if (isOpen() && isReleased) {
           finishRecording(false);
@@ -690,7 +741,16 @@ public class RecordAudioVideoController implements
     videoTopShadowView.setTranslationY(overallTranslation - inputOverlayView.getMeasuredHeight());
     videoBottomShadowView.setTranslationY(overallTranslation + videoBottomShadowView.getMeasuredHeight());
 
-    float y = overallTranslation + actualY;
+    float visualY = actualY;
+    if (inputGlass != null) {
+      dragSpring.target = actualY;
+      visualY = dragSpring.value;
+      if (!springPosted && dragSpring.isMoving()) {
+        springPosted = true;
+        android.view.Choreographer.getInstance().postFrameCallback(springFrame);
+      }
+    }
+    float y = overallTranslation + visualY;
     voiceVideoButtonView.setTranslationY(y);
 
     // Relative to voiceVideoButtonView
@@ -709,6 +769,7 @@ public class RecordAudioVideoController implements
     switchCameraButtonWrap.setTranslationX(cx - switchCameraButtonWrap.getMeasuredWidth() / 2f);
     disposableSwitchButton.setTranslationX(cx - disposableSwitchButton.getMeasuredWidth() / 2f);
     updateLockY();
+    updateRecordingGeometry();
 
     if (closeFactor * recordFactor == 1f) {
       stopRecording(CLOSE_MODE_CANCEL, false);
@@ -728,6 +789,7 @@ public class RecordAudioVideoController implements
     disposableSwitchButton.setScaleY(scale);
 
     recordBackground.setExpand(recordFactor);
+    updateRecordingGeometry();
   }
 
   private void updateVideoY () {
@@ -1360,6 +1422,7 @@ public class RecordAudioVideoController implements
     updateMuteAlpha();
 
     updateVideoY();
+    updateRecordingGeometry();
   }
 
   private void setRecordFactor (float factor) {
@@ -1427,6 +1490,8 @@ public class RecordAudioVideoController implements
   }
 
   private void onRecordRemoved () {
+    stopGlassSpring();
+    updateInputSurface(null);
     // note: when animations disabled happens before finishVideoRecording
     context.setScreenFlagEnabled(BaseActivity.SCREEN_FLAG_RECORDING, false);
     context.setOrientationLockFlagEnabled(BaseActivity.ORIENTATION_FLAG_RECORDING, false);

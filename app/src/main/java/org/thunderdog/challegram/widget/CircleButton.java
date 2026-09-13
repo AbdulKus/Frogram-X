@@ -53,6 +53,21 @@ import me.vkryl.core.lambda.Destroyable;
 
 public class CircleButton extends View implements FactorAnimator.Target, ReactionLoadListener, Destroyable {
   private Drawable icon;
+  private Drawable classicBackground;
+  private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
+  private org.thunderdog.challegram.ui.MessagesController glassController;
+  private int classicIconColor;
+
+  public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
+    if (glassController == controller) return;
+    if (classicBackground == null) { classicBackground = getBackground(); classicIconColor = iconColor; }
+    if (glass != null) glass.release();
+    glassController = controller;
+    glass = controller != null ? controller.createGlassSurface(this, ColorId.filling) : null;
+    setBackground(glass != null ? glass : classicBackground);
+    setIconColorId(glass != null ? ColorId.icon : classicIconColor);
+  }
+
   private int offsetLeft;
 
   private int iconColor;
@@ -462,7 +477,7 @@ public class CircleButton extends View implements FactorAnimator.Target, Reactio
       }
     } else if (icon != null) {
       final int iconColor = iconColorIsId ? Theme.getColor(this.iconColor) : this.iconColor;
-      final int crossIconColor = ColorUtils.fromToArgb(iconColor, crossIconColorId != 0 ? Theme.getColor(crossIconColorId) : iconColor, factor);
+      final int crossIconColor = glass != null ? Theme.iconColor() : ColorUtils.fromToArgb(iconColor, crossIconColorId != 0 ? Theme.getColor(crossIconColorId) : iconColor, factor);
       final Paint bitmapPaint = getIconPaint(iconColor);
       final int sourceAlpha = bitmapPaint.getAlpha();
 

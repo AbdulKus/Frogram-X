@@ -61,10 +61,10 @@ public class RecordButton extends View implements FactorAnimator.Target, ClickHe
         @TargetApi (Build.VERSION_CODES.LOLLIPOP)
         @Override
         public void getOutline (View view, android.graphics.Outline outline) {
-          if (expand <= 0f) {
+          if (expand <= 0f || glassMode) {
             outline.setEmpty();
           } else {
-            int radius = (int) (RecordButton.this.radius * expand);
+            int radius = (int) (RecordButton.this.hitRadius() * expand);
             outline.setRoundRect(center - radius, center - radius, center + radius, center + radius, radius);
           }
         }
@@ -86,17 +86,17 @@ public class RecordButton extends View implements FactorAnimator.Target, ClickHe
 
   @Override
   public boolean onTouchEvent (MotionEvent e) {
-    return onClickListener != null && (e.getAction() != MotionEvent.ACTION_DOWN || (expand == 1f && U.isInside(e.getX(), e.getY(), getMeasuredWidth() / 2, getMeasuredHeight() / 2, radius * expand))) && helper.onTouchEvent(this, e);
+    return onClickListener != null && (e.getAction() != MotionEvent.ACTION_DOWN || (expand == 1f && U.isInside(e.getX(), e.getY(), getMeasuredWidth() / 2, getMeasuredHeight() / 2, hitRadius() * expand))) && helper.onTouchEvent(this, e);
   }
 
   @Override
   public boolean needClickAt (View view, float x, float y) {
-    return U.isInside(x, y, getMeasuredWidth() / 2, getMeasuredHeight() / 2, radius * expand);
+    return U.isInside(x, y, getMeasuredWidth() / 2, getMeasuredHeight() / 2, hitRadius() * expand);
   }
 
   @Override
   public void onClickAt (View view, float x, float y) {
-    if (U.isInside(x, y, getMeasuredWidth() / 2, getMeasuredHeight() / 2, radius * expand)) {
+    if (U.isInside(x, y, getMeasuredWidth() / 2, getMeasuredHeight() / 2, hitRadius() * expand)) {
       onClickListener.onClick(this);
     }
   }
@@ -111,6 +111,18 @@ public class RecordButton extends View implements FactorAnimator.Target, ClickHe
 
   // Animators
 
+  private Runnable surfaceUpdate;
+  public void setSurfaceUpdateListener (Runnable listener) { surfaceUpdate = listener; }
+  private boolean glassMode;
+  public void setGlassMode (boolean enabled) {
+    glassMode = enabled;
+    setElevation(enabled ? 0f : Screen.dp(1f));
+    setTranslationZ(enabled ? 0f : Screen.dp(2f));
+    invalidateOutline();
+    invalidate();
+  }
+  public float getGlassPulse () { return volume; }
+  private float hitRadius () { return glassMode ? Screen.dp(31f) : radius; }
   private float expand;
 
   public void setExpand (float expand) {
@@ -164,6 +176,7 @@ public class RecordButton extends View implements FactorAnimator.Target, ClickHe
     if (this.volume != volume) {
       this.volume = volume;
       invalidate();
+      if (glassMode && surfaceUpdate != null) surfaceUpdate.run();
     }
   }
 
@@ -181,6 +194,7 @@ public class RecordButton extends View implements FactorAnimator.Target, ClickHe
 
   @Override
   public void onDraw (Canvas c) {
+    if (glassMode) return;
     int color = Theme.getColor(ColorId.circleButtonRegular);
     c.drawCircle(center, center, (radius + radiusAdd * volume) * expand, Paints.fillingPaint(ColorUtils.alphaColor(.3f, color)));
     c.drawCircle(center, center, radius * expand, Paints.fillingPaint(color));

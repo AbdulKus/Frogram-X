@@ -38,6 +38,19 @@ public class RecordControllerButton extends FrameLayoutFix {
   public static final int PADDING = 5;
 
   private ViewController<?> themeProvider;
+  private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
+  private android.graphics.drawable.Drawable classicBackground;
+  private org.thunderdog.challegram.ui.MessagesController glassController;
+  protected boolean hasGlassSurface () { return glass != null; }
+  public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
+    if (glassController == controller) return;
+    if (classicBackground == null) classicBackground = getBackground();
+    if (glass != null) glass.release();
+    glassController = controller;
+    glass = controller != null ? controller.createGlassSurface(this, ColorId.filling) : null;
+    setBackground(glass != null ? glass : classicBackground);
+  }
+
 
   public RecordControllerButton (Context context) {
     super(context);
@@ -61,7 +74,7 @@ public class RecordControllerButton extends FrameLayoutFix {
   protected void dispatchDraw (@NonNull Canvas canvas) {
     final float active = isActiveAnimator.getFloatValue();
     if (active > 0f) {
-      final int color = ColorUtils.fromToArgb(Theme.getColor(ColorId.filling), Theme.getColor(ColorId.fillingPositive), active);
+      final int color = glass != null ? ColorUtils.alphaColor(.22f * active, Theme.getColor(ColorId.fillingPositive)) : ColorUtils.fromToArgb(Theme.getColor(ColorId.filling), Theme.getColor(ColorId.fillingPositive), active);
       canvas.drawCircle(getMeasuredWidth() / 2f, getMeasuredHeight() / 2f, Screen.dp(BUTTON_SIZE / 2f), Paints.fillingPaint(color));
     }
 

@@ -46,6 +46,15 @@ jobs:
             app/src/main/java/org/thunderdog/challegram/util/GitHubRelease.java tests/updates/GitHubReleaseTest.java
           java -cp "$RUNNER_TEMP/json.jar:$RUNNER_TEMP/update-tests" GitHubReleaseTest
 
+      - name: Test glass blur and recording spring
+        run: |
+          mkdir -p "$RUNNER_TEMP/glass-tests"
+          javac -d "$RUNNER_TEMP/glass-tests" \
+            app/src/main/java/org/thunderdog/challegram/util/GlassBlur.java \
+            app/src/main/java/org/thunderdog/challegram/util/DampedSpring.java \
+            tests/graphics/GlassMathTest.java
+          java -cp "$RUNNER_TEMP/glass-tests" GlassMathTest
+
   build:
     name: Latest ARM64 APK
     needs: update-tests

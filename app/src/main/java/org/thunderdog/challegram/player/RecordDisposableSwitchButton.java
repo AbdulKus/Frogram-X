@@ -48,10 +48,10 @@ public class RecordDisposableSwitchButton extends RecordControllerButton {
     if (active == 0f) {
       Drawables.drawCentered(canvas, drawable, cx, cy, PorterDuffPaint.get(ColorId.icon));
     } else if (active == 1f) {
-      Drawables.drawCentered(canvas, drawable, cx, cy, PorterDuffPaint.get(ColorId.fillingPositiveContent));
+      Drawables.drawCentered(canvas, drawable, cx, cy, PorterDuffPaint.get((hasGlassSurface() ? ColorId.textLink : ColorId.fillingPositiveContent)));
     } else {
       Drawables.drawCentered(canvas, drawable, cx, cy, Paints.getPorterDuffPaint(
-        ColorUtils.fromToArgb(Theme.getColor(ColorId.icon), Theme.getColor(ColorId.fillingPositiveContent), active)
+        ColorUtils.fromToArgb(Theme.getColor(ColorId.icon), Theme.getColor((hasGlassSurface() ? ColorId.textLink : ColorId.fillingPositiveContent)), active)
       ));
     }
   }

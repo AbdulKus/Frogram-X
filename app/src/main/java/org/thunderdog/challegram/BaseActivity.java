@@ -879,7 +879,9 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   public void setWindowDecorSystemUiVisibility (int visibility, boolean remember) {
     boolean lightNavigationBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Config.USE_CUSTOM_NAVIGATION_COLOR && !Theme.isDark() && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
-    boolean lightStatusBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Theme.needLightStatusBar();
+    ViewController<?> statusController = navigation != null ? navigation.getCurrentStackItem() : null;
+    boolean glassHeader = statusController != null && statusController.hasFloatingHeader();
+    boolean lightStatusBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && (glassHeader ? !Theme.isDark() : Theme.needLightStatusBar());
     UI.setLightSystemBars(getWindow(), lightNavigationBar, lightStatusBar, visibility, true);
     if (this.isWindowLight != lightNavigationBar) {
       this.isWindowLight = lightNavigationBar;

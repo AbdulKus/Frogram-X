@@ -111,10 +111,12 @@ public class VoiceVideoButtonView extends View implements FactorAnimator.Target,
     Settings.instance().removeVideoPreferenceChangeListener(this);
   }
 
+  private boolean glassMode;
+  public void setGlassMode (boolean enabled) { glassMode = enabled; invalidate(); }
   private Paint paint;
 
   private Paint getIconPaint () {
-    int color = Theme.getColor(ColorId.circleButtonRegularIcon);
+    int color = Theme.getColor(glassMode ? ColorId.icon : ColorId.circleButtonRegularIcon);
     if (paint == null || paint.getColor() != color)
       paint = Paints.createPorterDuffPaint(paint, color);
     return paint;

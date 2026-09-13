@@ -342,6 +342,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private Drawable classicInputBackground;
   private Drawable classicBottomSpaceBackground;
   private ChatGlassDrawable inputGlass;
+  private View composerGlassView;
+  private Drawable classicReplyBackground;
+  private final android.graphics.Paint statusFadePaint = new android.graphics.Paint();
+  private int statusFadeHeight, statusFadeColor;
+
   private ChatGlassDrawable headerGlass;
 
   private View topGlassView;
@@ -454,6 +459,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         Views.setLayoutHeight(floatingPlayerView, Math.round(floatingPlayerOffset));
         floatingPlayerView.setVisibility(hasFloatingPlayer() && floatingPlayerOffset > 0f ? View.VISIBLE : View.GONE);
       }
+      if (composerGlassView != null) composerGlassView.invalidate();
       if (replyBarView != null && newChatInput) {
         floatingReplyClip.set(0, 0, replyBarView.getWidth(), Math.round(getReplyOffset()));
         replyBarView.setClipBounds(floatingReplyClip);
@@ -479,16 +485,25 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (inputGlass == null) {
       classicInputBackground = inputView.getBackground();
       classicBottomSpaceBackground = bottomSpace.getBackground();
-      inputGlass = new ChatGlassDrawable(wallpaperView, inputView, ColorId.filling);
+      classicReplyBackground = replyBarView.getBackground();
+      inputGlass = new ChatGlassDrawable(wallpaperView, composerGlassView, ColorId.filling);
       inputGlass.setMessages(messagesView);
       inputGlass.setVideoLayer(this::drawVideoForGlass);
     }
     newChatInput = enabled;
     bottomBar.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
+    for (CircleButton button : new CircleButton[] {scrollToBottomButton, mentionButton, reactionsButton}) {
+      if (button != null) button.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
+    }
     Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
     if (needBigPadding) manager.rebuildLastItem();
     inputGlass.setEnabled(enabled);
-    inputView.setBackground(enabled ? inputGlass : classicInputBackground);
+    inputView.setBackground(enabled ? null : classicInputBackground);
+    replyBarView.setBackground(enabled ? null : classicReplyBackground);
+    RelativeLayout.LayoutParams replyParams = (RelativeLayout.LayoutParams) replyBarView.getLayoutParams();
+    replyParams.leftMargin = replyParams.rightMargin = enabled ? Screen.dp(8f) : 0;
+    replyBarView.setLayoutParams(replyParams);
+    composerGlassView.setVisibility(enabled ? View.VISIBLE : View.GONE);
     LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
     int side = enabled ? Screen.dp(8f) : 0;
     int gap = enabled ? Screen.dp(6f) : 0;
@@ -571,6 +586,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
       addThemeInvalidateListener(floatingPlayerView);
     }
     if (headerView != null) floatingPlayerOffset = headerView.getFilling().getPlayerOffset();
+    if (pagerHeaderView != null) {
+      pagerHeaderView.getTopView().setTextFromToColorId(floatingHeader ? ColorId.icon : ColorId.headerText, floatingHeader ? ColorId.text : ColorId.headerText);
+      pagerHeaderView.getTopView().setSelectionColorId(floatingHeader ? ColorId.textLink : ColorId.headerText);
+    }
     headerCell.setContentInsetY(getHeaderControlsInset());
     headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
     if (headerView != null) headerView.resetColors(this, null);
@@ -583,7 +602,16 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
     if (!useFloatingChatHeader() || topGlassView == null || pagerScrollOffset != 0f) return false;
     // The shared surface is in the chat layer, behind both the title and pinned rows.
-    c.drawRect(0, 0, width, header.getEffectiveTopOffset(), Paints.fillingPaint(ColorUtils.alphaColor(.45f, Theme.fillingColor())));
+    int fadeHeight = header.getEffectiveTopOffset() + Screen.dp(22f);
+    int fadeColor = ChatGlassDrawable.surfaceColor(ColorId.filling);
+    if (statusFadeHeight != fadeHeight || statusFadeColor != fadeColor) {
+      statusFadeHeight = fadeHeight;
+      statusFadeColor = fadeColor;
+      statusFadePaint.setShader(new android.graphics.LinearGradient(0, 0, 0, fadeHeight,
+        new int[] {ColorUtils.alphaColor(.65f, fadeColor), ColorUtils.alphaColor(.32f, fadeColor), ColorUtils.alphaColor(0f, fadeColor)},
+        new float[] {0f, .55f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+    }
+    c.drawRect(0, 0, width, fadeHeight, statusFadePaint);
     return true;
   }
 
@@ -1728,6 +1756,19 @@ public class MessagesController extends ViewController<MessagesController.Argume
     videoLayer.setLayoutParams(new RelativeLayout.LayoutParams((RelativeLayout.LayoutParams) messagesView.getLayoutParams()));
     videoLayer.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> context().getRoundVideoController().checkLayout());
     contentView.addView(videoLayer);
+    composerGlassView = new View(context) {
+      @Override protected void onDraw (Canvas canvas) {
+        if (!newChatInput || inputGlass == null || bottomWrap.getVisibility() != View.VISIBLE) return;
+        float top = bottomWrap.getY() + inputView.getTop();
+        float bottom = top + inputView.getHeight();
+        if (getReplyOffset() > 0f) top = Math.min(top, replyBarView.getY());
+        inputGlass.setBounds(Screen.dp(8f), Math.round(top), getWidth() - Screen.dp(8f), Math.round(bottom));
+        inputGlass.draw(canvas);
+      }
+    };
+    composerGlassView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    composerGlassView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    contentView.addView(composerGlassView);
     if (!inPreviewMode) {
       contentView.addView(replyBarView);
     }
@@ -1794,6 +1835,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
         ));
       }
       pagerHeaderView.getTopView().setItems(items);
+      if (useFloatingChatHeader()) {
+        pagerHeaderView.getTopView().setTextFromToColorId(ColorId.icon, ColorId.text);
+        pagerHeaderView.getTopView().setSelectionColorId(ColorId.textLink);
+      }
 
       pagerContentAdapter = new MediaTabsAdapter(this, mediaControllers);
 
@@ -4318,6 +4363,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   public void onFocus () {
     super.onFocus();
+    context().updateWindowDecorSystemUiVisibility();
     if (!allowLayerTypeChanges()) getValue().setLayerType(View.LAYER_TYPE_NONE, null);
     if (inputGlass != null) inputGlass.refresh();
     if (headerGlass != null) headerGlass.refresh();
@@ -4507,6 +4553,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     saveDraft();
 
     super.onBlur();
+    context().getRootView().post(context()::updateWindowDecorSystemUiVisibility);
 
     messagesView.stopScroll();
 
@@ -7726,6 +7773,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private int originalLayerType1, originalLayerType2, originalLayerType3;
 
   private void setForceHw (boolean forceHw) {
+    if (newChatInput || useFloatingChatHeader()) {
+      this.forceHw = false;
+      messagesView.setLayerType(View.LAYER_TYPE_NONE, null);
+      if (replyBarView != null) replyBarView.setLayerType(View.LAYER_TYPE_NONE, null);
+      return;
+    }
     if (!Views.HARDWARE_LAYER_ENABLED)
       return;
     if (this.forceHw != forceHw) {
