@@ -456,7 +456,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       if (getReplyOffset() > 0f) top = Math.min(top, replyBarView.getY());
       // Reserve the reply row once; animate the drawable inset, never the View height.
       float inputTop = bottomWrap.getY() + inputView.getTop();
-      int reserve = replyBarView != null ? replyBarView.getLayoutParams().height : 0;
+      int reserve = replyBarView != null ? replyBarView.getLayoutParams().height + Math.max(0, inputView.getTop()) : 0;
       Views.setLayoutHeight(composerGlassView, inputView.getHeight() + reserve);
       composerGlassView.setTranslationY(inputTop - reserve);
       inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
@@ -7980,7 +7980,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
     updateFloatingInsets();
     bottomShadowView.setTranslationY(y + offset + keyboardOffset);
     if (replyBarView != null) {
-      replyBarView.setTranslationY(y + keyboardOffset);
+      float shown = replyBarVisible.getFloatValue() * (1f - getSearchTransformFactor());
+      float gap = newChatInput && inputView != null ? inputView.getTop() * (1f - shown) : 0f;
+      replyBarView.setTranslationY(y + keyboardOffset + gap);
     }
     checkScrollButtonOffsets();
     syncFloatingLayout();
