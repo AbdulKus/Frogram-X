@@ -1097,6 +1097,7 @@ public class RecordAudioVideoController implements
 
   private void setRecordModeImpl (int mode) {
     this.recordMode = mode;
+    syncRecordingUi();
     context.notifyBackPressAvailabilityChanged();
   }
 
@@ -1395,7 +1396,18 @@ public class RecordAudioVideoController implements
     durationView.setTranslationY(overallTranslation + editDy);
   }
 
+  private void syncRecordingUi () {
+    boolean visible = isOpen();
+    if (targetController != null) targetController.setRecordingUiVisible(visible);
+    if (rootLayout != null) {
+      rootLayout.setOutlineProvider(null);
+      rootLayout.setElevation(visible ? Screen.dp(8f) : 0f);
+    }
+    if (!visible && inputGlass != null) updateInputSurface(null);
+  }
+
   private void updateMainAlphas () {
+    syncRecordingUi();
     float editFactor = editAnimator.getValue() ? 1f : (recordAnimator.getValue() ? 1f : this.editFactor);
 
     float range = MathUtils.clamp(recordFactor);
@@ -1492,7 +1504,7 @@ public class RecordAudioVideoController implements
 
   private void onRecordRemoved () {
     stopGlassSpring();
-    updateInputSurface(null);
+    syncRecordingUi();
     // note: when animations disabled happens before finishVideoRecording
     context.setScreenFlagEnabled(BaseActivity.SCREEN_FLAG_RECORDING, false);
     context.setOrientationLockFlagEnabled(BaseActivity.ORIENTATION_FLAG_RECORDING, false);

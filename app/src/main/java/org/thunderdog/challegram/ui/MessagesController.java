@@ -365,6 +365,30 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   public boolean useFloatingInput () { return newChatInput; }
 
+  private final BoolAnimator recordingUiHidden = new BoolAnimator(0, new FactorAnimator.Target() {
+    @Override public void onFactorChanged (int id, float factor, float fraction, FactorAnimator animator) {
+      if (contentView != null) contentView.invalidate();
+    }
+    @Override public void onFactorChangeFinished (int id, float factor, FactorAnimator animator) { }
+  }, AnimatorUtils.DECELERATE_INTERPOLATOR, 180L);
+
+  public void setRecordingUiVisible (boolean visible) {
+    if (recordingUiHidden.getValue() == visible) return;
+    recordingUiHidden.setValue(visible, !visible && isFocused() && !isDestroyed());
+    if (scrollToBottomButton != null) scrollToBottomButton.setEnabled(!visible);
+    if (mentionButton != null) mentionButton.setEnabled(!visible);
+    if (reactionsButton != null) reactionsButton.setEnabled(!visible);
+    if (contentView != null) contentView.invalidate();
+  }
+
+  public float chatChildAlpha (View child) {
+    boolean action = child == scrollToBottomButtonWrap || child == mentionButtonWrap || child == reactionsButtonWrap ||
+      child == goToNextFoundMessageButtonBadge || child == goToPrevFoundMessageButtonBadge || child == bottomBar;
+    boolean composer = newChatInput && (child == composerGlassView || child == bottomWrap || child == replyBarView ||
+      child == emojiButton || child == attachButtons || child == sendButton || child == messageSenderButton);
+    return action || composer ? 1f - recordingUiHidden.getFloatValue() : 1f;
+  }
+
   private float floatingPlayerOffset;
 
   private int getGlassTopExtension () {
@@ -425,24 +449,24 @@ public class MessagesController extends ViewController<MessagesController.Argume
         }
       }
     }
+    boolean surfaceLayoutChanged = false;
     int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
+    if (composerGlassView != null) composerGlassView.setVisibility(newChatInput && bottomWrap.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
     if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
       float top = bottomWrap.getY() + inputView.getTop();
       float end = top + inputView.getHeight();
       if (getReplyOffset() > 0f) top = Math.min(top, replyBarView.getY());
-      int left = Screen.dp(8f), right = composerGlassView.getWidth() - left;
-      android.graphics.Rect old = inputGlass.getBounds();
-      if (old.left != left || old.top != Math.round(top) || old.right != right || old.bottom != Math.round(end)) {
-        inputGlass.setBounds(left, Math.round(top), right, Math.round(end));
-        composerGlassView.invalidate();
-      }
+      int height = Math.max(0, Math.round(end - top));
+      surfaceLayoutChanged = composerGlassView.getHeight() != height;
+      Views.setLayoutHeight(composerGlassView, height);
+      composerGlassView.setTranslationY(top);
       // Actual laid-out coordinates include IME/emoji translation exactly once.
       bottom = Math.max(0, Math.round(messagesView.getBottom() + messagesView.getTranslationY() - top + getAttachedFilesOffset()));
     }
     boolean changed = messagesView.getPaddingTop() != floatingOverlayTop || messagesView.getPaddingBottom() != bottom;
     messagesView.setOverlayPadding(floatingOverlayTop, bottom);
     // Do not display a frame with old item positions and new padding.
-    return !changed;
+    return !changed && !surfaceLayoutChanged;
   }
 
   private boolean updatingFloatingInsets;
@@ -522,6 +546,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       inputGlass.setVideoLayer(this::drawVideoForGlass);
     }
     newChatInput = enabled;
+    recordButton.setGlassMode(enabled);
+    composerGlassView.setBackground(enabled ? inputGlass : null);
     bottomBar.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
     for (CircleButton button : new CircleButton[] {scrollToBottomButton, mentionButton, reactionsButton}) {
       if (button != null) button.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
@@ -572,11 +598,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
       topGlassView = new View(context()) {
         @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
           super.onSizeChanged(w, h, oldw, oldh);
-          headerGlass.setBounds(Screen.dp(8f), context().getRootView().getTopInset() + Screen.dp(3f), w - Screen.dp(8f), h);
+          setBackground(new android.graphics.drawable.InsetDrawable(headerGlass, Screen.dp(8f), context().getRootView().getTopInset() + Screen.dp(3f), Screen.dp(8f), 0));
         }
         @Override protected void onDraw (Canvas canvas) {
           drawStatusFade(canvas, getWidth());
-          headerGlass.draw(canvas);
         }
       };
       headerGlass = new ChatGlassDrawable(wallpaperView, topGlassView, ColorId.filling);
@@ -1791,14 +1816,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
     videoLayer.setLayoutParams(new RelativeLayout.LayoutParams((RelativeLayout.LayoutParams) messagesView.getLayoutParams()));
     videoLayer.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> context().getRoundVideoController().checkLayout());
     contentView.addView(videoLayer);
-    composerGlassView = new View(context) {
-      @Override protected void onDraw (Canvas canvas) {
-        if (!newChatInput || inputGlass == null || bottomWrap.getVisibility() != View.VISIBLE) return;
-        inputGlass.draw(canvas);
-      }
-    };
+    composerGlassView = new View(context);
     composerGlassView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-    composerGlassView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    RelativeLayout.LayoutParams composerParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0);
+    composerParams.leftMargin = composerParams.rightMargin = Screen.dp(8f);
+    composerGlassView.setLayoutParams(composerParams);
     contentView.addView(composerGlassView);
     contentView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
       private android.view.ViewTreeObserver observer;
@@ -1925,7 +1947,19 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
     }
 
-    return contentView;
+    FrameLayoutFix page = new FrameLayoutFix(context) {
+      @Override protected void dispatchDraw (Canvas canvas) {
+        int save = canvas.save();
+        canvas.clipRect(0, useFloatingChatHeader() ? -getGlassTopExtension() : 0, getWidth(), getHeight());
+        super.dispatchDraw(canvas);
+        canvas.restoreToCount(save);
+      }
+    };
+    page.setClipChildren(false);
+    page.setClipToPadding(false);
+    page.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    page.addView(contentView);
+    return page;
   }
 
   private SliderView fontSliderView;

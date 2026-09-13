@@ -131,7 +131,7 @@ public class VoiceVideoButtonView extends View implements FactorAnimator.Target,
     final float videoFactor = inVideoMode.getFloatValue();
     final float searchFactor = inSearchMode.getFloatValue();
 
-    final Paint paint = hasTouchControls ? Paints.getIconGrayPorterDuffPaint() : getIconPaint();
+    final Paint paint = hasTouchControls && !glassMode ? Paints.getIconGrayPorterDuffPaint() : getIconPaint();
     final int savedAlpha = paint.getAlpha();
     final float generalFactor = (1f - sendFactor);
     if (generalFactor > 0f) {

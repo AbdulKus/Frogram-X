@@ -881,6 +881,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     boolean lightNavigationBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Config.USE_CUSTOM_NAVIGATION_COLOR && !Theme.isDark() && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
     ViewController<?> statusController = navigation != null ? navigation.getCurrentStackItem() : null;
     boolean glassHeader = statusController != null && statusController.hasFloatingHeader();
+    if (statusBar != null) statusBar.setFloatingHeader(glassHeader);
     boolean lightStatusBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && (glassHeader ? !Theme.isDark() : Theme.needLightStatusBar());
     UI.setLightSystemBars(getWindow(), lightNavigationBar, lightStatusBar, visibility, true);
     if (this.isWindowLight != lightNavigationBar) {

@@ -52,6 +52,16 @@ public class MessagesLayout extends RelativeLayout implements Animated {
     canvas.restoreToCount(save);
   }
 
+  @Override protected boolean drawChild (android.graphics.Canvas canvas, View child, long drawingTime) {
+    float alpha = controller != null ? controller.chatChildAlpha(child) : 1f;
+    if (alpha <= 0f) return false;
+    if (alpha >= 1f) return super.drawChild(canvas, child, drawingTime);
+    int save = canvas.saveLayerAlpha(child.getX(), child.getY(), child.getX() + child.getWidth(), child.getY() + child.getHeight(), Math.round(255f * alpha));
+    boolean result = super.drawChild(canvas, child, drawingTime);
+    canvas.restoreToCount(save);
+    return result;
+  }
+
   boolean changedMin;
   int lastMeasuredWidth;
 

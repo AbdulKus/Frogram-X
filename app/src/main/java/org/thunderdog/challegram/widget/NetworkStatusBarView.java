@@ -59,6 +59,19 @@ public class NetworkStatusBarView extends FrameLayoutFix implements Destroyable,
   private final TextView textView;
   private final LinearLayout statusWrap;
   private final FillingDrawable backgroundDrawable;
+  private boolean floatingHeader;
+
+  public void setFloatingHeader (boolean floating) {
+    floatingHeader = floating;
+    updateBackgroundAlpha();
+    int color = floating ? Theme.textAccentColor() : Theme.getColor(Config.STATUS_BAR_TEXT_COLOR_ID);
+    textView.setTextColor(color);
+    progressView.setProgressColor(color);
+  }
+
+  private void updateBackgroundAlpha () {
+    backgroundDrawable.setAlphaFactor(floatingHeader ? 0f : Config.USE_TRANSPARENT_STATUS_BAR && Settings.instance().useEdgeToEdge() ? Math.max(0f, factor) : 1f);
+  }
 
   public NetworkStatusBarView (Context context) {
     super(context);
@@ -288,9 +301,7 @@ public class NetworkStatusBarView extends FrameLayoutFix implements Destroyable,
       this.factor = factor;
       statusWrap.setAlpha(factor);
       statusWrap.setTranslationY(-Screen.getStatusBarHeight() + (int) ((float) Screen.getStatusBarHeight() * getVisibilityFactor()));
-      if (Config.USE_TRANSPARENT_STATUS_BAR && Settings.instance().useEdgeToEdge()) {
-        backgroundDrawable.setAlphaFactor(factor);
-      }
+      updateBackgroundAlpha();
       checkLowProfile();
     }
   }
