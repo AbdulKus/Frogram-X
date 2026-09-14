@@ -109,7 +109,7 @@ public class LockHeaderButton extends HeaderButton implements View.OnClickListen
     int cx = getMeasuredWidth() / 2;
     int cy = getMeasuredHeight() / 2;
 
-    Paint paint = Paints.getHeaderIconPaint();
+    Paint paint = themeColorId == 0 ? Paints.getHeaderIconPaint() : Paints.getPorterDuffPaint(getColor(0));
     Drawables.draw(c, lock, cx - lock.getMinimumWidth() / 2 + (int) ((float) Screen.dp(8f) * animator.getFloatValue()), cy - lock.getMinimumHeight() / 2, paint);
     Drawables.draw(c, base, cx - base.getMinimumWidth() / 2, cy - base.getMinimumHeight() / 2, paint);
   }

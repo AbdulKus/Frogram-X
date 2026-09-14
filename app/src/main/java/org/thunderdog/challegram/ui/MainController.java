@@ -314,7 +314,11 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     checkPagerMargins();
     styleMainTabs();
     updateMainGlassGeometry();
-    if (headerView != null) headerView.resetColors(this, null);
+    if (headerView != null) {
+      headerView.updateButton(R.id.menu_main, R.id.menu_btn_lock, button -> button.setThemeColorId(getHeaderIconColorId()));
+      headerView.updateButton(R.id.menu_main, R.id.menu_btn_search, button -> button.setThemeColorId(getHeaderIconColorId()));
+      headerView.resetColors(this, null);
+    }
     if (isFocused()) context().updateWindowDecorSystemUiVisibility();
   }
 
@@ -2080,7 +2084,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   @Override
   public void fillMenuItems (int id, HeaderView header, LinearLayout menu) {
     if (id == R.id.menu_main) {
-      header.addLockButton(menu);
+      addThemeInvalidateListener(header.addLockButton(menu).setThemeColorId(getHeaderIconColorId()));
       header.addSearchButton(menu, this);
     } else if (id == R.id.menu_clear) {
       header.addClearButton(menu, getSearchHeaderIconColorId(), getSearchBackButtonResource());
