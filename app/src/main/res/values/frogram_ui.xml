@@ -13,4 +13,6 @@
   <item type="id" name="btn_newChatSuggestions" />
   <string name="FrogramNewChatActions">Chat action buttons</string>
   <item type="id" name="btn_newChatActions" />
+  <string name="FrogramNewMainHeader">Chat list top bar</string>
+  <item type="id" name="btn_newMainHeader" />
 </resources>

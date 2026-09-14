@@ -1207,6 +1207,8 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     Views.setTopMargin(backButton, getEffectiveTopOffset() + Math.round(base + (next - base) * progress));
     Views.setTopMargin(menu, getEffectiveTopOffset() + base);
     Views.setTopMargin(menuPreview, getEffectiveTopOffset() + next);
+    if (title == textTitle) Views.setTopMargin(title, Screen.dp(15f) + getCurrentHeaderOffset() + base);
+    if (preview == textPreview && preview != null) Views.setTopMargin(preview, Screen.dp(15f) + getCurrentHeaderOffset() + next);
   }
 
   private final int[] surfaceLocation = new int[2], headerLocation = new int[2];
@@ -1259,7 +1261,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     if (textTitle == null || item == null)
       return;
     boolean updated;
-    int top = Screen.dp(15f) + currentHeaderOffset;
+    int top = Screen.dp(15f) + currentHeaderOffset + controlsInset(item);
     if (item.getBackButton() != BackHeaderButton.TYPE_NONE) {
       if (Lang.rtl()) {
         updated = Views.setMargins((FrameLayout.LayoutParams) textTitle.getLayoutParams(), menuWidth, top, Screen.dp(68f), 0);

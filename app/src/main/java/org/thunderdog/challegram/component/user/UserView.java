@@ -320,6 +320,8 @@ public class UserView extends BaseView implements Destroyable, RemoveHelper.Remo
     avatarReceiver.destroy();
   }
 
+  public void drawForGlass (Canvas c) { onDraw(c); }
+
   @Override
   protected void onDraw (Canvas c) {
     removeHelper.save(c);

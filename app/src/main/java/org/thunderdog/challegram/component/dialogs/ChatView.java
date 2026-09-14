@@ -562,6 +562,8 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
     return false;
   }
 
+  public void drawForGlass (Canvas c) { onDraw(c); }
+
   @Override
   protected void onDraw (Canvas c) {
     if (chat == null) {

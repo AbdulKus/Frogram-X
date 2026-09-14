@@ -71,7 +71,12 @@ public class ChatsRecyclerView extends CustomRecyclerView implements ClickHelper
 
     // setItemAnimator(null);
 
-    setLayoutManager(manager = new LinearLayoutManager(context, RecyclerView.VERTICAL, false));
+    setLayoutManager(manager = new LinearLayoutManager(context, RecyclerView.VERTICAL, false) {
+      @Override protected void calculateExtraLayoutSpace (@NonNull RecyclerView.State state, @NonNull int[] extraLayoutSpace) {
+        super.calculateExtraLayoutSpace(state, extraLayoutSpace);
+        if (!getClipToPadding()) extraLayoutSpace[0] += getPaddingTop() + Screen.dp(48f);
+      }
+    });
     addOnScrollListener(new OnScrollListener() {
       @Override
       public void onScrolled (@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -305,7 +310,7 @@ public class ChatsRecyclerView extends CustomRecyclerView implements ClickHelper
     int viewTop;
     if (firstVisiblePosition != -1) {
       View view = manager.findViewByPosition(firstVisiblePosition);
-      viewTop = view != null ? view.getTop() : 0;
+      viewTop = view != null ? manager.getDecoratedTop(view) - getPaddingTop() : 0;
     } else {
       viewTop = 0;
     }

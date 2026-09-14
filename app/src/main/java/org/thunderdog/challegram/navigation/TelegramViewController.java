@@ -154,8 +154,12 @@ public abstract class TelegramViewController<T> extends ViewController<T> {
   protected void onBottomInsetChanged (int extraBottomInset, int extraBottomInsetWithoutIme, boolean isImeInset) {
     super.onBottomInsetChanged(extraBottomInset, extraBottomInsetWithoutIme, isImeInset);
     if (chatSearchView != null) {
-      chatSearchView.setPadding(0, 0, 0, extraBottomInsetWithoutIme);
+      chatSearchView.setPadding(0, chatSearchView.getPaddingTop(), 0, extraBottomInsetWithoutIme);
     }
+  }
+
+  protected LinearLayoutManager createChatSearchLayoutManager () {
+    return new LinearLayoutManager(context(), RecyclerView.VERTICAL, false);
   }
 
   protected final CustomRecyclerView generateChatSearchView (@Nullable ViewGroup parent) {
@@ -214,7 +218,7 @@ public abstract class TelegramViewController<T> extends ViewController<T> {
     });
     chatSearchView.setBackgroundColor(Theme.backgroundColor());
     addThemeBackgroundColorListener(chatSearchView, ColorId.background);
-    chatSearchView.setLayoutManager(new LinearLayoutManager(context(), RecyclerView.VERTICAL, false));
+    chatSearchView.setLayoutManager(createChatSearchLayoutManager());
     if (parent != null) {
       chatSearchView.setAlpha(0f);
       chatSearchView.setScrollDisabled(true);

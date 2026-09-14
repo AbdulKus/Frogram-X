@@ -26,6 +26,77 @@ import androidx.recyclerview.widget.RecyclerView;
 import me.vkryl.android.animator.Animated;
 
 public class CustomRecyclerView extends RecyclerView implements Animated {
+  private Runnable backdropInvalidationListener;
+  private boolean capturingGlass;
+  private boolean glassOverlay;
+
+  public void setGlassOverlay (boolean enabled) {
+    glassOverlay = enabled;
+  }
+
+  @Override public void setClipToPadding (boolean clip) {
+    super.setClipToPadding(clip && !glassOverlay);
+  }
+
+
+  public void setBackdropInvalidationListener (@Nullable Runnable listener) {
+    backdropInvalidationListener = listener;
+  }
+
+  private void invalidateBackdrop () {
+    if (!capturingGlass && backdropInvalidationListener != null) backdropInvalidationListener.run();
+  }
+
+  @Override public void onDescendantInvalidated (View child, View target) {
+    super.onDescendantInvalidated(child, target);
+    invalidateBackdrop();
+  }
+
+  @Override public android.view.ViewParent invalidateChildInParent (int[] location, android.graphics.Rect dirty) {
+    invalidateBackdrop();
+    return super.invalidateChildInParent(location, dirty);
+  }
+
+  @Override public void onScrolled (int dx, int dy) {
+    super.onScrolled(dx, dy);
+    invalidateBackdrop();
+  }
+
+  public void drawForGlass (android.graphics.Canvas canvas) {
+    capturingGlass = true;
+    try {
+      if (getBackground() != null) getBackground().draw(canvas);
+      for (int i = 0; i < getChildCount(); i++) drawGlassChild(canvas, getChildAt(i));
+    } finally {
+      capturingGlass = false;
+    }
+  }
+
+  private static void drawGlassChild (android.graphics.Canvas canvas, View child) {
+    if (child.getVisibility() != View.VISIBLE || child.getAlpha() <= 0f) return;
+    int save = canvas.save();
+    canvas.translate(child.getLeft(), child.getTop());
+    canvas.concat(child.getMatrix());
+    if (canvas.clipRect(0, 0, child.getWidth(), child.getHeight())) {
+      if (child.getAlpha() < 1f) canvas.saveLayerAlpha(0, 0, child.getWidth(), child.getHeight(), Math.round(255f * child.getAlpha()));
+      if (child.getBackground() != null) child.getBackground().draw(canvas);
+      if (child instanceof org.thunderdog.challegram.component.dialogs.ChatView) {
+        ((org.thunderdog.challegram.component.dialogs.ChatView) child).drawForGlass(canvas);
+      } else if (child instanceof org.thunderdog.challegram.widget.BetterChatView) {
+        ((org.thunderdog.challegram.widget.BetterChatView) child).drawForGlass(canvas);
+      } else if (child instanceof org.thunderdog.challegram.widget.DoubleTextView) {
+        ((org.thunderdog.challegram.widget.DoubleTextView) child).drawForGlass(canvas);
+      } else if (child instanceof org.thunderdog.challegram.component.user.UserView) {
+        ((org.thunderdog.challegram.component.user.UserView) child).drawForGlass(canvas);
+      } else if (child instanceof android.view.ViewGroup) {
+        android.view.ViewGroup group = (android.view.ViewGroup) child;
+        canvas.translate(-group.getScrollX(), -group.getScrollY());
+        for (int i = 0; i < group.getChildCount(); i++) drawGlassChild(canvas, group.getChildAt(i));
+      }
+    }
+    canvas.restoreToCount(save);
+  }
+
   public CustomRecyclerView (Context context) {
     super(context);
   }
@@ -44,7 +115,7 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
     if (manager instanceof LinearLayoutManager) {
       savedScrollPosition = ((LinearLayoutManager) manager).findFirstVisibleItemPosition();
       View view = savedScrollPosition == -1 ? null : manager.findViewByPosition(savedScrollPosition);
-      savedScrollOffset = view != null ? view.getTop() : 0;
+      savedScrollOffset = view != null ? manager.getDecoratedTop(view) - getPaddingTop() : 0;
     } else {
       savedScrollPosition = -1;
       savedScrollOffset = 0;
@@ -52,7 +123,7 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
     View view = manager.findViewByPosition(adapterIndex);
     if (view != null) {
       view.requestLayout();
-      if (savedScrollOffset != -1 && manager instanceof LinearLayoutManager) {
+      if (savedScrollPosition != RecyclerView.NO_POSITION && manager instanceof LinearLayoutManager) {
         ((LinearLayoutManager) manager).scrollToPositionWithOffset(savedScrollPosition, savedScrollOffset);
       }
     } else {
@@ -212,6 +283,7 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
   @Override
   protected void onLayout (boolean changed, int left, int top, int right, int bottom) {
     super.onLayout(changed, left, top, right, bottom);
+    invalidateBackdrop();
     if (pendingAction != null) {
       pendingAction.run();
       pendingAction = null;
@@ -229,7 +301,7 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
     }
     savedScrollPosition = ((LinearLayoutManager) manager).findFirstVisibleItemPosition();
     View view = manager.findViewByPosition(savedScrollPosition);
-    savedScrollTop = view != null ? manager.getDecoratedTop(view) : 0;
+    savedScrollTop = view != null ? manager.getDecoratedTop(view) - getPaddingTop() : 0;
   }
 
   public void restoreScrollPosition () {

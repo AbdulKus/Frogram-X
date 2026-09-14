@@ -174,14 +174,24 @@ public abstract class ViewPagerController<T> extends TelegramViewController<T> i
     }
   }
 
+  protected int getContentTopOverflow () { return 0; }
+
   @Override
   protected View onCreateView (Context context) {
     FrameLayoutFix contentView = new FrameLayoutFix(context) {
       @Override
       protected void onDraw (Canvas c) {
-        c.drawRect(0, 0, getMeasuredWidth(), Size.getHeaderDrawerSize(), Paints.fillingPaint(Theme.getColor(getDrawerReplacementColorId())));
+        if (getContentTopOverflow() == 0) c.drawRect(0, 0, getMeasuredWidth(), Size.getHeaderDrawerSize(), Paints.fillingPaint(Theme.getColor(getDrawerReplacementColorId())));
+      }
+      @Override protected void dispatchDraw (Canvas canvas) {
+        int save = canvas.save();
+        canvas.clipRect(0, -getContentTopOverflow(), getWidth(), getHeight());
+        super.dispatchDraw(canvas);
+        canvas.restoreToCount(save);
       }
     };
+    contentView.setClipChildren(getContentTopOverflow() == 0);
+    contentView.setClipToPadding(getContentTopOverflow() == 0);
     contentView.setWillNotDraw(false);
 
     List<ViewPagerTopView.Item> sections = getPagerSectionItems();

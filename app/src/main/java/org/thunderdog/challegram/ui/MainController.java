@@ -23,6 +23,7 @@ import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.media.MediaMetadataRetriever;
@@ -127,6 +128,8 @@ import org.thunderdog.challegram.util.text.Counter;
 import org.thunderdog.challegram.util.text.IconSpan;
 import org.thunderdog.challegram.util.text.TextColorSet;
 import org.thunderdog.challegram.widget.BubbleLayout;
+import org.thunderdog.challegram.widget.ChatGlassDrawable;
+import org.thunderdog.challegram.v.CustomRecyclerView;
 import org.thunderdog.challegram.widget.FillingSpace;
 import org.thunderdog.challegram.widget.PopupLayout;
 import org.thunderdog.challegram.widget.ShadowView;
@@ -180,6 +183,224 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   private FrameLayoutFix mainWrap;
   private FrameLayoutFix pagerWrap;
   private OverlayButtonWrap composeWrap;
+  private FrameLayoutFix mainContentRoot;
+  private View mainGlassView, mainPlayerView;
+  private ChatGlassDrawable mainGlass, mainPlayerGlass;
+  private CustomRecyclerView mainSearchView;
+  private float mainPlayerOffset;
+  private final android.graphics.Paint mainStatusPaint = new android.graphics.Paint();
+  private int mainStatusHeight, mainStatusColor;
+  private final int[] sourcePosition = new int[2], listPosition = new int[2];
+  private final java.util.WeakHashMap<RecyclerView, ListInsets> glassLists = new java.util.WeakHashMap<>();
+
+  private static final class ListInsets {
+    final int top;
+    final boolean clip;
+    ListInsets (RecyclerView view) { top = view.getPaddingTop(); clip = view.getClipToPadding(); }
+  }
+
+  @Override public boolean hasFloatingHeader () { return Settings.instance().useNewMainHeader(); }
+  @Override public boolean hasFloatingPlayer () { return hasFloatingHeader(); }
+  @Override public int getHeaderControlsInset () { return hasFloatingHeader() ? Screen.dp(4.5f) : 0; }
+  @Override public boolean allowLayerTypeChanges () { return !hasFloatingHeader(); }
+  @Override protected int getContentTopOverflow () {
+    return hasFloatingHeader() ? getHeaderHeight() + context().getRootView().getTopInset() : 0;
+  }
+  @Override protected int getHeaderIconColorId () {
+    return hasFloatingHeader() ? MessagesController.getGlassIconColorId() : super.getHeaderIconColorId();
+  }
+  @Override protected int getHeaderTextColorId () {
+    return hasFloatingHeader() ? ColorId.text : super.getHeaderTextColorId();
+  }
+  @Override protected int getSearchHeaderIconColorId () {
+    return hasFloatingHeader() ? MessagesController.getGlassIconColorId() : super.getSearchHeaderIconColorId();
+  }
+  @Override protected int getSearchTextColorId () {
+    return hasFloatingHeader() ? ColorId.text : super.getSearchTextColorId();
+  }
+  @Override protected int getSelectHeaderIconColorId () {
+    return hasFloatingHeader() ? MessagesController.getGlassIconColorId() : super.getSelectHeaderIconColorId();
+  }
+  @Override protected int getSelectTextColorId () {
+    return hasFloatingHeader() ? ColorId.text : super.getSelectTextColorId();
+  }
+  @Override public boolean drawHeaderBackground (Canvas canvas, HeaderView header, int width, int height, int color) {
+    return hasFloatingHeader() && mainGlassView != null;
+  }
+  @Override public View getViewForApplyingOffsets () {
+    return hasFloatingHeader() ? null : super.getViewForApplyingOffsets();
+  }
+  @Override protected boolean applyPlayerOffset (float factor, float top) {
+    mainPlayerOffset = top;
+    boolean changed = super.applyPlayerOffset(factor, top);
+    updateMainGlassGeometry();
+    invalidateFloatingPlayer();
+    return changed;
+  }
+  @Override public void invalidateFloatingPlayer () {
+    if (mainPlayerView != null) mainPlayerView.invalidate();
+  }
+
+  private void invalidateMainGlass () {
+    if (mainGlass != null) mainGlass.invalidateBackdrop();
+    if (mainPlayerGlass != null) mainPlayerGlass.invalidateBackdrop();
+  }
+
+  private void drawListBackdrop (Canvas canvas, RecyclerView list, float alpha) {
+    if (!(list instanceof CustomRecyclerView) || !list.isShown() || list.getWindowToken() == null || alpha <= 0f) return;
+    list.getLocationInWindow(listPosition);
+    int save = canvas.save();
+    canvas.translate(listPosition[0] - sourcePosition[0], listPosition[1] - sourcePosition[1]);
+    if (canvas.clipRect(0, 0, list.getWidth(), list.getHeight())) {
+      if (alpha < 1f) canvas.saveLayerAlpha(0, 0, list.getWidth(), list.getHeight(), Math.round(alpha * 255f));
+      ((CustomRecyclerView) list).drawForGlass(canvas);
+    }
+    canvas.restoreToCount(save);
+  }
+
+  private void drawMainBackdrop (Canvas canvas) {
+    mainWrap.getLocationInWindow(sourcePosition);
+    canvas.drawColor(Theme.fillingColor());
+    // Both pages can be visible while swiping folders. Window coordinates keep
+    // their samples aligned during navigation without capturing the header itself.
+    for (RecyclerView list : glassLists.keySet()) {
+      if (list != mainSearchView) drawListBackdrop(canvas, list, list.getAlpha());
+    }
+    if (mainSearchView != null) drawListBackdrop(canvas, mainSearchView, mainSearchView.getAlpha());
+  }
+
+  private void trackGlassList (RecyclerView list) {
+    if (list == null || glassLists.containsKey(list)) return;
+    glassLists.put(list, new ListInsets(list));
+    if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setBackdropInvalidationListener(this::invalidateMainGlass);
+    applyListInset(list, glassLists.get(list));
+  }
+
+  private void applyListInset (RecyclerView list, ListInsets original) {
+    int top = original.top + (hasFloatingHeader() ? getContentTopOverflow() + Screen.dp(6f) +
+      (mainPlayerOffset > 0f ? Math.round(mainPlayerOffset) + Screen.dp(12f) : 0) : 0);
+    if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setGlassOverlay(hasFloatingHeader());
+    if (list.getPaddingTop() != top) list.setPadding(list.getPaddingLeft(), top, list.getPaddingRight(), list.getPaddingBottom());
+    list.setClipToPadding(hasFloatingHeader() ? false : original.clip);
+  }
+
+  private void updateMainGlassGeometry () {
+    if (mainGlassView == null) return;
+    int extension = getContentTopOverflow();
+    Views.setTopMargin(pagerWrap, -extension);
+    Views.setTopMargin(mainSearchView, -extension);
+    Views.setTopMargin(mainGlassView, -extension);
+    Views.setLayoutHeight(mainGlassView, extension + Screen.dp(6f));
+    for (java.util.Map.Entry<RecyclerView, ListInsets> entry : glassLists.entrySet()) applyListInset(entry.getKey(), entry.getValue());
+    Views.setTopMargin(mainPlayerView, Screen.dp(12f));
+    Views.setLayoutHeight(mainPlayerView, Math.round(mainPlayerOffset));
+    mainPlayerView.setVisibility(hasFloatingHeader() && mainPlayerOffset > 0f ? View.VISIBLE : View.GONE);
+    invalidateMainGlass();
+  }
+
+  private void applyMainGlass () {
+    if (mainGlassView == null) return;
+    boolean enabled = hasFloatingHeader();
+    mainContentRoot.setClipChildren(!enabled);
+    mainContentRoot.setClipToPadding(!enabled);
+    mainWrap.setClipChildren(!enabled);
+    mainWrap.setClipToPadding(!enabled);
+    mainGlassView.setVisibility(enabled ? View.VISIBLE : View.GONE);
+    mainGlass.setEnabled(enabled);
+    mainPlayerGlass.setEnabled(enabled);
+    if (headerView != null) mainPlayerOffset = headerView.getFilling().getPlayerOffset();
+    // Undo the classic player's page translation when enabling the new UI.
+    getViewPager().setTranslationY(enabled ? 0f : mainPlayerOffset);
+    checkPagerMargins();
+    styleMainTabs();
+    updateMainGlassGeometry();
+    if (headerView != null) headerView.resetColors(this, null);
+    if (isFocused()) context().updateWindowDecorSystemUiVisibility();
+  }
+
+  private void styleMainTabs () {
+    if (headerCell == null) return;
+    boolean floatingTabs = hasFloatingHeader() && !displayTabsAtBottom();
+    ViewPagerHeaderViewCompact cell = (ViewPagerHeaderViewCompact) headerCell.getView();
+    cell.setClipChildren(!floatingTabs);
+    cell.getRecyclerView().setTranslationY(floatingTabs ? getHeaderControlsInset() : 0f);
+    if (!displayTabsAtBottom()) {
+      headerCell.getTopView().setTextFromToColorId(floatingTabs ? ColorId.text : ColorId.headerTabInactiveText,
+        floatingTabs ? ColorId.text : ColorId.headerTabActiveText);
+      headerCell.getTopView().setSelectionColorId(floatingTabs ? ColorId.textLink : ColorId.headerTabActive);
+    }
+    if (toggleHeaderView != null) {
+      toggleHeaderView.setTextTop(17f + (hasFloatingHeader() ? 4.5f : 0f));
+      toggleHeaderView.setTriangleTop(16f + (hasFloatingHeader() ? 4.5f : 0f));
+      toggleHeaderView.invalidate();
+    }
+  }
+
+  private void createMainGlass (Context context) {
+    mainGlassView = new View(context) {
+      @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        setBackground(new android.graphics.drawable.InsetDrawable(mainGlass, Screen.dp(8f),
+          MainController.this.context().getRootView().getTopInset() + Screen.dp(3f), Screen.dp(8f), 0));
+      }
+      @Override protected void onDraw (Canvas canvas) {
+        int height = MainController.this.context().getRootView().getTopInset() + Screen.dp(24f);
+        int color = ChatGlassDrawable.surfaceColor(ColorId.filling);
+        if (height != mainStatusHeight || color != mainStatusColor) {
+          mainStatusHeight = height;
+          mainStatusColor = color;
+          mainStatusPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, height,
+            new int[] {ColorUtils.alphaColor(.65f, color), ColorUtils.alphaColor(.32f, color), ColorUtils.alphaColor(0f, color)},
+            new float[] {0f, .55f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+        }
+        canvas.drawRect(0, 0, getWidth(), height, mainStatusPaint);
+      }
+    };
+    mainGlass = new ChatGlassDrawable(mainWrap, mainGlassView, ColorId.filling, this::drawMainBackdrop);
+    mainGlassView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    mainWrap.addView(mainGlassView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+    addThemeInvalidateListener(mainGlassView);
+    mainPlayerView = new View(context) {
+      private final android.graphics.Path playerClip = new android.graphics.Path();
+      @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+        mainPlayerGlass.setBounds(Screen.dp(8f), 0, w - Screen.dp(8f), h);
+      }
+      @Override protected void onDraw (Canvas canvas) {
+        if (headerView == null) return;
+        mainPlayerGlass.draw(canvas);
+        int save = canvas.save();
+        playerClip.reset();
+        playerClip.addRoundRect(Screen.dp(8f), 0, getWidth() - Screen.dp(8f), getHeight(), Screen.dp(18f), Screen.dp(18f), android.graphics.Path.Direction.CW);
+        canvas.clipPath(playerClip);
+        headerView.getFilling().drawFloatingPlayer(canvas, getHeight());
+        canvas.restoreToCount(save);
+      }
+      @Override public boolean onTouchEvent (MotionEvent event) {
+        return headerView != null && headerView.getFilling().onFloatingPlayerTouch(event, getHeight());
+      }
+    };
+    mainPlayerGlass = new ChatGlassDrawable(mainWrap, mainPlayerView, ColorId.filling, this::drawMainBackdrop);
+    mainWrap.addView(mainPlayerView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+    addThemeInvalidateListener(mainPlayerView);
+    trackGlassList(mainSearchView);
+    mainWrap.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> updateMainGlassGeometry());
+    applyMainGlass();
+  }
+
+  @Override protected androidx.recyclerview.widget.LinearLayoutManager createChatSearchLayoutManager () {
+    return new androidx.recyclerview.widget.LinearLayoutManager(context(), RecyclerView.VERTICAL, false) {
+      @Override protected void calculateExtraLayoutSpace (@NonNull RecyclerView.State state, @NonNull int[] extraLayoutSpace) {
+        super.calculateExtraLayoutSpace(state, extraLayoutSpace);
+        if (hasFloatingHeader()) extraLayoutSpace[0] += getPaddingTop() + Screen.dp(48f);
+      }
+    };
+  }
+
+  @Override protected void applySearchTransformFactor (float factor, boolean isOpening) {
+    super.applySearchTransformFactor(factor, isOpening);
+    invalidateMainGlass();
+  }
+
 
   @Override
   protected View onCreateView (Context context) {
@@ -216,12 +437,21 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     pagerWrap.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     pagerWrap.addView(pager);
 
-    mainWrap = new FrameLayoutFix(context);
+    mainContentRoot = contentView;
+    mainWrap = new FrameLayoutFix(context) {
+      @Override protected void dispatchDraw (Canvas canvas) {
+        int save = canvas.save();
+        canvas.clipRect(0, -getContentTopOverflow(), getWidth(), getHeight());
+        super.dispatchDraw(canvas);
+        canvas.restoreToCount(save);
+      }
+    };
     mainWrap.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     mainWrap.addView(pagerWrap);
-    generateChatSearchView(mainWrap);
+    mainSearchView = generateChatSearchView(mainWrap);
 
     contentView.addView(mainWrap);
+    createMainGlass(context);
 
     UI.setSoftInputMode(UI.getContext(context), Config.DEFAULT_WINDOW_PARAMS);
 
@@ -394,8 +624,8 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       if (useGlobalFilter()) {
         if (toggleHeaderView == null) {
           toggleHeaderView = new ToggleHeaderView2(context);
-          toggleHeaderView.setTextTop(17f);
-          toggleHeaderView.setTriangleTop(16f);
+          toggleHeaderView.setTextTop(17f + (hasFloatingHeader() ? 4.5f : 0f));
+          toggleHeaderView.setTriangleTop(16f + (hasFloatingHeader() ? 4.5f : 0f));
           toggleHeaderView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(56f), Gravity.TOP, Screen.dp(56f), 0, Screen.dp(68f), 0));
           toggleHeaderView.setOnClickListener(v -> showGlobalFilter());
           toggleHeaderView.setOnLongClickListener(v -> applyGlobalFilter(FILTER_NONE));
@@ -951,6 +1181,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   @Override
   public void onPageScrolled (int position, int actualPosition, float actualPositionOffset, int actualPositionOffsetPixels) {
     super.onPageScrolled(position, actualPosition, actualPositionOffset, actualPositionOffsetPixels);
+    invalidateMainGlass();
     if (Config.CHAT_FOLDERS_HIDE_BOTTOM_BAR_ON_SCROLL && displayTabsAtBottom()) {
       showBottomBar();
     }
@@ -1002,12 +1233,14 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     checkTabs();
     checkMenu();
     checkMargins();
+    applyMainGlass();
   }
 
   private void checkMargins () {
     checkPagerMargins();
     checkHeaderMargins();
     checkComposeWrapPaddings();
+    updateMainGlassGeometry();
   }
 
   private void checkComposeWrapPaddings () {
@@ -1020,10 +1253,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   private void checkPagerMargins () {
     if (!Config.CHAT_FOLDERS_HIDE_BOTTOM_BAR_ON_SCROLL && displayTabsAtBottom()) {
-      Views.setBottomMargin(getViewPager(), getHeaderHeight());
+      Views.setBottomMargin(getViewPager(), getHeaderHeight() + (!hasFloatingHeader() ? Math.round(mainPlayerOffset) : 0));
       Views.setBottomMargin(pagerWrap, updateSnackBar != null ? Math.round(updateSnackBar.getHeight() * updateSnackBar.getVisibilityFactor()) : 0); // FIXME
     } else {
-      Views.setBottomMargin(getViewPager(), 0);
+      Views.setBottomMargin(getViewPager(), !hasFloatingHeader() ? Math.round(mainPlayerOffset) : 0);
       Views.setBottomMargin(pagerWrap, 0);
     }
   }
@@ -1123,6 +1356,12 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   @Override
   public void destroy () {
+    if (mainGlass != null) mainGlass.release();
+    if (mainPlayerGlass != null) mainPlayerGlass.release();
+    for (RecyclerView list : glassLists.keySet()) {
+      if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setBackdropInvalidationListener(null);
+    }
+    glassLists.clear();
     super.destroy();
     tdlib.listeners().removeOptionListener(this);
     context().appUpdater().removeListener(this);
@@ -1298,6 +1537,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   @Override
   public void onFocus () {
     super.onFocus();
+    applyMainGlass();
     // FIXME check tdlib.isUnauthorized()
     tdlib.context().changePreferredAccountId(tdlib.id(), TdlibManager.SWITCH_REASON_NAVIGATION);
     if (UI.TEST_MODE == UI.TEST_MODE_USER) {
@@ -1693,6 +1933,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   private void modifyNewPagerItemController (final ViewController<?> c) {
     if (c instanceof RecyclerViewProvider) {
       c.getValue();
+      trackGlassList(((RecyclerViewProvider) c).provideRecyclerView());
       ((RecyclerViewProvider) c).provideRecyclerView().addOnScrollListener(new RecyclerView.OnScrollListener() {
         private float lastY;
         private float lastShowY;
@@ -2807,6 +3048,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
         }
       }
     }
+    styleMainTabs();
   }
 
   private void checkMenu () {
@@ -3028,13 +3270,16 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   public static class UnreadCounterColorSet implements TextColorSet {
     private @Nullable Counter counter;
     private final FutureBool displayTabsAtBottom;
+    private FutureBool floatingHeader = () -> false;
 
     public UnreadCounterColorSet (FutureBool displayTabsAtBottom) {
       this.displayTabsAtBottom = displayTabsAtBottom;
     }
 
     private static UnreadCounterColorSet create(MainController parent) {
-      return new UnreadCounterColorSet(parent::displayTabsAtBottom);
+      UnreadCounterColorSet colors = new UnreadCounterColorSet(parent::displayTabsAtBottom);
+      colors.floatingHeader = () -> parent.hasFloatingHeader() && !parent.displayTabsAtBottom();
+      return colors;
     }
 
     public void setCounter (@Nullable Counter counter) {
@@ -3061,12 +3306,12 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
     @ColorInt
     private int foregroundColor () {
-      return Theme.getColor(displayTabsAtBottom.getBoolValue() ? ColorId.headerLightBackground : ColorId.headerBackground);
+      return Theme.getColor(floatingHeader.getBoolValue() ? ColorId.filling : displayTabsAtBottom.getBoolValue() ? ColorId.headerLightBackground : ColorId.headerBackground);
     }
 
     @ColorInt
     private int backgroundColor() {
-      return Theme.getColor(displayTabsAtBottom.getBoolValue() ? ColorId.headerLightText : ColorId.headerText);
+      return Theme.getColor(floatingHeader.getBoolValue() ? ColorId.text : displayTabsAtBottom.getBoolValue() ? ColorId.headerLightText : ColorId.headerText);
     }
   }
 

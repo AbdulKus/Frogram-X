@@ -20,7 +20,9 @@ public final class SettingsNewUiController extends RecyclerViewController<Void> 
   @Override protected void onCreateView (Context context, CustomRecyclerView recyclerView) {
     adapter = new SettingsAdapter(this) {
       @Override protected void setValuedSetting (ListItem item, SettingView view, boolean isUpdate) {
-        if (item.getId() == R.id.btn_newChatMenu) {
+        if (item.getId() == R.id.btn_newMainHeader) {
+          view.getToggler().setRadioEnabled(Settings.instance().useNewMainHeader(), isUpdate);
+        } else if (item.getId() == R.id.btn_newChatMenu) {
           view.getToggler().setRadioEnabled(Settings.instance().useNewChatMenu(), isUpdate);
         } else if (item.getId() == R.id.btn_newChatSuggestions) {
           view.getToggler().setRadioEnabled(Settings.instance().useNewChatSuggestions(), isUpdate);
@@ -35,6 +37,8 @@ public final class SettingsNewUiController extends RecyclerViewController<Void> 
     };
     adapter.setItems(new ListItem[] {
       new ListItem(ListItem.TYPE_SHADOW_TOP),
+      new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newMainHeader, 0, R.string.FrogramNewMainHeader),
+      new ListItem(ListItem.TYPE_SEPARATOR_FULL),
       new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newChatHeader, 0, R.string.FrogramNewChatHeader),
       new ListItem(ListItem.TYPE_SEPARATOR_FULL),
       new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_newChatInput, 0, R.string.FrogramNewChatInput),
@@ -50,7 +54,9 @@ public final class SettingsNewUiController extends RecyclerViewController<Void> 
   }
 
   @Override public void onClick (View view) {
-    if (view.getId() == R.id.btn_newChatMenu) {
+    if (view.getId() == R.id.btn_newMainHeader) {
+      Settings.instance().setUseNewMainHeader(adapter.toggleView(view));
+    } else if (view.getId() == R.id.btn_newChatMenu) {
       Settings.instance().setUseNewChatMenu(adapter.toggleView(view));
     } else if (view.getId() == R.id.btn_newChatSuggestions) {
       Settings.instance().setUseNewChatSuggestions(adapter.toggleView(view));

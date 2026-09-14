@@ -299,6 +299,8 @@ public class DoubleTextView extends RelativeLayout implements RtlCheckListener, 
     receiver.getImageReceiver(0).clear();
   }
 
+  public void drawForGlass (Canvas c) { onDraw(c); }
+
   @Override
   protected void onDraw (Canvas c) {
     final boolean needThemedColorFilter = stickerSetInfo != null && stickerSetInfo.needThemedColorFilter();

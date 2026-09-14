@@ -392,7 +392,14 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   public void draw (@NonNull Canvas c) {
     // Each page keeps its own surface throughout a navigation transition.
     if (headerView.drawFloatingHeaderTransition(c, width, (int) fillingBottom)) return;
-    // Keep transforms and selection/search on their native surface.
+    // A controller that retains floating glass during search/selection also owns
+    // the surface throughout the transform (including the native circular reveal).
+    if (navigationController != null && !navigationController.isAnimating()) {
+      ViewController<?> current = navigationController.getCurrentStackItem();
+      if (current != null && current.inTransformMode() && current.hasFloatingHeader() &&
+          current.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) return;
+    }
+    // Other transforms retain their native surface.
     if (!restoreRect && fillFactor == 1f && hideFactor == 0f && radiusFactor == 0f &&
         !headerView.isAnimating() && navigationController != null) {
       ViewController<?> current = navigationController.getCurrentStackItem();

@@ -29,6 +29,8 @@ import org.thunderdog.challegram.v.MessagesRecyclerView;
 /** A small in-memory backdrop of this chat, excluding the overlaid controls. */
 public final class ChatGlassDrawable extends Drawable implements View.OnAttachStateChangeListener {
   private final WallpaperView wallpaper;
+  private final View sourceView;
+  private final VideoLayer backdrop;
   private final View host;
   private final int colorId;
   private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -92,7 +94,14 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private int alpha = 255;
 
   public ChatGlassDrawable (WallpaperView wallpaper, View host, int colorId) {
-    this.wallpaper = wallpaper;
+    this(wallpaper, host, colorId, null);
+  }
+
+  /** The source paints content only, without drawing live Android view display lists. */
+  public ChatGlassDrawable (View sourceView, View host, int colorId, @Nullable VideoLayer backdrop) {
+    this.sourceView = sourceView;
+    this.wallpaper = sourceView instanceof WallpaperView ? (WallpaperView) sourceView : null;
+    this.backdrop = backdrop;
     this.host = host;
     this.colorId = colorId;
     prepareFrame = () -> {
@@ -193,9 +202,9 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   }
 
   private boolean prepareBackdrop () {
-    if (released || !enabled || panel.isEmpty() || (wallpaper.getWidth() == 0 && (messages == null || messages.getWidth() == 0))) return false;
+    if (released || !enabled || panel.isEmpty() || (sourceView.getWidth() == 0 && (messages == null || messages.getWidth() == 0))) return false;
     host.getLocationInWindow(hostPosition);
-    wallpaper.getLocationInWindow(wallpaperPosition);
+    sourceView.getLocationInWindow(wallpaperPosition);
     int relativeX = hostPosition[0] - wallpaperPosition[0];
     int relativeY = hostPosition[1] - wallpaperPosition[1];
     int color = Theme.getColor(colorId);
@@ -237,7 +246,8 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     int sampleSave = sampleCanvas.save();
     sampleCanvas.scale(capture.getWidth() / sampleBounds.width(), capture.getHeight() / sampleBounds.height());
     sampleCanvas.translate(-x, -y);
-    wallpaper.drawForGlass(sampleCanvas);
+    if (backdrop != null) backdrop.draw(sampleCanvas);
+    else if (wallpaper != null) wallpaper.drawForGlass(sampleCanvas);
     if (messages != null && messages.getWidth() > 0) {
       sampleCanvas.translate(messagesX, messagesY);
       messages.drawForGlass(sampleCanvas);

@@ -644,7 +644,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
               int firstVisiblePosition = manager.findFirstVisibleItemPosition();
               if (firstVisiblePosition == 1) {
                 View view = manager.findViewByPosition(1);
-                if (view != null && manager.getDecoratedTop(view) == 0) {
+                if (view != null && manager.getDecoratedTop(view) == recyclerView.getPaddingTop()) {
                   setArchiveCollapsed(false);
                 }
               }
@@ -657,7 +657,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
                 if (firstVisiblePosition == 0) {
                   setArchiveCollapsed(false);
                   View view = manager.findViewByPosition(firstVisiblePosition);
-                  int top = view != null ? -manager.getDecoratedTop(view) : 0;
+                  int top = view != null ? recyclerView.getPaddingTop() - manager.getDecoratedTop(view) : 0;
                   int itemHeight = ChatsViewHolder.measureHeightForType(ChatsAdapter.VIEW_TYPE_CHAT);
                   if (top < itemHeight / 2) {
                     chatsView.smoothScrollBy(0, -top);
@@ -666,7 +666,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
                   }
                 } else if (firstVisiblePosition == 1) {
                   View view = manager.findViewByPosition(firstVisiblePosition);
-                  setArchiveCollapsed(view == null || manager.getDecoratedTop(view) < 0);
+                  setArchiveCollapsed(view == null || manager.getDecoratedTop(view) < recyclerView.getPaddingTop());
                 } else {
                   setArchiveCollapsed(true);
                 }
@@ -856,8 +856,8 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
     if (firstVisiblePosition == 0) {
       View view = manager.findViewByPosition(0);
       if (view != null) {
-        int top = Math.max(0, manager.getDecoratedTop(view));
-        int bottom = Math.max(0, manager.getDecoratedBottom(view));
+        int top = Math.max(0, manager.getDecoratedTop(view) - chatsView.getPaddingTop());
+        int bottom = Math.max(0, manager.getDecoratedBottom(view) - chatsView.getPaddingTop());
         chatsView.smoothScrollBy(0, (bottom - top));
       }
       if (parentController != null) {
@@ -1069,7 +1069,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
 
       View firstView = manager.findViewByPosition(firstVisiblePosition);
       if (firstView != null) {
-        totalScrollBy -= manager.getDecoratedTop(firstView); // firstView.getTop();
+        totalScrollBy -= manager.getDecoratedTop(firstView) - chatsView.getPaddingTop(); // firstView.getTop();
       }
       chatsView.smoothScrollBy(0, -totalScrollBy);
     }

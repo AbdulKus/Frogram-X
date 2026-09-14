@@ -780,7 +780,7 @@ public class ChatsAdapter extends RecyclerView.Adapter<ChatsViewHolder> {
     int offset;
     if (firstItem != -1) {
       View v = layoutManager.findViewByPosition(firstItem);
-      offset = v != null ? layoutManager.getDecoratedTop(v) : 0;
+      offset = v != null ? layoutManager.getDecoratedTop(v) - layoutManager.getPaddingTop() : 0;
     } else {
       offset = 0;
     }

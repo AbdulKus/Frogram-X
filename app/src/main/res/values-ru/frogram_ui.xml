@@ -6,4 +6,5 @@
   <string name="FrogramNewChatMenu">Меню чата</string>
   <string name="FrogramNewChatSuggestions">Подсказки ввода</string>
   <string name="FrogramNewChatActions">Кнопки действий в чате</string>
+  <string name="FrogramNewMainHeader">Верхняя панель списка чатов</string>
 </resources>
