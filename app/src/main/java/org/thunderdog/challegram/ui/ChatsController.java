@@ -412,7 +412,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
       TGChat current = context.adapter.getChatByItemPosition(position);
       if (current == null) {
         if (context.adapter.getItemCount() > 0 && context.adapter.hasArchive() && context.hideArchive && position == context.adapter.getItemCount() - 1) {
-          outRect.bottom = Math.max(0, parent.getMeasuredHeight() - context.calculateTotalScrollContentHeight());
+          outRect.bottom = Math.max(0, parent.getMeasuredHeight() - parent.getPaddingTop() - context.calculateTotalScrollContentHeight());
         } else {
           outRect.bottom = 0;
         }

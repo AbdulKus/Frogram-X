@@ -1271,14 +1271,17 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
     if (floatingButton != null && !SimpleShapeDrawable.USE_SOFTWARE_SHADOW) {
       Views.setLayerType(floatingButton, type == View.LAYER_TYPE_HARDWARE && SimpleShapeDrawable.USE_SOFTWARE_SHADOW ? View.LAYER_TYPE_SOFTWARE : type);
     }
-    boolean livePages = (left instanceof org.thunderdog.challegram.ui.MessagesController && !left.allowLayerTypeChanges()) ||
-      (right instanceof org.thunderdog.challegram.ui.MessagesController && !right.allowLayerTypeChanges());
+    boolean liveLeft = left != null && (left.hasFloatingHeader() ||
+      left instanceof org.thunderdog.challegram.ui.MessagesController && !left.allowLayerTypeChanges());
+    boolean liveRight = right != null && (right.hasFloatingHeader() ||
+      right instanceof org.thunderdog.challegram.ui.MessagesController && !right.allowLayerTypeChanges());
+    boolean livePages = liveLeft || liveRight;
     // Apply synchronously: a queued layer change can outlive detach/re-attach.
     // Both pages must stay live when one extends its content behind the shared header.
-    if (left != null && (left.allowLayerTypeChanges() || livePages && left instanceof org.thunderdog.challegram.ui.MessagesController)) {
+    if (left != null && (left.allowLayerTypeChanges() || liveLeft)) {
       left.getValue().setLayerType(livePages ? View.LAYER_TYPE_NONE : type, null);
     }
-    if (right != null && (right.allowLayerTypeChanges() || livePages && right instanceof org.thunderdog.challegram.ui.MessagesController)) {
+    if (right != null && (right.allowLayerTypeChanges() || liveRight)) {
       right.getValue().setLayerType(livePages ? View.LAYER_TYPE_NONE : type, null);
     }
   }
