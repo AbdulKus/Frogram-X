@@ -171,6 +171,20 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
     Views.applyBottomInset(recyclerView, extraBottomInset);
   }
 
+  private FrameLayoutFix savedPage;
+  private int savedHeaderOverflow;
+
+  public void setSavedHeaderInsets (int overflow, int top, Runnable invalidation) {
+    if (savedPage == null) return;
+    savedHeaderOverflow = overflow;
+    recyclerView.setGlassOverlay(overflow > 0);
+    recyclerView.setBackdropInvalidationListener(invalidation);
+    Views.setTopMargin(recyclerView, -overflow);
+    if (recyclerView.getPaddingTop() != top) recyclerView.setPadding(recyclerView.getPaddingLeft(), top, recyclerView.getPaddingRight(), recyclerView.getPaddingBottom());
+    recyclerView.setClipToPadding(overflow == 0 && recyclerView.getPaddingBottom() == 0);
+    savedPage.invalidate();
+  }
+
   private TdlibMessageViewer.Viewport messageViewport;
 
   @SuppressLint("InflateParams")
@@ -234,6 +248,21 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
     buildCells();
     recyclerView.setAdapter(adapter);
     loadInitialChunk();
+    if (alternateParent != null) {
+      savedPage = new FrameLayoutFix(context) {
+        @Override protected void dispatchDraw (android.graphics.Canvas canvas) {
+          int save = canvas.save();
+          canvas.clipRect(0, -savedHeaderOverflow, getWidth(), getHeight());
+          super.dispatchDraw(canvas);
+          canvas.restoreToCount(save);
+        }
+      };
+      savedPage.setClipChildren(false);
+      savedPage.setClipToPadding(false);
+      savedPage.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+      savedPage.addView(recyclerView);
+      return savedPage;
+    }
     return recyclerView;
   }
 
@@ -270,7 +299,7 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
       if (firstVisiblePosition == 0 || firstVisiblePosition == -1) {
         View view = manager.findViewByPosition(0);
         if (view != null) {
-          int top = view.getTop();
+          int top = view.getTop() - recyclerView.getPaddingTop();
           if (parent != null) {
             top -= parent.getItemsBound();
           }
@@ -285,7 +314,12 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
   }
 
   protected void onCreateView (Context context, MediaRecyclerView recyclerView, SettingsAdapter adapter) {
-    recyclerView.setLayoutManager(new LinearLayoutManager(context, RecyclerView.VERTICAL, false));
+    recyclerView.setLayoutManager(new LinearLayoutManager(context, RecyclerView.VERTICAL, false) {
+      @Override protected void calculateExtraLayoutSpace (@NonNull RecyclerView.State state, @NonNull int[] space) {
+        super.calculateExtraLayoutSpace(state, space);
+        if (savedHeaderOverflow > 0) space[0] += getPaddingTop() + Screen.dp(48f);
+      }
+    });
   }
 
   protected int getItemCellHeight () {
@@ -374,7 +408,7 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
     int scrollY = calculateScrollY(i);
     View view = recyclerView.getLayoutManager().findViewByPosition(i);
     if (view != null) {
-      scrollY -= view.getTop();
+      scrollY -= view.getTop() - recyclerView.getPaddingTop();
     }
 
     return scrollY;
@@ -1407,6 +1441,7 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
       messageViewport.performDestroy();
     }
     TGLegacyManager.instance().removeEmojiListener(adapter);
+    if (recyclerView != null) recyclerView.setBackdropInvalidationListener(null);
     Views.destroyRecyclerView(recyclerView);
   }
 

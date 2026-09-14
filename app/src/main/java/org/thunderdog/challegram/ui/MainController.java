@@ -321,7 +321,8 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     boolean floatingTabs = hasFloatingHeader() && !displayTabsAtBottom();
     ViewPagerHeaderViewCompact cell = (ViewPagerHeaderViewCompact) headerCell.getView();
     cell.setClipChildren(!floatingTabs);
-    cell.getRecyclerView().setTranslationY(floatingTabs ? getHeaderControlsInset() : 0f);
+    cell.setContentInsetY(floatingTabs ? getHeaderControlsInset() : 0);
+    headerCell.getTopView().setGlassSelection(hasFloatingHeader());
     if (!displayTabsAtBottom()) {
       headerCell.getTopView().setTextFromToColorId(floatingTabs ? ColorId.text : ColorId.headerTabInactiveText,
         floatingTabs ? ColorId.text : ColorId.headerTabActiveText);

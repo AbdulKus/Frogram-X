@@ -171,6 +171,8 @@ public class CustomResultView extends SparseDrawableView implements Destroyable,
     }
   }
 
+  public void drawForGlass (Canvas c) { onDraw(c); }
+
   @Override
   protected void onDraw (Canvas c) {
     if (result != null) {

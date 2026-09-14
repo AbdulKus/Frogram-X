@@ -350,6 +350,60 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private ChatGlassDrawable headerGlass;
 
   private View topGlassView;
+  private FrameLayoutFix savedTabsRoot;
+  private final int[] savedRootPosition = new int[2], savedSourcePosition = new int[2];
+
+  private void configureSavedMedia (SharedBaseController<?> controller) {
+    int overflow = useFloatingChatHeader() ? getGlassTopExtension() : 0;
+    controller.setSavedHeaderInsets(overflow, overflow > 0 ? overflow + Screen.dp(6f) + getFloatingPlayerInset() : 0,
+      this::invalidateChatGlass);
+  }
+
+  private void drawSavedBackdrop (Canvas canvas) {
+    if (savedTabsRoot == null) return;
+    savedTabsRoot.getLocationInWindow(savedRootPosition);
+    canvas.drawColor(Theme.fillingColor());
+    if (contentView.isShown() && contentView.getParent() != null) {
+      int save = canvas.save();
+      wallpaperView.getLocationInWindow(savedSourcePosition);
+      canvas.translate(savedSourcePosition[0] - savedRootPosition[0], savedSourcePosition[1] - savedRootPosition[1]);
+      if (canvas.clipRect(0, 0, wallpaperView.getWidth(), wallpaperView.getHeight())) wallpaperView.drawForGlass(canvas);
+      canvas.restoreToCount(save);
+      save = canvas.save();
+      messagesView.getLocationInWindow(savedSourcePosition);
+      canvas.translate(savedSourcePosition[0] - savedRootPosition[0], savedSourcePosition[1] - savedRootPosition[1]);
+      if (canvas.clipRect(0, 0, messagesView.getWidth(), messagesView.getHeight())) {
+        messagesView.drawForGlass(canvas);
+        drawVideoForGlass(canvas);
+      }
+      canvas.restoreToCount(save);
+    }
+    if (pagerContentAdapter != null) {
+      for (int i = 0; i < pagerContentAdapter.cachedItems.size(); i++) {
+        RecyclerView list = pagerContentAdapter.cachedItems.valueAt(i).getRecyclerView();
+        if (!(list instanceof org.thunderdog.challegram.v.CustomRecyclerView) || !list.isShown() || list.getParent() == null) continue;
+        int save = canvas.save();
+        list.getLocationInWindow(savedSourcePosition);
+        canvas.translate(savedSourcePosition[0] - savedRootPosition[0], savedSourcePosition[1] - savedRootPosition[1]);
+        if (canvas.clipRect(0, 0, list.getWidth(), list.getHeight())) ((org.thunderdog.challegram.v.CustomRecyclerView) list).drawForGlass(canvas);
+        canvas.restoreToCount(save);
+      }
+    }
+  }
+
+  private void attachSavedGlass () {
+    if (savedTabsRoot == null || topGlassView == null) return;
+    if (topGlassView.getParent() != savedTabsRoot) {
+      ((ViewGroup) topGlassView.getParent()).removeView(topGlassView);
+      savedTabsRoot.addView(topGlassView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+      ((ViewGroup) floatingPlayerView.getParent()).removeView(floatingPlayerView);
+      savedTabsRoot.addView(floatingPlayerView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+      headerGlass.setBackdrop(savedTabsRoot, this::drawSavedBackdrop);
+      playerGlass.setBackdrop(savedTabsRoot, this::drawSavedBackdrop);
+    }
+    updateFloatingInsets();
+  }
+
   private FrameLayoutFix videoLayer;
   private View floatingPlayerView;
   private ChatGlassDrawable playerGlass;
@@ -396,7 +450,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override public boolean hasFloatingHeader () {
-    return useFloatingChatHeader() && pagerScrollOffset == 0f && !inTransformMode();
+    return useFloatingChatHeader() && !inTransformMode();
   }
 
   @Override public int getHeaderControlsInset () {
@@ -425,7 +479,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override public boolean hasFloatingPlayer () {
-    return useFloatingChatHeader() && pagerScrollOffset == 0f && !inTransformMode();
+    return useFloatingChatHeader() && !inTransformMode();
   }
 
   @Override public void invalidateFloatingPlayer () {
@@ -521,16 +575,20 @@ public class MessagesController extends ViewController<MessagesController.Argume
       if (topGlassView != null) {
         // Include the status bar in the backdrop, but keep the island below it.
         Views.setTopMargin(topGlassView, -header);
-        Views.setLayoutHeight(topGlassView, header + topBar.getTotalVisualHeight() + Screen.dp(6f));
+        int barsHeight = Math.round(topBar.getTotalVisualHeight() * (savedTabsRoot != null ? 1f - MathUtils.clamp(pagerScrollOffset) : 1f));
+        Views.setLayoutHeight(topGlassView, header + barsHeight + Screen.dp(6f));
         Views.setTopMargin(messagesView, -header);
         if (videoLayer != null) Views.setTopMargin(videoLayer, -header);
         Views.setTopMargin(wallpaperView, -header);
         topGlassView.invalidate();
       }
       if (floatingPlayerView != null) {
-        Views.setTopMargin(floatingPlayerView, topBar.getTotalVisualHeight() + Screen.dp(12f));
+        Views.setTopMargin(floatingPlayerView, Math.round(topBar.getTotalVisualHeight() * (savedTabsRoot != null ? 1f - MathUtils.clamp(pagerScrollOffset) : 1f)) + Screen.dp(12f));
         Views.setLayoutHeight(floatingPlayerView, Math.round(floatingPlayerOffset));
         floatingPlayerView.setVisibility(hasFloatingPlayer() && floatingPlayerOffset > 0f ? View.VISIBLE : View.GONE);
+      }
+      if (savedTabsRoot != null && pagerContentAdapter != null) {
+        for (int i = 0; i < pagerContentAdapter.cachedItems.size(); i++) configureSavedMedia(pagerContentAdapter.cachedItems.valueAt(i));
       }
       if (composerGlassView != null) composerGlassView.invalidate();
       if (replyBarView != null && newChatInput) {
@@ -633,7 +691,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
     RelativeLayout.LayoutParams glassParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, header + topBar.getTotalVisualHeight() + Screen.dp(6f));
     glassParams.topMargin = -header;
-    topGlassView.setLayoutParams(glassParams);
+    if (savedTabsRoot == null) topGlassView.setLayoutParams(glassParams);
+    else {
+      FrameLayoutFix.LayoutParams savedParams = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, glassParams.height);
+      savedParams.topMargin = -header;
+      topGlassView.setLayoutParams(savedParams);
+    }
     topGlassView.setVisibility(floatingHeader ? View.VISIBLE : View.GONE);
     if (floatingPlayerView == null) {
       floatingPlayerView = new View(context()) {
@@ -667,6 +730,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (pagerHeaderView != null) {
       pagerHeaderView.getTopView().setTextFromToColorId(floatingHeader ? getGlassIconColorId() : ColorId.headerText, floatingHeader ? ColorId.text : ColorId.headerText);
       pagerHeaderView.getTopView().setSelectionColorId(floatingHeader ? ColorId.textLink : ColorId.headerText);
+      pagerHeaderView.getTopView().setGlassSelection(floatingHeader);
+      pagerHeaderView.setContentInsetY(getHeaderControlsInset());
     }
     headerCell.setContentInsetY(getHeaderControlsInset());
     headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
@@ -678,7 +743,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
-    if (!useFloatingChatHeader() || topGlassView == null || pagerScrollOffset != 0f) return false;
+    if (!useFloatingChatHeader() || topGlassView == null) return false;
     return true;
   }
 
@@ -1923,6 +1988,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       if (useFloatingChatHeader()) {
         pagerHeaderView.getTopView().setTextFromToColorId(getGlassIconColorId(), ColorId.text);
         pagerHeaderView.getTopView().setSelectionColorId(ColorId.textLink);
+        pagerHeaderView.getTopView().setGlassSelection(true);
+        pagerHeaderView.setContentInsetY(getHeaderControlsInset());
       }
 
       pagerContentAdapter = new MediaTabsAdapter(this, mediaControllers);
@@ -1962,6 +2029,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
       contentView.setClipToPadding(false);
       contentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
       contentView.addView(pagerContentView);
+      savedTabsRoot = contentView;
+      attachSavedGlass();
+      savedTabsRoot.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> updateFloatingInsets());
 
       return contentView;
 
@@ -2077,6 +2147,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
       container.addView(c.getValue());
       c.setBottomInset(context.extraBottomInset, context.extraBottomInsetWithoutIme);
+      context.configureSavedMedia(c);
+      context.invalidateChatGlass();
       return c;
     }
 
@@ -2104,6 +2176,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     pagerHeaderView.getTopView().setSelectionFactor(offset);
     if (this.pagerScrollOffset != offset) {
       this.pagerScrollOffset = offset;
+      invalidateChatGlass();
       updateFloatingInsets();
       if (headerView != null) headerView.invalidate();
       if (hideKeyboardOnPageScroll) {

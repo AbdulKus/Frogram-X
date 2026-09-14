@@ -510,6 +510,16 @@ public class ViewPagerHeaderViewCompact extends FrameLayoutFix implements PagerH
     return adapter.topView;
   }
 
+  private int contentInsetY;
+  private float expansionTranslationY;
+
+  public void setContentInsetY (int inset) {
+    if (contentInsetY != inset) {
+      contentInsetY = inset;
+      recyclerView.setTranslationY(contentInsetY + expansionTranslationY);
+    }
+  }
+
   private static final float TOP_SCALE_LIMIT = .25f;
 
   @Override
@@ -520,7 +530,8 @@ public class ViewPagerHeaderViewCompact extends FrameLayoutFix implements PagerH
 
     //noinspection Range
     recyclerView.setAlpha(scaleFactor <= TOP_SCALE_LIMIT ? 0f : (scaleFactor - TOP_SCALE_LIMIT) / TOP_SCALE_LIMIT);
-    recyclerView.setTranslationY(Size.getHeaderSizeDifference(true) * (1f - scaleFactor));
+    expansionTranslationY = Size.getHeaderSizeDifference(true) * (1f - scaleFactor);
+    recyclerView.setTranslationY(contentInsetY + expansionTranslationY);
   }
 
   private static final Interpolator QUINTIC_INTERPOLATOR = t -> {

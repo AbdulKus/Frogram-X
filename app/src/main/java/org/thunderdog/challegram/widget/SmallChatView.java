@@ -156,6 +156,8 @@ public class SmallChatView extends BaseView implements AttachDelegate, TooltipOv
     }
   }
 
+  public void drawForGlass (Canvas c) { onDraw(c); }
+
   @Override
   protected void onDraw (@NonNull Canvas c) {
     if (chat == null) {

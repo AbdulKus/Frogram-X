@@ -29,8 +29,8 @@ import org.thunderdog.challegram.v.MessagesRecyclerView;
 /** A small in-memory backdrop of this chat, excluding the overlaid controls. */
 public final class ChatGlassDrawable extends Drawable implements View.OnAttachStateChangeListener {
   private final WallpaperView wallpaper;
-  private final View sourceView;
-  private final VideoLayer backdrop;
+  private View sourceView;
+  private VideoLayer backdrop;
   private final View host;
   private final int colorId;
   private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -44,6 +44,13 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private VideoLayer videoLayer;
 
   public void setVideoLayer (VideoLayer layer) { videoLayer = layer; }
+
+  public void setBackdrop (View source, VideoLayer drawer) {
+    sourceView = source;
+    backdrop = drawer;
+    messages = null;
+    invalidateBackdrop();
+  }
 
   public void refresh () {
     if (released) return;

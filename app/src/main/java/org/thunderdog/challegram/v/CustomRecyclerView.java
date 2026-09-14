@@ -80,7 +80,13 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
     if (canvas.clipRect(0, 0, child.getWidth(), child.getHeight())) {
       if (child.getAlpha() < 1f) canvas.saveLayerAlpha(0, 0, child.getWidth(), child.getHeight(), Math.round(255f * child.getAlpha()));
       if (child.getBackground() != null) child.getBackground().draw(canvas);
-      if (child instanceof org.thunderdog.challegram.component.dialogs.ChatView) {
+      if (child instanceof org.thunderdog.challegram.component.sharedmedia.MediaSmallView) {
+        ((org.thunderdog.challegram.component.sharedmedia.MediaSmallView) child).drawForGlass(canvas);
+      } else if (child instanceof org.thunderdog.challegram.widget.SmallChatView) {
+        ((org.thunderdog.challegram.widget.SmallChatView) child).drawForGlass(canvas);
+      } else if (child instanceof org.thunderdog.challegram.component.inline.CustomResultView) {
+        ((org.thunderdog.challegram.component.inline.CustomResultView) child).drawForGlass(canvas);
+      } else if (child instanceof org.thunderdog.challegram.component.dialogs.ChatView) {
         ((org.thunderdog.challegram.component.dialogs.ChatView) child).drawForGlass(canvas);
       } else if (child instanceof org.thunderdog.challegram.widget.BetterChatView) {
         ((org.thunderdog.challegram.widget.BetterChatView) child).drawForGlass(canvas);

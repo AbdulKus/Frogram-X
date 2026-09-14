@@ -251,6 +251,8 @@ public class MediaSmallView extends SparseDrawableView implements Destroyable, F
     return item == null ? null : imageReceiver.getCurrentFile() != null ? imageReceiver : gifReceiver;
   }
 
+  public void drawForGlass (Canvas c) { onDraw(c); }
+
   @Override
   protected void onDraw (Canvas c) {
     if (item == null) {

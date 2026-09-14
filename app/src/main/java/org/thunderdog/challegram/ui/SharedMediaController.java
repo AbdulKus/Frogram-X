@@ -152,7 +152,12 @@ public class SharedMediaController extends SharedBaseController<MediaItem> imple
     decoration.setNeedDraw(true, ListItem.TYPE_SMALL_MEDIA);
     decoration.setDrawColorId(ColorId.filling);
     decoration.setSpanSizeLookup(lookup);
-    GridLayoutManager manager = new RtlGridLayoutManager(context, spanCount);
+    GridLayoutManager manager = new RtlGridLayoutManager(context, spanCount) {
+      @Override protected void calculateExtraLayoutSpace (@androidx.annotation.NonNull RecyclerView.State state, @androidx.annotation.NonNull int[] space) {
+        super.calculateExtraLayoutSpace(state, space);
+        if (alternateParent != null && !getClipToPadding()) space[0] += getPaddingTop() + Screen.dp(48f);
+      }
+    };
     manager.setSpanSizeLookup(lookup);
     recyclerView.addItemDecoration(decoration);
     recyclerView.setLayoutManager(manager);
