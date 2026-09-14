@@ -1042,8 +1042,10 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
   private final android.graphics.RectF glassTabBounds = new android.graphics.RectF();
   private android.graphics.Shader glassTabSheen;
   private int glassTabHeight;
+  private int glassTabRippleColor;
 
   public void setGlassSelection (boolean enabled) {
+    if (glassSelection == enabled) return;
     glassSelection = enabled;
     for (int i = 0; i < getChildCount(); i++) {
       View child = getChildAt(i);
@@ -1058,7 +1060,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
       mask.setColor(android.graphics.Color.WHITE);
       mask.setCornerRadius(Screen.dp(20f));
       view.setBackground(new android.graphics.drawable.RippleDrawable(
-        android.content.res.ColorStateList.valueOf(ColorUtils.alphaColor(.22f, Theme.headerColor())), null,
+        android.content.res.ColorStateList.valueOf(ColorUtils.alphaColor(.22f, getGlassTabTint())), null,
         new android.graphics.drawable.InsetDrawable(mask, Screen.dp(4f), Screen.dp(8f), Screen.dp(4f), Screen.dp(8f))));
     } else if (isDark) {
       RippleSupport.setTransparentBlackSelector(view);
@@ -1067,25 +1069,60 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     }
   }
 
+  private int getGlassTabTint () {
+    return ColorUtils.fromToArgb(Theme.headerColor(), Theme.getColor(ColorId.textLink), .45f);
+  }
+
+  private void updateGlassTabRippleColors () {
+    int color = ColorUtils.alphaColor(.22f, getGlassTabTint());
+    if (glassTabRippleColor == color) return;
+    glassTabRippleColor = color;
+    android.content.res.ColorStateList colors = android.content.res.ColorStateList.valueOf(color);
+    for (int i = 0; i < getChildCount(); i++) {
+      Drawable background = getChildAt(i).getBackground();
+      if (getChildAt(i) instanceof BackgroundView && background instanceof android.graphics.drawable.RippleDrawable) {
+        ((android.graphics.drawable.RippleDrawable) background).setColor(colors);
+      }
+    }
+  }
+
+  private float getGlassTabLeft (int index) {
+    float left = 0f;
+    for (int i = 0; i < index; i++) {
+      left += shouldWrapContent() ? getItemWidth(i, selectionFactor) : commonItemWidth;
+    }
+    return left;
+  }
+
   private void drawGlassSelection (Canvas canvas, int height, boolean rtl) {
     if (items.isEmpty()) return;
     int index = MathUtils.clamp((int) selectionFactor, 0, items.size() - 1);
+    int nextIndex = Math.min(index + 1, items.size() - 1);
     float progress = MathUtils.clamp(selectionFactor - index);
-    float left = 0f;
-    for (int i = 0; i < index; i++) left += shouldWrapContent() ? getItemWidth(i, selectionFactor) : commonItemWidth;
+    // A tapped distant tab expands only its source and destination labels.
+    // Follow those same endpoints, with one continuous swell for the whole move.
+    if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex &&
+        fromIndex < items.size() && toIndex < items.size()) {
+      index = fromIndex;
+      nextIndex = toIndex;
+      progress = MathUtils.clamp((selectionFactor - fromIndex) / (toIndex - fromIndex));
+    }
+    float left = getGlassTabLeft(index);
+    float nextLeft = getGlassTabLeft(nextIndex);
     float width = shouldWrapContent() ? getItemWidth(index, selectionFactor) : commonItemWidth;
-    float nextWidth = shouldWrapContent() ? getItemWidth(Math.min(index + 1, items.size() - 1), selectionFactor) : commonItemWidth;
-    left += width * progress;
+    float nextWidth = shouldWrapContent() ? getItemWidth(nextIndex, selectionFactor) : commonItemWidth;
+    left += (nextLeft - left) * progress;
     width += (nextWidth - width) * progress;
-    // A small, continuous swelling connects the two tabs while the finger moves.
-    float swell = (float) Math.sin(Math.PI * progress) * Math.min(Screen.dp(8f), width * .08f);
+    float swell = org.thunderdog.challegram.unsorted.Settings.instance().needReduceMotion() ? 0f :
+      (float) Math.sin(Math.PI * progress) * Math.min(Screen.dp(8f), width * .08f);
     if (rtl) left = totalWidth - left - width;
     glassTabBounds.set(left + Screen.dp(4f) - swell, Screen.dp(8f), left + width - Screen.dp(4f) + swell, height - Screen.dp(8f));
+    if (glassTabBounds.isEmpty()) return;
     float radius = glassTabBounds.height() / 2f;
-    int tint = ColorUtils.fromToArgb(Theme.headerColor(), Theme.getColor(ColorId.textLink), .25f);
+    int tint = getGlassTabTint();
     float alpha = 1f - disabledFactor;
     glassTabPaint.setShader(null);
-    glassTabPaint.setColor(ColorUtils.alphaColor((Theme.isDark() ? .28f : .25f) * alpha, tint));
+    glassTabPaint.setColor(ColorUtils.alphaColor((Theme.isDark() ? .30f : .32f) * alpha, tint));
     canvas.drawRoundRect(glassTabBounds, radius, radius, glassTabPaint);
     if (glassTabSheen == null || glassTabHeight != height) {
       glassTabHeight = height;
@@ -1111,6 +1148,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
   @Override
   @SuppressWarnings("deprecation")
   public void draw (@NonNull Canvas c) {
+    if (glassSelection) updateGlassTabRippleColors();
     super.draw(c);
 
     if (items == null) {

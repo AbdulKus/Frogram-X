@@ -352,11 +352,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private View topGlassView;
   private FrameLayoutFix savedTabsRoot;
   private final int[] savedRootPosition = new int[2], savedSourcePosition = new int[2];
+  private final Runnable savedGlassInvalidation = this::invalidateChatGlass;
 
   private void configureSavedMedia (SharedBaseController<?> controller) {
     int overflow = useFloatingChatHeader() ? getGlassTopExtension() : 0;
     controller.setSavedHeaderInsets(overflow, overflow > 0 ? overflow + Screen.dp(6f) + getFloatingPlayerInset() : 0,
-      this::invalidateChatGlass);
+      overflow > 0 ? savedGlassInvalidation : null);
   }
 
   private void drawSavedBackdrop (Canvas canvas) {
@@ -394,11 +395,13 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private void attachSavedGlass () {
     if (savedTabsRoot == null || topGlassView == null) return;
     if (topGlassView.getParent() != savedTabsRoot) {
-      ((ViewGroup) topGlassView.getParent()).removeView(topGlassView);
+      if (topGlassView.getParent() instanceof ViewGroup) ((ViewGroup) topGlassView.getParent()).removeView(topGlassView);
       savedTabsRoot.addView(topGlassView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
-      ((ViewGroup) floatingPlayerView.getParent()).removeView(floatingPlayerView);
-      savedTabsRoot.addView(floatingPlayerView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
       headerGlass.setBackdrop(savedTabsRoot, this::drawSavedBackdrop);
+    }
+    if (floatingPlayerView != null && floatingPlayerView.getParent() != savedTabsRoot) {
+      if (floatingPlayerView.getParent() instanceof ViewGroup) ((ViewGroup) floatingPlayerView.getParent()).removeView(floatingPlayerView);
+      savedTabsRoot.addView(floatingPlayerView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
       playerGlass.setBackdrop(savedTabsRoot, this::drawSavedBackdrop);
     }
     updateFloatingInsets();
@@ -2105,6 +2108,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       } else {
         container.removeView(((ViewController<?>) object).getValue());
       }
+      context.invalidateChatGlass();
     }
 
     @Override
@@ -2130,6 +2134,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     public Object instantiateItem (ViewGroup container, int position) {
       if (position == 0) {
         container.addView(context.contentView);
+        context.invalidateChatGlass();
         return context;
       }
       SharedBaseController<?> c = cachedItems.get(position);

@@ -176,11 +176,17 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
 
   public void setSavedHeaderInsets (int overflow, int top, Runnable invalidation) {
     if (savedPage == null) return;
+    recyclerView.setBackdropInvalidationListener(invalidation);
+    boolean changed = savedHeaderOverflow != overflow || recyclerView.getPaddingTop() != top;
+    if (!changed) return;
     savedHeaderOverflow = overflow;
     recyclerView.setGlassOverlay(overflow > 0);
-    recyclerView.setBackdropInvalidationListener(invalidation);
     Views.setTopMargin(recyclerView, -overflow);
-    if (recyclerView.getPaddingTop() != top) recyclerView.setPadding(recyclerView.getPaddingLeft(), top, recyclerView.getPaddingRight(), recyclerView.getPaddingBottom());
+    if (recyclerView.getPaddingTop() != top) {
+      recyclerView.saveScrollPosition();
+      recyclerView.setPadding(recyclerView.getPaddingLeft(), top, recyclerView.getPaddingRight(), recyclerView.getPaddingBottom());
+      recyclerView.restoreScrollPosition();
+    }
     recyclerView.setClipToPadding(overflow == 0 && recyclerView.getPaddingBottom() == 0);
     savedPage.invalidate();
   }
