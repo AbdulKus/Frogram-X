@@ -30,14 +30,19 @@ public class TgCallsController extends VoIPInstance {
   private final String version;
   private long nativePtr;
   private boolean videoEnabled;
+  private boolean startVideoWhenSinksReady;
   private boolean frontCamera = true;
   public TgCallsController (@NonNull Tdlib tdlib, @NonNull TdApi.Call call, @NonNull CallConfiguration configuration, @NonNull CallOptions options, @NonNull ConnectionStateListener stateListener, String version) {
     super(tdlib, call, configuration, options, stateListener);
     if (configuration.state.encryptionKey.length != 256)
       throw new IllegalArgumentException(Integer.toString(configuration.state.encryptionKey.length));
     this.version = version;
-    this.videoEnabled = configuration.isVideo;
+    this.videoEnabled = false;
+    this.startVideoWhenSinksReady = configuration.isVideo;
     this.nativePtr = newInstance(version, configuration, options);
+    if (nativePtr == 0) {
+      throw new IllegalStateException("Unable to initialize tgcalls " + version);
+    }
   }
 
   private long nativePtr () {
@@ -124,6 +129,9 @@ public class TgCallsController extends VoIPInstance {
 
   @Override
   public void setVideoEnabled (boolean enabled) {
+    if (!enabled) {
+      startVideoWhenSinksReady = false;
+    }
     if (videoEnabled != enabled) {
       videoEnabled = enabled;
       nativeSetVideoEnabled(nativePtr(), enabled);
@@ -145,6 +153,10 @@ public class TgCallsController extends VoIPInstance {
   public void setVideoSinks (@Nullable VideoSink localSink, @Nullable VideoSink remoteSink) {
     nativeSetLocalVideoOutput(nativePtr(), localSink);
     nativeSetRemoteVideoOutput(nativePtr(), remoteSink);
+    if (startVideoWhenSinksReady && localSink != null) {
+      startVideoWhenSinksReady = false;
+      setVideoEnabled(true);
+    }
   }
 
   @Override

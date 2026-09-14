@@ -67,6 +67,8 @@ public class CallManager implements GlobalCallListener {
   private Tdlib currentCallTdlib;
   private @Nullable TdApi.Call currentCall;
   private boolean currentCallAcknowledged;
+  private int answerWithoutVideoAccountId = TdlibAccount.NO_ID;
+  private int answerWithoutVideoCallId;
 
   public void addCurrentCallListener (CurrentCallListener listener) {
     listeners.add(listener);
@@ -83,6 +85,10 @@ public class CallManager implements GlobalCallListener {
       return;
     }
     if (currentCall == null || call == null) {
+      if (call == null) {
+        answerWithoutVideoAccountId = TdlibAccount.NO_ID;
+        answerWithoutVideoCallId = 0;
+      }
       this.currentCallTdlib = tdlib;
       this.currentCall = call;
       this.currentCallAcknowledged = call == null || UI.getUiState() != UI.State.RESUMED || UI.isNavigationBusyWithSomething();
@@ -526,29 +532,46 @@ debugCall id:long debug:string = Ok;
   }
 
   public void acceptCall (Context context, Tdlib tdlib, final int callId) {
+    acceptCall(context, tdlib, callId, true);
+  }
+
+  public void acceptCall (Context context, Tdlib tdlib, final int callId, final boolean withVideo) {
     if (checkConnection(context, tdlib)) {
       TdApi.Call pendingCall = tdlib.cache().getCall(callId);
       if (!checkRecordPermissions(context, tdlib, pendingCall, 0, null)) {
         return;
       }
       BaseActivity activity = UI.getUiContext();
-      if (pendingCall != null && pendingCall.isVideo && activity != null &&
+      if (withVideo && pendingCall != null && pendingCall.isVideo && activity != null &&
           activity.permissions().requestAccessCameraPermission(granted -> {
             if (granted) {
-              acceptCall(context, tdlib, callId);
+              acceptCall(context, tdlib, callId, true);
             } else {
-              sendAcceptCall(tdlib, callId);
+              acceptCall(context, tdlib, callId, false);
             }
           })) {
         return;
       }
-      sendAcceptCall(tdlib, callId);
+      sendAcceptCall(tdlib, callId, withVideo);
     }
   }
 
-  private void sendAcceptCall (Tdlib tdlib, int callId) {
-    Log.v(Log.TAG_VOIP, "#%d: AcceptCall requested", callId);
+  private void sendAcceptCall (Tdlib tdlib, int callId, boolean withVideo) {
+    if (withVideo) {
+      if (answerWithoutVideoAccountId == tdlib.id() && answerWithoutVideoCallId == callId) {
+        answerWithoutVideoAccountId = TdlibAccount.NO_ID;
+        answerWithoutVideoCallId = 0;
+      }
+    } else {
+      answerWithoutVideoAccountId = tdlib.id();
+      answerWithoutVideoCallId = callId;
+    }
+    Log.v(Log.TAG_VOIP, "#%d: AcceptCall requested, withVideo:%b", callId, withVideo);
     tdlib.client().send(new TdApi.AcceptCall(callId, VoIP.getProtocol()), object -> Log.v(Log.TAG_VOIP, "#%d: AcceptCall completed: %s", callId, object));
+  }
+
+  public boolean shouldStartVideo (Tdlib tdlib, int callId) {
+    return answerWithoutVideoAccountId != tdlib.id() || answerWithoutVideoCallId != callId;
   }
 
   public void hangUpCurrentCall () {
