@@ -187,7 +187,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   private View mainGlassView, mainPlayerView;
   private ChatGlassDrawable mainGlass, mainPlayerGlass;
   private CustomRecyclerView mainSearchView;
-  private float mainPlayerOffset;
+  private float mainPlayerOffset, mainPlayerFactor;
   private final android.graphics.Paint mainStatusPaint = new android.graphics.Paint();
   private int mainStatusHeight, mainStatusColor;
   private final int[] sourcePosition = new int[2], listPosition = new int[2];
@@ -226,16 +226,6 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   }
   @Override public boolean drawHeaderBackground (Canvas canvas, HeaderView header, int width, int height, int color) {
     return hasFloatingHeader() && mainGlassView != null;
-  }
-  @Override public View getViewForApplyingOffsets () {
-    return hasFloatingHeader() ? null : super.getViewForApplyingOffsets();
-  }
-  @Override protected boolean applyPlayerOffset (float factor, float top) {
-    mainPlayerOffset = top;
-    boolean changed = super.applyPlayerOffset(factor, top);
-    updateMainGlassGeometry();
-    invalidateFloatingPlayer();
-    return changed;
   }
   @Override public void invalidateFloatingPlayer () {
     if (mainPlayerView != null) mainPlayerView.invalidate();
@@ -309,8 +299,12 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     mainGlass.setEnabled(enabled);
     mainPlayerGlass.setEnabled(enabled);
     if (headerView != null) mainPlayerOffset = headerView.getFilling().getPlayerOffset();
-    // Undo the classic player's page translation when enabling the new UI.
-    getViewPager().setTranslationY(enabled ? 0f : mainPlayerOffset);
+    // The classic player moves the entire list/search wrapper. Clear both its
+    // translation and reserved margin when switching to an overlaid player.
+    mainWrap.setTranslationY(enabled ? 0f : mainPlayerOffset);
+    Views.setBottomMargin(mainWrap, !enabled && mainPlayerFactor == 1f ? Math.round(mainPlayerOffset) : 0);
+    bottomBarOffsetByPlayer = !enabled && mainPlayerFactor < 1f ? -mainPlayerOffset : 0;
+    invalidateBottomBarOffset();
     checkPagerMargins();
     styleMainTabs();
     updateMainGlassGeometry();
@@ -1128,7 +1122,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   @Override
   public View getViewForApplyingOffsets () {
-    return mainWrap;
+    return hasFloatingHeader() ? null : mainWrap;
   }
 
   // Overlay wrap
@@ -1257,10 +1251,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   private void checkPagerMargins () {
     if (!Config.CHAT_FOLDERS_HIDE_BOTTOM_BAR_ON_SCROLL && displayTabsAtBottom()) {
-      Views.setBottomMargin(getViewPager(), getHeaderHeight() + (!hasFloatingHeader() ? Math.round(mainPlayerOffset) : 0));
+      Views.setBottomMargin(getViewPager(), getHeaderHeight());
       Views.setBottomMargin(pagerWrap, updateSnackBar != null ? Math.round(updateSnackBar.getHeight() * updateSnackBar.getVisibilityFactor()) : 0); // FIXME
     } else {
-      Views.setBottomMargin(getViewPager(), !hasFloatingHeader() ? Math.round(mainPlayerOffset) : 0);
+      Views.setBottomMargin(getViewPager(), 0);
       Views.setBottomMargin(pagerWrap, 0);
     }
   }
@@ -2916,11 +2910,15 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   @Override
   protected boolean applyPlayerOffset (float factor, float top) {
+    mainPlayerOffset = top;
+    mainPlayerFactor = factor;
     boolean result = super.applyPlayerOffset(factor, top);
-    if (result) {
-      bottomBarOffsetByPlayer = factor < 1f ? -top : 0;
+    if (result || hasFloatingHeader()) {
+      bottomBarOffsetByPlayer = !hasFloatingHeader() && factor < 1f ? -top : 0;
       invalidateBottomBarOffset();
     }
+    updateMainGlassGeometry();
+    invalidateFloatingPlayer();
     return result;
   }
 
