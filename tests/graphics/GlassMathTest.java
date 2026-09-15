@@ -1,6 +1,7 @@
 import java.util.Arrays;
 import java.util.Random;
 import org.thunderdog.challegram.util.GlassBlur;
+import org.thunderdog.challegram.util.FloatingPlayerGeometry;
 import org.thunderdog.challegram.util.GlassFrameCache;
 import org.thunderdog.challegram.util.GlassSampling;
 import org.thunderdog.challegram.util.DampedSpring;
@@ -27,6 +28,29 @@ public final class GlassMathTest {
     return data;
   }
   public static void main(String[] args) {
+    for (int height : new int[] {36, 54, 72, 108, 144}) {
+      int gap = height / 3;
+      check(FloatingPlayerGeometry.inset(0, height, gap) == 0, "closed player reserved space");
+      check(FloatingPlayerGeometry.inset(.001f, height, gap) == 0, "first frame jumped by the full gap");
+      check(FloatingPlayerGeometry.inset(height, height, gap) == height + gap, "open player overlaps content");
+      check(FloatingPlayerGeometry.visibility(-1, height) == 0f, "negative visibility");
+      check(FloatingPlayerGeometry.visibility(height * 2, height) == 1f, "overshot visibility");
+      int last = 0;
+      for (int frame = 0; frame <= 1000; frame++) {
+        float offset = height * frame / 1000f;
+        int inset = FloatingPlayerGeometry.inset(offset, height, gap);
+        check(inset >= last && inset - last <= 2, "player animation jumped or reversed");
+        check(inset == Math.round(offset) + FloatingPlayerGeometry.gap(offset, height, gap), "list and sticky header disagree");
+        check(inset <= height + gap, "animated inset exceeded open geometry");
+        last = inset;
+      }
+      // Start closing midway, reopen, and finish closing: geometry has no stale endpoint.
+      for (float factor : new float[] {0f, .3f, .7f, .4f, .9f, 1f, .2f, 0f}) {
+        float visibility = FloatingPlayerGeometry.visibility(height * factor, height);
+        check(Math.abs(visibility - factor) < .00001f, "interrupted player animation retained old state");
+      }
+    }
+    check(FloatingPlayerGeometry.inset(10f, 0, 12) == 0, "unmeasured player reserved space");
     GlassBlur blur = new GlassBlur();
     int[] fine = new int[96 * 24 * 4], coarse = new int[96 * 24];
     for (int phase = 0; phase < 2; phase++) {
@@ -117,6 +141,6 @@ public final class GlassMathTest {
       spring.target = -50; spring.step(4f); check(Float.isFinite(spring.value), "long frame");
       spring.reset(0f); check(!spring.isMoving(), "callback would continue after close");
     }
-    System.out.println("Glass sampling: phase stability, RGB averaging, overscan edge; blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; thread post: forward/return, stationary frames and edge jitter; spring: 30/60/90/120 Hz, return and teardown passed");
+    System.out.println("Player geometry: 5 densities, 5005 frames, interrupted open/close; glass sampling: phase stability, RGB averaging, overscan edge; blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; thread post: forward/return, stationary frames and edge jitter; spring: 30/60/90/120 Hz, return and teardown passed");
   }
 }

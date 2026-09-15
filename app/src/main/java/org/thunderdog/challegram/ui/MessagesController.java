@@ -222,6 +222,7 @@ import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.ui.camera.CameraAccessImageView;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Test;
+import org.thunderdog.challegram.util.FloatingPlayerGeometry;
 import org.thunderdog.challegram.util.CancellableResultHandler;
 import org.thunderdog.challegram.util.ForumTopicIconModifier;
 import org.thunderdog.challegram.util.HapticMenuHelper;
@@ -453,7 +454,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override public boolean hasFloatingHeader () {
-    return useFloatingChatHeader() && !inTransformMode();
+    return useFloatingChatHeader();
   }
 
   @Override public int getHeaderControlsInset () {
@@ -482,7 +483,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override public boolean hasFloatingPlayer () {
-    return useFloatingChatHeader() && !inTransformMode();
+    return useFloatingChatHeader();
   }
 
   @Override public void invalidateFloatingPlayer () {
@@ -490,7 +491,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private int getFloatingPlayerInset () {
-    return hasFloatingPlayer() && floatingPlayerOffset > 0f ? Math.round(floatingPlayerOffset) + Screen.dp(12f) : 0;
+    return hasFloatingPlayer() ? FloatingPlayerGeometry.inset(floatingPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0;
   }
   private int floatingOverlayTop, glassControlsColor;
   public static int getGlassIconColorId () { return Theme.isDark() ? ColorId.icon : ColorId.text; }
@@ -587,8 +588,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
       if (floatingPlayerView != null) {
         Views.setTopMargin(floatingPlayerView, Math.round(topBar.getTotalVisualHeight() * (savedTabsRoot != null ? 1f - MathUtils.clamp(pagerScrollOffset) : 1f)) + Screen.dp(12f));
-        Views.setLayoutHeight(floatingPlayerView, Math.round(floatingPlayerOffset));
-        floatingPlayerView.setVisibility(hasFloatingPlayer() && floatingPlayerOffset > 0f ? View.VISIBLE : View.GONE);
+        float visibility = FloatingPlayerGeometry.visibility(floatingPlayerOffset, HeaderView.getPlayerSize());
+        Views.setLayoutHeight(floatingPlayerView, HeaderView.getPlayerSize());
+        floatingPlayerView.setAlpha(visibility);
+        floatingPlayerView.setTranslationY(-Screen.dp(8f) * (1f - visibility));
+        floatingPlayerView.setVisibility(hasFloatingPlayer() && visibility > 0f ? View.VISIBLE : View.GONE);
       }
       if (savedTabsRoot != null && pagerContentAdapter != null) {
         for (int i = 0; i < pagerContentAdapter.cachedItems.size(); i++) configureSavedMedia(pagerContentAdapter.cachedItems.valueAt(i));
@@ -910,7 +914,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public View getViewForApplyingOffsets () {
-    return /*pagerContentView != null ? null : */topBar;
+    return hasFloatingPlayer() ? null : topBar;
   }
 
   @Override
@@ -10239,7 +10243,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public int getTopOffset () {
     int total = topBar.getTotalVisualHeight();
     total *= (1f - getSearchTransformFactor());
-    return total + (useFloatingChatHeader() ? getGlassTopExtension() + Screen.dp(6f) + (floatingPlayerOffset > 0f ? Screen.dp(12f) : 0) : 0);
+    return total + (useFloatingChatHeader() ? getGlassTopExtension() + Screen.dp(6f) + FloatingPlayerGeometry.gap(floatingPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0);
   }
 
   public final void onMessagesFrameChanged () {
@@ -12909,6 +12913,26 @@ public class MessagesController extends ViewController<MessagesController.Argume
   @Override
   protected int getHeaderIconColorId () {
     return useFloatingChatHeader() ? getGlassIconColorId() : super.getHeaderIconColorId();
+  }
+
+  @Override
+  protected int getSearchHeaderIconColorId () {
+    return useFloatingChatHeader() ? getGlassIconColorId() : super.getSearchHeaderIconColorId();
+  }
+
+  @Override
+  protected int getSearchTextColorId () {
+    return useFloatingChatHeader() ? ColorId.text : super.getSearchTextColorId();
+  }
+
+  @Override
+  protected int getSelectHeaderIconColorId () {
+    return useFloatingChatHeader() ? getGlassIconColorId() : super.getSelectHeaderIconColorId();
+  }
+
+  @Override
+  protected int getSelectTextColorId () {
+    return useFloatingChatHeader() ? ColorId.text : super.getSelectTextColorId();
   }
 
   @Override

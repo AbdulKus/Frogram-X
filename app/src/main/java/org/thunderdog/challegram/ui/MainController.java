@@ -121,6 +121,7 @@ import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.unsorted.Passcode;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Test;
+import org.thunderdog.challegram.util.FloatingPlayerGeometry;
 import org.thunderdog.challegram.util.AppUpdater;
 import org.thunderdog.challegram.util.FeatureAvailability;
 import org.thunderdog.challegram.util.StringList;
@@ -268,7 +269,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   private void applyListInset (RecyclerView list, ListInsets original) {
     int top = original.top + (hasFloatingHeader() ? getContentTopOverflow() + Screen.dp(6f) +
-      (mainPlayerOffset > 0f ? Math.round(mainPlayerOffset) + Screen.dp(12f) : 0) : 0);
+      FloatingPlayerGeometry.inset(mainPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0);
     if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setGlassOverlay(hasFloatingHeader());
     if (list.getPaddingTop() != top) list.setPadding(list.getPaddingLeft(), top, list.getPaddingRight(), list.getPaddingBottom());
     list.setClipToPadding(hasFloatingHeader() ? false : original.clip);
@@ -283,8 +284,12 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     Views.setLayoutHeight(mainGlassView, extension + Screen.dp(6f));
     for (java.util.Map.Entry<RecyclerView, ListInsets> entry : glassLists.entrySet()) applyListInset(entry.getKey(), entry.getValue());
     Views.setTopMargin(mainPlayerView, Screen.dp(12f));
-    Views.setLayoutHeight(mainPlayerView, Math.round(mainPlayerOffset));
-    mainPlayerView.setVisibility(hasFloatingHeader() && mainPlayerOffset > 0f ? View.VISIBLE : View.GONE);
+    float visibility = FloatingPlayerGeometry.visibility(mainPlayerOffset, HeaderView.getPlayerSize());
+    // Fade a full-size surface: resizing it to 1px draws the border/text as stripes.
+    Views.setLayoutHeight(mainPlayerView, HeaderView.getPlayerSize());
+    mainPlayerView.setAlpha(visibility);
+    mainPlayerView.setTranslationY(-Screen.dp(8f) * (1f - visibility));
+    mainPlayerView.setVisibility(hasFloatingPlayer() && visibility > 0f ? View.VISIBLE : View.GONE);
     invalidateMainGlass();
   }
 
@@ -298,7 +303,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     mainGlassView.setVisibility(enabled ? View.VISIBLE : View.GONE);
     mainGlass.setEnabled(enabled);
     mainPlayerGlass.setEnabled(enabled);
-    if (headerView != null) mainPlayerOffset = headerView.getFilling().getPlayerOffset();
+    if (headerView != null) {
+      mainPlayerOffset = headerView.getFilling().getPlayerOffset();
+      mainPlayerFactor = FloatingPlayerGeometry.visibility(mainPlayerOffset, HeaderView.getPlayerSize());
+    }
     // The classic player moves the entire list/search wrapper. Clear both its
     // translation and reserved margin when switching to an overlaid player.
     mainWrap.setTranslationY(enabled ? 0f : mainPlayerOffset);

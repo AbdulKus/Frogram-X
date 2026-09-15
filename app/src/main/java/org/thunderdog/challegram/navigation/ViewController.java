@@ -1189,6 +1189,8 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   private float lastPlayerFactor;
+  private float lastPlayerOffset;
+  private View lastPlayerOffsetView;
 
   protected int extraBottomInset;
   protected int extraBottomInsetWithoutIme;
@@ -1228,11 +1230,12 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   protected boolean applyPlayerOffset (float factor, float top) {
-    if (lastPlayerFactor == factor) {
+    View view = getViewForApplyingOffsets();
+    if (lastPlayerFactor == factor && lastPlayerOffset == top && lastPlayerOffsetView == view) {
       return false;
     }
-
-    View view = getViewForApplyingOffsets();
+    lastPlayerOffset = top;
+    lastPlayerOffsetView = view;
 
     if (view == null) {
       lastPlayerFactor = factor;

@@ -215,7 +215,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   }
 
   public int getPlayerOffset () {
-    return (int) (HeaderView.getPlayerSize() * showFactor);
+    return Math.round(HeaderView.getPlayerSize() * showFactor);
   }
 
   public void setCollapsed (boolean collapsed) {
@@ -368,11 +368,9 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   public void setRestorePixels (boolean restore, float pixels, int color) {
     this.restoreRect = restore;
-    if (restore) {
-      this.restorePixels = pixels;
-      this.restoreColor = color;
-      invalidate();
-    }
+    this.restorePixels = restore ? pixels : 0f;
+    this.restoreColor = restore ? color : 0;
+    invalidate();
   }
 
   public void restorePixels (float pixels) {
@@ -392,22 +390,11 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   public void draw (@NonNull Canvas c) {
     // Each page keeps its own surface throughout a navigation transition.
     if (headerView.drawFloatingHeaderTransition(c, width, (int) fillingBottom)) return;
-    // A controller that retains floating glass during search/selection also owns
-    // the surface throughout the transform (including the native circular reveal).
-    if (navigationController != null && !navigationController.isAnimating()) {
-      ViewController<?> current = navigationController.getCurrentStackItem();
-      if (current != null && current.inTransformMode() && current.hasFloatingHeader() &&
-          current.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) return;
-    }
-    // Other transforms retain their native surface.
-    if (!restoreRect && fillFactor == 1f && hideFactor == 0f && radiusFactor == 0f &&
-        !headerView.isAnimating() && navigationController != null) {
-      ViewController<?> current = navigationController.getCurrentStackItem();
-      if (current != null && !current.inTransformMode() &&
-          current.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) {
-        return;
-      }
-    }
+    // Surface ownership is independent of legacy popup/reveal animation flags.
+    // In particular, returning from the expanded player must not restore a second bar.
+    ViewController<?> surfaceOwner = navigationController != null ? navigationController.getCurrentStackItem() : null;
+    if (surfaceOwner != null && surfaceOwner.hasFloatingHeader() &&
+        surfaceOwner.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) return;
     if (restoreRect && restorePixels > 0) {
       if (Lang.rtl()) {
         c.drawRect(0, 0, restorePixels, fillingBottom, Paints.fillingPaint(restoreColor));
@@ -457,26 +444,24 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   private void invalidate () {
     // invalidateSelf();
     headerView.invalidate();
-    ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
-    if (current != null) current.invalidateFloatingPlayer();
+    if (navigationController != null) navigationController.invalidateFloatingPlayers();
   }
 
   private void invalidateOngoingBar () {
     // invalidateSelf();
     headerView.invalidate(0, playerTop, width, playerBottom);
-    ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
-    if (current != null) current.invalidateFloatingPlayer();
+    if (navigationController != null) navigationController.invalidateFloatingPlayers();
   }
 
   private boolean drawingFloatingPlayer;
+  private boolean handlingFloatingPlayerTouch;
 
   public void drawFloatingPlayer (Canvas canvas, int surfaceHeight) {
     if (!hasVisibleOngoingBar()) return;
     int save = canvas.save();
-    canvas.translate(0, (surfaceHeight - playerTop - playerBottom) / 2f);
     drawingFloatingPlayer = true;
     try {
-      drawOngoingBar(canvas);
+      drawOngoingBar(canvas, 0, surfaceHeight);
     } finally {
       drawingFloatingPlayer = false;
       canvas.restoreToCount(save);
@@ -484,11 +469,16 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   }
 
   public boolean onFloatingPlayerTouch (MotionEvent event, int surfaceHeight) {
+    if (event.getActionMasked() == MotionEvent.ACTION_DOWN &&
+        (!hasVisibleOngoingBar() || event.getX() < Screen.dp(8f) || event.getX() > width - Screen.dp(8f) ||
+         event.getY() < 0 || event.getY() > surfaceHeight)) return false;
     MotionEvent translated = MotionEvent.obtain(event);
     translated.offsetLocation(0, (playerTop + playerBottom - surfaceHeight) / 2f);
+    handlingFloatingPlayerTouch = true;
     try {
       return helper != null && helper.onTouchEvent(headerView, translated);
     } finally {
+      handlingFloatingPlayerTouch = false;
       translated.recycle();
     }
   }
@@ -504,11 +494,13 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   private void drawOngoingBar (Canvas c) {
     int hide = (int) ((float) HeaderView.getPlayerSize() * hideFactor);
-    int playerTop = this.playerTop - hide;
-    int playerBottom = this.playerBottom - hide;
+    drawOngoingBar(c, this.playerTop - hide, this.playerBottom - hide);
+  }
+
+  private void drawOngoingBar (Canvas c, int playerTop, int playerBottom) {
     float rectWidth;
 
-    if (restoreRect && restorePixels > 0) {
+    if (!drawingFloatingPlayer && restoreRect && restorePixels > 0) {
       rectWidth = width - restorePixels;
     } else {
       rectWidth = width;
@@ -689,7 +681,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   }
 
   private void drawOngoingAudio (Canvas c, int playerTop, float rectWidth, int playerBottom) {
-    if (restoreRect && restorePixels > 0) {
+    if (!drawingFloatingPlayer && restoreRect && restorePixels > 0) {
       c.drawRect(rectWidth, playerTop, width, playerBottom, Paints.fillingPaint(Theme.fillingColor()));
     }
 
@@ -1084,7 +1076,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   private void drawOngoingCall (Canvas c, int playerTop, float rectWidth, int playerBottom) {
     final int backgroundColor = ColorUtils.fromToArgb(Theme.getColor(ColorId.headerBarCallMuted), ColorUtils.fromToArgb(Theme.getColor(ColorId.headerBarCallActive), Theme.getColor(ColorId.headerBarCallIncoming), callIncomingFactor), (1f - callMuteFactor) * callActiveFactor);
-    if (restoreRect && restorePixels > 0) {
+    if (!drawingFloatingPlayer && restoreRect && restorePixels > 0) {
       c.drawRect(rectWidth, playerTop, width, playerBottom, Paints.fillingPaint(backgroundColor));
     }
     final int playerFillingColor = ColorUtils.alphaColor(dropShadowAlpha, backgroundColor);
@@ -1283,7 +1275,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   public boolean needClickAt (View view, float x, float y) {
     touchDownX = x;
     touchDownY = y;
-    return (navigationController == null || !navigationController.isAnimating()) && (showOngoingBar || showFactor != 0f) && dropShadowAlpha != 0f && hideFactor != 1f && !(y < playerTop) && !(y > playerBottom) && !(y <= fillingBottom);
+    return (navigationController == null || !navigationController.isAnimating()) && (showOngoingBar || showFactor != 0f) && dropShadowAlpha != 0f && hideFactor != 1f && !(y < playerTop) && !(y > playerBottom) && (handlingFloatingPlayerTouch || y > fillingBottom);
   }
 
   @Override

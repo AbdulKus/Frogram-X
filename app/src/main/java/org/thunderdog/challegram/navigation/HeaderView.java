@@ -1721,6 +1721,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   }
 
   void applyPreview (ViewController<?> current) {
+    filling.setRestorePixels(false, 0f, 0);
     this.previewOpened = false;
 
     if (shareHeader) {
@@ -2691,6 +2692,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   }
 
   void clearPreview () {
+    filling.setRestorePixels(false, 0f, 0);
     this.previewOpened = false;
     previewItem = null;
     baseItem = null;

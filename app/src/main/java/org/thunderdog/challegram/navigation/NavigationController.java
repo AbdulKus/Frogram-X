@@ -644,7 +644,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   private float currentPlayerOffset;
 
   protected boolean applyPlayerOffset (float factor, float top) {
-    if (currentPlayerFactor != factor) {
+    if (currentPlayerFactor != factor || currentPlayerOffset != top) {
       currentPlayerFactor = factor;
       currentPlayerOffset = top;
       if (childWrappers != null) {
@@ -655,6 +655,12 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
       return true;
     }
     return false;
+  }
+
+  public void invalidateFloatingPlayers () {
+    if (childWrappers != null) {
+      for (ViewController<?> controller : childWrappers) controller.invalidateFloatingPlayer();
+    }
   }
 
   private void prepareHeaderAnimation (ViewController<?> left, ViewController<?> right, boolean forward, int direction, boolean forceRtl) {
