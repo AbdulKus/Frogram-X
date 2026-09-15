@@ -117,7 +117,7 @@ public class MessagesLoader implements Client.ResultHandler {
   private long contextId;
 
   private boolean canShowSponsoredMessage (long chatId) {
-    return tdlib.isChannel(chatId) && !manager.controller().isInForceTouchMode() && !manager.controller().inPreviewMode() && !manager.controller().areScheduledOnly() && !manager.controller().arePinnedMessages();
+    return Config.SPONSORED_MESSAGES_ENABLED && tdlib.isChannel(chatId) && !manager.controller().isInForceTouchMode() && !manager.controller().inPreviewMode() && !manager.controller().areScheduledOnly() && !manager.controller().arePinnedMessages();
   }
 
   public void requestSponsoredMessages (long chatId, RunnableData<TdApi.SponsoredMessages> callback) {

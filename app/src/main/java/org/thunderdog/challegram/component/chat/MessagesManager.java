@@ -1456,7 +1456,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   private void insertExtraSponsoredMessages (List<TGMessage> addedItems, boolean fromTop) {
-    if (sponsoredMessages == null || sponsoredMessages.messages.length == 0 || sponsoredMessages.messagesBetween == 0) {
+    if (!Config.SPONSORED_MESSAGES_ENABLED || sponsoredMessages == null || sponsoredMessages.messages.length == 0 || sponsoredMessages.messagesBetween == 0) {
       return;
     }
 
@@ -1532,7 +1532,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   private void insertFirstSponsoredMessageImpl () {
-    if (sponsoredMessages == null || sponsoredMessages.messages.length == 0 || loader.canLoadBottom()) {
+    if (!Config.SPONSORED_MESSAGES_ENABLED || sponsoredMessages == null || sponsoredMessages.messages.length == 0 || loader.canLoadBottom()) {
       return;
     }
 
@@ -1559,6 +1559,9 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   private void checkSponsoredMessages () {
+    if (!Config.SPONSORED_MESSAGES_ENABLED) {
+      return;
+    }
     if (sponsoredContext != null) {
       insertFirstSponsoredMessage();
       return;
