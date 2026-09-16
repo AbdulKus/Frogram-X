@@ -352,12 +352,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   private View topGlassView;
   private FrameLayoutFix savedTabsRoot;
+  private FrameLayoutFix savedTopBarOverlay;
+  private RelativeLayout.LayoutParams savedTopBarLayoutParams;
+  private int savedTopBarChildIndex;
   private final int[] savedRootPosition = new int[2], savedSourcePosition = new int[2];
   private final Runnable savedGlassInvalidation = this::invalidateChatGlass;
 
   private void configureSavedMedia (SharedBaseController<?> controller) {
     int overflow = useFloatingChatHeader() ? getGlassTopExtension() : 0;
-    controller.setSavedHeaderInsets(overflow, overflow > 0 ? overflow + Screen.dp(6f) + getFloatingPlayerInset() : 0,
+    controller.setSavedHeaderInsets(overflow, overflow > 0 ? overflow + getTopBarSurfaceHeight() + Screen.dp(6f) + getFloatingPlayerInset() : 0,
       overflow > 0 ? savedGlassInvalidation : null);
   }
 
@@ -405,7 +408,42 @@ public class MessagesController extends ViewController<MessagesController.Argume
       savedTabsRoot.addView(floatingPlayerView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
       playerGlass.setBackdrop(savedTabsRoot, this::drawSavedBackdrop);
     }
+    updateSavedTopBarParent();
     updateFloatingInsets();
+  }
+
+  private int getTopBarSurfaceHeight () {
+    if (topBar == null) return 0;
+    float visibility = savedTabsRoot != null ? 1f - MathUtils.clamp(pagerScrollOffset) : 1f;
+    return Math.round(topBar.getTotalVisualHeight() * visibility);
+  }
+
+  private void updateSavedTopBarParent () {
+    if (savedTabsRoot == null || topBar == null) return;
+    if (useFloatingChatHeader()) {
+      if (savedTopBarOverlay == null) {
+        // Keep interactive rows above the common glass, with their own bounded
+        // viewport. A full-screen overlay would intercept the other saved tabs.
+        savedTopBarOverlay = new FrameLayoutFix(context());
+        savedTopBarOverlay.setClipChildren(true);
+        savedTopBarOverlay.setClipToPadding(true);
+        int playerIndex = savedTabsRoot.indexOfChild(floatingPlayerView);
+        savedTabsRoot.addView(savedTopBarOverlay, playerIndex >= 0 ? playerIndex : savedTabsRoot.getChildCount(),
+          FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+      }
+      if (topBar.getParent() == contentView) {
+        savedTopBarChildIndex = contentView.indexOfChild(topBar);
+        savedTopBarLayoutParams = new RelativeLayout.LayoutParams((RelativeLayout.LayoutParams) topBar.getLayoutParams());
+        contentView.removeView(topBar);
+        FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, topBar.getTotalVisualHeight());
+        params.leftMargin = params.rightMargin = Screen.dp(8f);
+        savedTopBarOverlay.addView(topBar, params);
+      }
+    } else if (savedTopBarOverlay != null && topBar.getParent() == savedTopBarOverlay) {
+      savedTopBarOverlay.removeView(topBar);
+      contentView.addView(topBar, Math.min(savedTopBarChildIndex, contentView.getChildCount()), savedTopBarLayoutParams);
+      savedTopBarOverlay.setVisibility(View.GONE);
+    }
   }
 
   private FrameLayoutFix videoLayer;
@@ -568,6 +606,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     updatingFloatingInsets = true;
     try {
       int header = useFloatingChatHeader() ? getGlassTopExtension() : 0;
+      int barsHeight = getTopBarSurfaceHeight();
       contentView.setTopOverflow(header);
       // The thread preview overlays the post. Its animation must not move the list
       // that determines whether that same post has scrolled out of view.
@@ -579,15 +618,20 @@ public class MessagesController extends ViewController<MessagesController.Argume
       if (topGlassView != null) {
         // Include the status bar in the backdrop, but keep the island below it.
         Views.setTopMargin(topGlassView, -header);
-        int barsHeight = Math.round(topBar.getTotalVisualHeight() * (savedTabsRoot != null ? 1f - MathUtils.clamp(pagerScrollOffset) : 1f));
         Views.setLayoutHeight(topGlassView, header + barsHeight + Screen.dp(6f));
         Views.setTopMargin(messagesView, -header);
         if (videoLayer != null) Views.setTopMargin(videoLayer, -header);
         Views.setTopMargin(wallpaperView, -header);
         topGlassView.invalidate();
       }
+      if (savedTopBarOverlay != null && topBar.getParent() == savedTopBarOverlay) {
+        Views.setLayoutHeight(topBar, topBar.getTotalVisualHeight());
+        Views.setLayoutHeight(savedTopBarOverlay, barsHeight);
+        savedTopBarOverlay.setAlpha(1f - MathUtils.clamp(pagerScrollOffset));
+        savedTopBarOverlay.setVisibility(barsHeight > 0 ? View.VISIBLE : View.GONE);
+      }
       if (floatingPlayerView != null) {
-        Views.setTopMargin(floatingPlayerView, Math.round(topBar.getTotalVisualHeight() * (savedTabsRoot != null ? 1f - MathUtils.clamp(pagerScrollOffset) : 1f)) + Screen.dp(12f));
+        Views.setTopMargin(floatingPlayerView, barsHeight + Screen.dp(12f));
         float visibility = FloatingPlayerGeometry.visibility(floatingPlayerOffset, HeaderView.getPlayerSize());
         Views.setLayoutHeight(floatingPlayerView, HeaderView.getPlayerSize());
         floatingPlayerView.setAlpha(visibility);
@@ -673,7 +717,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
     messagesView.setClipToPadding(!(floatingHeader || enabled));
     messagesView.setTranslationY(enabled ? 0f : -getReplyOffset() - getAttachedFilesOffset() - getKeyboardOffset());
 
-    RelativeLayout.LayoutParams topParams = (RelativeLayout.LayoutParams) topBar.getLayoutParams();
+    updateSavedTopBarParent();
+    ViewGroup.MarginLayoutParams topParams = (ViewGroup.MarginLayoutParams) topBar.getLayoutParams();
     topParams.leftMargin = topParams.rightMargin = floatingHeader ? Screen.dp(8f) : 0;
     topBar.setLayoutParams(topParams);
     topBar.setTranslationY(floatingHeader ? 0f : floatingPlayerOffset);
@@ -10241,8 +10286,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   public int getTopOffset () {
+    // CollapseListView already applies the search visibility to each row.
     int total = topBar.getTotalVisualHeight();
-    total *= (1f - getSearchTransformFactor());
     return total + (useFloatingChatHeader() ? getGlassTopExtension() + Screen.dp(6f) + FloatingPlayerGeometry.gap(floatingPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0);
   }
 

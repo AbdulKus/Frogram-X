@@ -1225,7 +1225,9 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
 
   @SuppressWarnings("deprecation")
   private void drawControllerSurface (Canvas canvas, ViewController<?> controller, ViewController<?> covering, int width, int height) {
-    if (controller == null) return;
+    // Popup controllers (including PlaybackController) draw their own header
+    // inside their content. Match the settled state while they animate, too.
+    if (controller == null || controller.usePopupMode()) return;
     View view = controller.getValue();
     view.getLocationInWindow(surfaceLocation);
     getLocationInWindow(headerLocation);

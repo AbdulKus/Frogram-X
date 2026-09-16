@@ -406,11 +406,13 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
 
   @Override
   protected void onLayout (boolean changed, int l, int t, int r, int b) {
-    l += getPaddingLeft();
-    r -= getPaddingRight();
-    showAllButton.layout(l, b - Screen.dp(36f), r, b);
-    recyclerView.layout(l, t, r, getRecyclerHeight());
-    collapseButton.layout(r - collapseButton.getMeasuredWidth(), b - collapseButton.getMeasuredHeight(), r, b);
+    // Children use local coordinates, regardless of this bar's parent offset.
+    int left = getPaddingLeft();
+    int right = getWidth() - getPaddingRight();
+    int bottom = getHeight();
+    showAllButton.layout(left, bottom - Screen.dp(36f), right, bottom);
+    recyclerView.layout(left, 0, right, getRecyclerHeight());
+    collapseButton.layout(right - collapseButton.getMeasuredWidth(), bottom - collapseButton.getMeasuredHeight(), right, bottom);
   }
 
   private void updateContentInset (MessagePreviewView view, int position) {
