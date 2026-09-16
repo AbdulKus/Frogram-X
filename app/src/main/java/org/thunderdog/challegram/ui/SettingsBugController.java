@@ -479,11 +479,21 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
     b.append("Frogram X push diagnostics\n");
     b.append("App: ").append(BuildConfig.VERSION_NAME).append(" (").append(BuildConfig.VERSION_CODE).append(")\n");
     b.append("Package: ").append(context.getPackageName()).append('\n');
+    b.append("Telegram API ID: ").append(BuildConfig.TELEGRAM_API_ID).append('\n');
     b.append("Token state: ").append(getPushTokenStateSummary()).append('\n');
+    TdApi.DeviceToken deviceToken = tdlib.context().getToken();
+    if (deviceToken instanceof TdApi.DeviceTokenFirebaseCloudMessaging) {
+      TdApi.DeviceTokenFirebaseCloudMessaging fcm = (TdApi.DeviceTokenFirebaseCloudMessaging) deviceToken;
+      b.append("Firebase identifier length: ").append(fcm.token != null ? fcm.token.length() : 0).append('\n');
+    }
     b.append("TDLib registration: ").append(getPushRegistrationSummary()).append('\n');
+    b.append("Registration confirms token acceptance, not push delivery.\n");
     b.append("Packages received: ").append(settings.getPushMessageStats()).append('\n');
 
     long receivedTime = settings.getLastReceivedPushMessageReceivedTime();
+    if (receivedTime == 0) {
+      b.append("Delivery: NOT VERIFIED (no push recorded). Check the Telegram app's FCM server credentials and Firebase project.\n");
+    }
     b.append("Last push received: ");
     b.append(receivedTime != 0 ? Lang.getTimestamp(receivedTime, TimeUnit.MILLISECONDS) : "No data");
     b.append('\n');
@@ -494,6 +504,8 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
     }
     b.append("Last push TTL: ").append(settings.getLastReceivedPushMessageTtl()).append('\n');
     b.append("Push service: ").append(TdlibNotificationUtils.getDeviceTokenRetriever().name).append('\n');
+    b.append("Push configuration: ").append(TdlibNotificationUtils.getDeviceTokenRetriever().getConfiguration()).append('\n');
+    b.append("Telegram sender credentials: configured outside the APK; cannot be verified by this report.\n");
     b.append("App fingerprint: ").append(U.getApkFingerprint("SHA1")).append("\n\n");
     b.append(tgx.bridge.PushDiagnostics.report());
     return b.toString();
@@ -1303,7 +1315,7 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
           adapter.updateValuedSettingById(R.id.btn_secret_pushRegistration);
           adapter.updateValuedSettingById(R.id.btn_secret_pushDiagnostics);
         }
-        UI.showToast(success ? "Push re-registration completed" : "Push re-registration failed. See diagnostics.", Toast.LENGTH_SHORT);
+        UI.showToast(success ? "Token refreshed; TDLib registration requested" : "Push re-registration failed. See diagnostics.", Toast.LENGTH_SHORT);
       }));
     } else if (viewId == R.id.btn_secret_pushClear) {
       tgx.bridge.PushDiagnostics.initialize(context);
