@@ -1074,6 +1074,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
   private SearchEditTextDelegate searchHeaderView;
 
+  final boolean isSearchHeader (View view) {
+    return searchHeaderView != null && searchHeaderView.view() == view;
+  }
+
   protected void modifySearchHeaderView (HeaderEditText headerEditText) {
     // called only once
   }
@@ -1141,6 +1145,11 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
       searchHeaderView.view().setLayoutParams(params);
 
       modifySearchHeaderView(searchHeaderView.editView());
+      if (hasFloatingHeader()) {
+        HeaderEditText editText = searchHeaderView.editView();
+        editText.setPadding(editText.getPaddingLeft(), 0, editText.getPaddingRight(), 0);
+        editText.setIncludeFontPadding(false);
+      }
     }
     return searchHeaderView;
   }

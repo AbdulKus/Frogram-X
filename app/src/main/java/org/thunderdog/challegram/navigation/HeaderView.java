@@ -257,10 +257,10 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset() + controlsInset(stack != null ? stack.getCurrent() : null));
       }
       if (title != textTitle) {
-        dispatchOffset(title);
+        dispatchOffset(title, getBaseController());
       }
       if (preview != null && preview != textPreview) {
-        dispatchOffset(preview);
+        dispatchOffset(preview, getPreviewController());
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
         invalidateOutline();
@@ -270,6 +270,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       } else {
         setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, Size.getMaximumHeaderSize() + getEffectiveTopOffset() + filling.getExtraHeight() + Size.getHeaderPortraitSize(), Gravity.TOP));
       }
+      updateControlInsets();
       // requestLayout();
     }
   }
@@ -424,9 +425,15 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   }
 
   @Override
+  protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
+    // Child geometry must be final before measuring, including the first search frame.
+    updateControlInsets();
+    super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+  }
+
+  @Override
   protected void onLayout (boolean changed, int left, int top, int right, int bottom) {
     super.onLayout(changed, left, top, right, bottom);
-    updateControlInsets();
     if (changed) {
       filling.layout(getMeasuredWidth(), (int) height, getHeightFactor());
       invalidate();
@@ -1198,19 +1205,52 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     return controller != null ? controller.getHeaderControlsInset() : 0;
   }
 
+  private static int startControlsInset (ViewController<?> controller) {
+    return controller != null && controller.hasFloatingHeader() ? Screen.dp(6f) : 0;
+  }
+
+  private static int endControlsInset (ViewController<?> controller) {
+    return controller != null && controller.hasFloatingHeader() ? Screen.dp(10f) : 0;
+  }
+
+  private ViewController<?> getBaseController () {
+    return previewOpened ? (baseItem != null ? baseItem : previewItem) : stack != null ? stack.getCurrent() : null;
+  }
+
+  private ViewController<?> getPreviewController () {
+    // A search/select transformation has one controller and two header views.
+    return previewOpened ? (previewItem != null ? previewItem : baseItem) : null;
+  }
+
   private void updateControlInsets () {
-    ViewController<?> current = stack != null ? stack.getCurrent() : null;
-    ViewController<?> baseController = previewOpened ? baseItem : current;
+    updateControlInsets(getBaseController(), getPreviewController(), previewOpened ? (translateForward ? 1f - translationFactor : translationFactor) : 0f);
+  }
+
+  private void updateControlInsets (ViewController<?> baseController, ViewController<?> previewController, float progress) {
     int base = controlsInset(baseController);
-    int next = controlsInset(previewItem);
-    float progress = previewOpened ? (translateForward ? 1f - translationFactor : translationFactor) : 0f;
-    Views.setTopMargin(backButton, getEffectiveTopOffset() + Math.round(base + (next - base) * progress));
-    Views.setTopMargin(menu, getEffectiveTopOffset() + base);
-    Views.setTopMargin(menuPreview, getEffectiveTopOffset() + next);
+    int next = controlsInset(previewController);
+    int start = Math.round(startControlsInset(baseController) + (startControlsInset(previewController) - startControlsInset(baseController)) * progress);
+    setControlMargins(backButton, start, getEffectiveTopOffset() + Math.round(base + (next - base) * progress), 0);
+    setControlMargins(menu, 0, getEffectiveTopOffset() + base, endControlsInset(baseController));
+    setControlMargins(menuPreview, 0, getEffectiveTopOffset() + next, endControlsInset(previewController));
     if (title == textTitle) Views.setTopMargin(title, Screen.dp(15f) + getCurrentHeaderOffset() + base);
-    else if (title != null && baseController != null && baseController.inSearchMode()) Views.setTopMargin(title, getCurrentHeaderOffset() + base);
+    else updateSearchInsets(title, baseController);
     if (preview == textPreview && preview != null) Views.setTopMargin(preview, Screen.dp(15f) + getCurrentHeaderOffset() + next);
-    else if (preview != null && previewItem != null && previewItem.inSearchMode()) Views.setTopMargin(preview, getCurrentHeaderOffset() + next);
+    else updateSearchInsets(preview, previewController);
+  }
+
+  private static void setControlMargins (View view, int start, int top, int end) {
+    if (view != null && Views.setMargins(view, Lang.rtl() ? end : start, top, Lang.rtl() ? start : end, 0)) {
+      Views.updateLayoutParams(view);
+    }
+  }
+
+  private void updateSearchInsets (View view, ViewController<?> controller) {
+    // Match the cached search view itself, never the controller's changing mode.
+    // Custom search wrappers manage their child geometry and offsets themselves.
+    if (view instanceof HeaderEditText && controller != null && controller.isSearchHeader(view)) {
+      setControlMargins(view, Screen.dp(68f) + startControlsInset(controller), getCurrentHeaderOffset() + controlsInset(controller), Screen.dp(49f) + endControlsInset(controller));
+    }
   }
 
   private final int[] surfaceLocation = new int[2], headerLocation = new int[2];
@@ -1268,9 +1308,9 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     int top = Screen.dp(15f) + currentHeaderOffset + controlsInset(item);
     if (item.getBackButton() != BackHeaderButton.TYPE_NONE) {
       if (Lang.rtl()) {
-        updated = Views.setMargins((FrameLayout.LayoutParams) textTitle.getLayoutParams(), menuWidth, top, Screen.dp(68f), 0);
+        updated = Views.setMargins((FrameLayout.LayoutParams) textTitle.getLayoutParams(), menuWidth + endControlsInset(item), top, Screen.dp(68f) + startControlsInset(item), 0);
       } else {
-        updated = Views.setMargins((FrameLayout.LayoutParams) textTitle.getLayoutParams(), Screen.dp(68f), top, menuWidth, 0);
+        updated = Views.setMargins((FrameLayout.LayoutParams) textTitle.getLayoutParams(), Screen.dp(68f) + startControlsInset(item), top, menuWidth + endControlsInset(item), 0);
       }
     } else {
       if (Lang.rtl()) {
@@ -1283,7 +1323,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       Views.updateLayoutParams(textTitle);
   }
 
-  private void dispatchOffset (View view) {
+  private void dispatchOffset (View view, ViewController<?> controller) {
     int headerOffset = getCurrentHeaderOffset();
     if (view instanceof OffsetChangeListener) {
       ((OffsetChangeListener) view).onHeaderOffsetChanged(this, headerOffset);
@@ -1291,6 +1331,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       Views.setTopMargin(view, Screen.dp(15f) + headerOffset);
     } else {
       Views.setTopMargin(view, headerOffset);
+      updateSearchInsets(view, controller);
     }
   }
 
@@ -1303,7 +1344,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       Views.setMediumText(textTitle, item.getName());
       newTitle = textTitle;
     } else {
-      dispatchOffset(newTitle);
+      dispatchOffset(newTitle, item);
     }
 
     if (title != null && title != newTitle) {
@@ -1357,7 +1398,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       Views.setMediumText(textPreview, previewItem.getName());
       preview = textPreview;
     } else {
-      dispatchOffset(preview);
+      dispatchOffset(preview, getPreviewController());
     }
 
     if (preview != title) {
@@ -1774,6 +1815,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
 
     previewItem = null;
     baseItem = null;
+    updateControlInsets(current, null, 0f);
   }
 
   // Transformation
@@ -2220,6 +2262,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     }
 
     item.executeAnimationReadyListeners();
+    updateControlInsets(item, null, 0f);
   }
 
   private float currentX, currentY;
