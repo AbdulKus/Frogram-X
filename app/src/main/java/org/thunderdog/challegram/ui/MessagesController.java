@@ -10289,7 +10289,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public int getTopOffset () {
     // CollapseListView already applies the search visibility to each row.
     int total = topBar.getTotalVisualHeight();
-    return useFloatingChatHeader() ? floatingOverlayTop : total;
+    // Date and media overlays add the player's translation themselves. Message
+    // jumps use RecyclerView padding, which already includes the whole player.
+    return useFloatingChatHeader() ? Math.max(0, floatingOverlayTop - Math.round(floatingPlayerOffset)) : total;
   }
 
   public final void onMessagesFrameChanged () {
