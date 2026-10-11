@@ -3000,7 +3000,8 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   public int getTargetHeight () {
-    return org.thunderdog.challegram.util.ChatViewport.height(getRecyclerHeight(), Math.max(manager.getPaddingTop(), controller.getTopOffset()), 0);
+    int top = controller.hasFloatingHeader() ? manager.getPaddingTop() : controller.getTopOffset();
+    return org.thunderdog.challegram.util.ChatViewport.height(getRecyclerHeight(), top, 0);
   }
 
   public int getRecyclerWidth () {
