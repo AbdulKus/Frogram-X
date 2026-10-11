@@ -59,6 +59,7 @@ public class OverlayButtonWrap extends FrameLayoutFix implements View.OnClickLis
 
   private Callback callback;
   private CircleButton mainButton;
+  private boolean glassMode;
   // private int rowsCount;
   private final FactorAnimator animator;
 
@@ -72,6 +73,7 @@ public class OverlayButtonWrap extends FrameLayoutFix implements View.OnClickLis
   }
 
   public void initWithList (final @NonNull ViewController<?> parent, int overlayColorId, int overlayIconColorId, int[] ids, int[] resources, int[] backgrounds, int[] colors, int[] items, boolean reverse) {
+    glassMode = parent instanceof org.thunderdog.challegram.ui.MainController;
     if (reverse) {
       for (int i = ids.length - 1, j = 0; i >= 1; i--, j++) {
         addButton(parent, j, ids[i], resources[i], backgrounds[i], colors[i], items[i - 1]);
@@ -111,9 +113,17 @@ public class OverlayButtonWrap extends FrameLayoutFix implements View.OnClickLis
     button.setId(id);
     button.setOnClickListener(this);
     button.setLayoutParams(params);
+    applyGlass(parent, button);
     parent.addThemeInvalidateListener(button);
 
     addView(mainButton = button);
+  }
+
+  private void applyGlass (ViewController<?> parent, View host) {
+    if (!glassMode) return;
+    org.thunderdog.challegram.widget.ChatGlassDrawable glass = ((org.thunderdog.challegram.ui.MainController) parent).createComposeGlass(host);
+    if (host instanceof CircleButton) ((CircleButton) host).setGlassDrawable(glass);
+    else host.setBackground(glass);
   }
 
   public void updateRtl () {
@@ -158,15 +168,18 @@ public class OverlayButtonWrap extends FrameLayoutFix implements View.OnClickLis
         return !(e.getAction() == MotionEvent.ACTION_DOWN && getAlpha() == 0f) && super.onTouchEvent(e);
       }
     };
-    text.setTextColor(Theme.textDecentColor());
-    parent.addThemeTextDecentColorListener(text);
-    RippleSupport.setRectBackground(text, 3f, 4f, ColorId.filling);
+    text.setTextColor(glassMode ? Theme.textAccentColor() : Theme.textDecentColor());
+    if (glassMode) parent.addThemeTextColorListener(text, ColorId.text);
+    else parent.addThemeTextDecentColorListener(text);
+    if (glassMode) applyGlass(parent, text);
+    else RippleSupport.setRectBackground(text, 3f, 4f, ColorId.filling);
     parent.addThemeInvalidateListener(text);
     text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f);
     text.setTypeface(Fonts.getRobotoBold());
     text.setSingleLine(true);
+    text.setGravity(Gravity.CENTER);
     text.setEllipsize(TextUtils.TruncateAt.END);
-    text.setPadding(Screen.dp(8f) + padding, Screen.dp(2.5f) + padding, Screen.dp(8f) + padding, padding);
+    text.setPadding(Screen.dp(12f), padding, Screen.dp(12f), padding);
     text.setOnClickListener(this);
     return text;
   }
@@ -185,6 +198,7 @@ public class OverlayButtonWrap extends FrameLayoutFix implements View.OnClickLis
     CircleButton circleButton;
     circleButton = new CircleButton(getContext());
     circleButton.init(resource, 40f, 4f, background, colorId);
+    applyGlass(parent, circleButton);
     button = circleButton;
     /* else {
       AvatarView avatarView = new AvatarView(getContext());
@@ -280,7 +294,7 @@ public class OverlayButtonWrap extends FrameLayoutFix implements View.OnClickLis
       return;
     }
     isOpen = !isOpen;
-    if (Views.HARDWARE_LAYER_ENABLED) {
+    if (Views.HARDWARE_LAYER_ENABLED && !glassMode) {
       if (isOpen && animator.getFactor() == 0f) {
         setChildrenLayerType(LAYER_TYPE_HARDWARE);
       }

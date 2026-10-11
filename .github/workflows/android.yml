@@ -54,10 +54,12 @@ jobs:
             app/src/main/java/org/thunderdog/challegram/util/FloatingPlayerGeometry.java \
             app/src/main/java/org/thunderdog/challegram/util/GlassFrameCache.java \
             app/src/main/java/org/thunderdog/challegram/util/GlassSampling.java \
+            app/src/main/java/org/thunderdog/challegram/util/ChatViewport.java \
             app/src/main/java/org/thunderdog/challegram/util/ThreadHeaderVisibility.java \
             app/src/main/java/org/thunderdog/challegram/util/DampedSpring.java \
-            tests/graphics/GlassMathTest.java
+            tests/graphics/GlassMathTest.java tests/graphics/ChatViewportTest.java
           java -cp "$RUNNER_TEMP/glass-tests" GlassMathTest
+          java -cp "$RUNNER_TEMP/glass-tests" ChatViewportTest
 
   build:
     name: Latest ARM64 APK

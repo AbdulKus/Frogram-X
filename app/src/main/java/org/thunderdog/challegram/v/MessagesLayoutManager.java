@@ -31,22 +31,43 @@ public class MessagesLayoutManager extends LinearLayoutManager {
   private final Context context;
   private MessagesManager manager;
   private boolean pendingScroll;
+  private int pendingPosition;
+  private java.util.function.IntSupplier pendingOffset;
 
   public boolean hasPendingScroll () { return pendingScroll; }
 
   @Override public void scrollToPosition (int position) {
+    pendingOffset = null;
     pendingScroll = true;
     super.scrollToPosition(position);
   }
 
   @Override public void scrollToPositionWithOffset (int position, int offset) {
+    pendingOffset = null;
     pendingScroll = true;
     super.scrollToPositionWithOffset(position, offset);
+  }
+
+  public void scrollToPositionWithOffset (int position, java.util.function.IntSupplier offset) {
+    pendingScroll = true;
+    pendingPosition = position;
+    pendingOffset = offset;
+    super.scrollToPositionWithOffset(position, offset.getAsInt());
+  }
+
+  @Override public void onLayoutChildren (RecyclerView.Recycler recycler, RecyclerView.State state) {
+    if (pendingOffset != null && !state.isPreLayout()) {
+      // The composer/IME may be measured after a history request. Resolve the
+      // target against the final viewport before the first visible frame.
+      super.scrollToPositionWithOffset(pendingPosition, pendingOffset.getAsInt());
+    }
+    super.onLayoutChildren(recycler, state);
   }
 
   @Override public void onLayoutCompleted (RecyclerView.State state) {
     super.onLayoutCompleted(state);
     pendingScroll = false;
+    pendingOffset = null;
   }
 
   public MessagesLayoutManager (Context context, int orientation, boolean reverseLayout) {
@@ -66,7 +87,8 @@ public class MessagesLayoutManager extends LinearLayoutManager {
         // Glass needs the rows under the islands and just outside its blur kernel.
         // Recycling at the padded viewport edge makes their reflections pop out.
         extraLayoutSpace[0] = Math.max(extraLayoutSpace[0], recycler.getPaddingTop() + Screen.dp(48f));
-        extraLayoutSpace[1] = Math.max(extraLayoutSpace[1], recycler.getPaddingBottom() + Screen.dp(48f));
+        // Do not bind/decode a keyboard's worth of offscreen media every frame.
+        extraLayoutSpace[1] = Math.max(extraLayoutSpace[1], Math.min(recycler.getPaddingBottom(), manager.controller().getGlassBottomOverscan()) + Screen.dp(48f));
       }
     }
   }

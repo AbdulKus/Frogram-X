@@ -93,7 +93,7 @@ public class InlineResultsWrap extends FrameLayoutFix implements View.OnClickLis
 
   private void updateSurface () {
     MessagesController controller = offsetProvider == null && !adapter.useDarkMode() &&
-      org.thunderdog.challegram.unsorted.Settings.instance().useNewChatSuggestions() ? findMessagesController() : null;
+      findMessagesController();
     if (controller == glassController && (controller != null || recyclerView.getPaddingLeft() == 0)) return;
     if (glass != null) glass.release();
     glassController = controller;

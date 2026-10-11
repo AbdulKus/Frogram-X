@@ -184,7 +184,8 @@ public class Settings {
   private static final int VERSION_46 = 46; // Remove folders experimental setting
   private static final int VERSION_47 = 47; // Force reset released features list
   private static final int VERSION_48 = 48; // Force strong sensor, if user has it.
-  private static final int VERSION = VERSION_48;
+  private static final int VERSION_49 = 49; // Remove retired Frogram UI switches
+  private static final int VERSION = VERSION_49;
 
   private static final AtomicBoolean hasInstance = new AtomicBoolean(false);
   private static volatile Settings instance;
@@ -975,41 +976,6 @@ public class Settings {
   public void putFloat (String key, float value) {
     pmc.putFloat(key, value).apply();
   }
-
-  private Boolean newMainHeader, newChatHeader, newChatInput, newChatMenu, newChatSuggestions, newChatActions;
-
-  public boolean useNewMainHeader () {
-    return newMainHeader != null ? newMainHeader : (newMainHeader = getBoolean("frogram_ui_main_header", true));
-  }
-
-  public void setUseNewMainHeader (boolean enabled) {
-    putBoolean("frogram_ui_main_header", newMainHeader = enabled);
-  }
-
-  public boolean useNewChatHeader () {
-    return newChatHeader != null ? newChatHeader : (newChatHeader = getBoolean("frogram_ui_chat_header", true));
-  }
-
-  public void setUseNewChatHeader (boolean enabled) {
-    putBoolean("frogram_ui_chat_header", newChatHeader = enabled);
-  }
-
-  public boolean useNewChatInput () {
-    return newChatInput != null ? newChatInput : (newChatInput = getBoolean("frogram_ui_chat_input", true));
-  }
-
-  public void setUseNewChatInput (boolean enabled) {
-    putBoolean("frogram_ui_chat_input", newChatInput = enabled);
-  }
-
-  public boolean useNewChatMenu () { return newChatMenu != null ? newChatMenu : (newChatMenu = getBoolean("frogram_ui_chat_menu", true)); }
-  public void setUseNewChatMenu (boolean enabled) { putBoolean("frogram_ui_chat_menu", newChatMenu = enabled); }
-
-  public boolean useNewChatSuggestions () { return newChatSuggestions != null ? newChatSuggestions : (newChatSuggestions = getBoolean("frogram_ui_chat_suggestions", true)); }
-  public void setUseNewChatSuggestions (boolean enabled) { putBoolean("frogram_ui_chat_suggestions", newChatSuggestions = enabled); }
-
-  public boolean useNewChatActions () { return newChatActions != null ? newChatActions : (newChatActions = getBoolean("frogram_ui_chat_actions", true)); }
-  public void setUseNewChatActions (boolean enabled) { putBoolean("frogram_ui_chat_actions", newChatActions = enabled); }
 
   public void putBoolean (String key, boolean value) {
     pmc.putBoolean(key, value);
@@ -2244,6 +2210,10 @@ public class Settings {
         // No features were officially available before VERSION_46.
         // Reset just once in VERSION_47 right prior to stable release.
         editor.putLong(KEY_FEATURES, 0);
+        break;
+      }
+      case VERSION_49: {
+        pmc.removeByPrefix("frogram_ui_");
         break;
       }
       case VERSION_48: {

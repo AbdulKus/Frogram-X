@@ -952,7 +952,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     long totalScrollBottom = 0;
     View view = manager.findViewByPosition(firstVisibleItemPosition);
     if (view != null) {
-      totalScrollBottom = view.getBottom() - manager.getHeight();
+      totalScrollBottom = view.getBottom() - (manager.getHeight() - manager.getPaddingBottom());
     }
 
     int i = 0;
@@ -2614,6 +2614,12 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     if (!isFocused) {
       return;
     }
+    // Measurement still exposes children from the previous viewport. Saving
+    // them during an IME resize or before a pending jump corrupts restoration.
+    if ((manager instanceof org.thunderdog.challegram.v.MessagesLayoutManager &&
+        ((org.thunderdog.challegram.v.MessagesLayoutManager) manager).hasPendingScroll()) || controller.getMessagesView().isLayoutRequested()) {
+      return;
+    }
 
     int firstVisibleItemPosition = manager.findFirstVisibleItemPosition();
     int lastVisibleItemPosition = manager.findLastVisibleItemPosition();
@@ -2982,9 +2988,9 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   // Delegate
 
   public int getRecyclerHeight () {
-    int height = manager.getHeight();
+    int height = controller.getMessagesView().getMeasuredHeight();
     if (height != 0) {
-      return Math.max(0, height - controller.getFloatingBottomInset());
+      return Math.max(0, height - manager.getPaddingBottom());
     }
     return controller.makeGuessAboutHeight();
   }
@@ -2994,7 +3000,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   public int getTargetHeight () {
-    return getRecyclerHeight() - controller.getTopOffset();
+    return org.thunderdog.challegram.util.ChatViewport.height(getRecyclerHeight(), Math.max(manager.getPaddingTop(), controller.getTopOffset()), 0);
   }
 
   public int getRecyclerWidth () {
@@ -3022,11 +3028,11 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     long totalScrollBottom = 0;
     View view = manager.findViewByPosition(firstVisibleItemPosition);
     if (view != null) {
-      totalScrollBottom = view.getBottom() - manager.getHeight();
+      totalScrollBottom = view.getBottom() - (manager.getHeight() - manager.getPaddingBottom());
     }
 
     long desiredScrollBottom = -offset;
-    long maxScrollBottom = -manager.getHeight();
+    long contentHeight = 0;
 
     int i = 0;
     int messageCount = adapter.getMessageCount();
@@ -3044,18 +3050,11 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       if (i < index) {
         desiredScrollBottom += messageHeight;
       }
-      maxScrollBottom += messageHeight;
+      contentHeight += messageHeight;
       i++;
     }
 
-    if (maxScrollBottom > 0) {
-      desiredScrollBottom = Math.max(0, Math.min(maxScrollBottom, desiredScrollBottom));
-      if (desiredScrollBottom != totalScrollBottom) {
-        return (int) (totalScrollBottom - desiredScrollBottom);
-      }
-    }
-
-    return 0;
+    return org.thunderdog.challegram.util.ChatViewport.scrollBy(totalScrollBottom, desiredScrollBottom, contentHeight, getTargetHeight());
   }
 
   private void scrollToPositionWithOffset (final int index, final int offset, boolean smooth) {
@@ -3077,6 +3076,15 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     }
   }
 
+  private void scrollToViewportOffset (int index, java.util.function.IntSupplier offset, boolean smooth, boolean roundVideo) {
+    if ((!smooth || controller.getMessagesView().isLayoutRequested()) && manager instanceof org.thunderdog.challegram.v.MessagesLayoutManager) {
+      stopScroll();
+      ((org.thunderdog.challegram.v.MessagesLayoutManager) manager).scrollToPositionWithOffset(index, offset);
+    } else {
+      scrollToPositionWithOffset(index, offset.getAsInt(), smooth, roundVideo);
+    }
+  }
+
   private void scrollToHistoryStart () {
     int messageCount = adapter.getMessageCount();
     if (messageCount == 0)
@@ -3092,7 +3100,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     if (messageThread != null) {
       int targetHeight = getTargetHeight();
       if (FeatureToggles.SCROLL_TO_HEADER_MESSAGE_ON_THREAD_FIRST_OPEN && isTopMessageHeader) {
-        scrollToPositionWithOffsetImpl(messageCount - 1, targetHeight / 2);
+        scrollToViewportOffset(messageCount - 1, () -> getTargetHeight() / 2, false, false);
         return;
       }
       if (shouldShowThreadHeaderPreview() && isTopMessageHeader) {
@@ -3111,7 +3119,8 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
           targetHeight -= previewHeight;
         }
       }
-      scrollToPositionWithOffsetImpl(scrollIndex, targetHeight - scrollMessage.getHeight());
+      final int previewInset = getTargetHeight() - targetHeight;
+      scrollToViewportOffset(scrollIndex, () -> getTargetHeight() - previewInset - scrollMessage.getHeight(), false, false);
     } else {
       scrollToPositionWithOffsetImpl(scrollIndex, -scrollMessage.getHeight());
     }
@@ -3128,9 +3137,9 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       int offset = messageId != null ? messageId.offsetPixels - scrollMessage.getExtraPadding() : 0;
       // Older floating-composer builds could save the last short message below
       // the viewport. Preserve reading positions inside genuinely tall messages.
-      if (index == 0 && scrollMessage.getHeight() <= getTargetHeight()) offset = Math.max(0, offset);
       this.returnToMessageIds = messageId != null ? messageId.returnToMessageIds : null;
-      scrollToPositionWithOffset(index, offset, false);
+      final int restoredOffset = offset;
+      scrollToViewportOffset(index, () -> index == 0 && scrollMessage.getHeight() <= getTargetHeight() ? 0 : restoredOffset, false, false);
       checkScrollToBottomButton();
       return;
     }
@@ -3151,11 +3160,11 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       height -= offset;
     }
 
-    if (highlightMode == HIGHLIGHT_MODE_UNREAD || highlightMode == HIGHLIGHT_MODE_UNREAD_NEXT || fullHeight + scrollMessage.findTopEdge() >= height) {
-      scrollToPositionWithOffset(index, height - fullHeight, smooth, isPlayingRoundMessage);
+    final int targetMessageHeight = fullHeight;
+    final boolean unread = highlightMode == HIGHLIGHT_MODE_UNREAD || highlightMode == HIGHLIGHT_MODE_UNREAD_NEXT;
+    scrollToViewportOffset(index, () -> org.thunderdog.challegram.util.ChatViewport.messageOffset(getTargetHeight(), targetMessageHeight, scrollMessage.findTopEdge(), unread), smooth, isPlayingRoundMessage);
+    if (unread || fullHeight + scrollMessage.findTopEdge() >= height) {
       wasScrollByUser = false;
-    } else {
-      scrollToPositionWithOffset(index, height / 2 - fullHeight / 2 + scrollMessage.findTopEdge(), smooth, isPlayingRoundMessage);
     }
 
     // scrollToPositionWithOffsetImpl(index, 0);

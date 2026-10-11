@@ -191,6 +191,11 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     paint.setAlpha(alpha);
     canvas.drawRect(panel, paint);
     paint.setShader(null);
+    if (host.isPressed()) {
+      paint.setColor(Theme.textAccentColor());
+      paint.setAlpha(Math.round(alpha * .12f));
+      canvas.drawRect(panel, paint);
+    }
     canvas.restoreToCount(save);
 
     paint.setStyle(Paint.Style.STROKE);
@@ -281,6 +286,8 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   }
 
   @Override public void setAlpha (int alpha) { this.alpha = alpha; invalidateSelf(); }
+  @Override public boolean isStateful () { return true; }
+  @Override protected boolean onStateChange (int[] state) { invalidateSelf(); return true; }
   @Override public void setColorFilter (@Nullable ColorFilter filter) { }
   @Override public int getOpacity () { return PixelFormat.TRANSLUCENT; }
 }

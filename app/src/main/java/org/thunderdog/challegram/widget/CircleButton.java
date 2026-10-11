@@ -61,6 +61,19 @@ public class CircleButton extends View implements FactorAnimator.Target, Reactio
   private android.view.ViewOutlineProvider classicOutline;
   private float classicElevation;
 
+  /** A glass button backed by a list screen rather than a conversation. */
+  public void setGlassDrawable (ChatGlassDrawable drawable) {
+    if (glass == drawable) return;
+    if (glass != null) glass.release();
+    glass = drawable;
+    setStateListAnimator(null);
+    setOutlineProvider(null);
+    setElevation(0f);
+    setTranslationZ(0f);
+    setBackground(drawable);
+    setIconColorId(org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId());
+  }
+
   public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
     if (glassController == controller) return;
     if (classicBackground == null) { classicBackground = getBackground(); classicIconColor = iconColor; }

@@ -340,11 +340,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private MessagesLayout contentView;
   private LinearLayout bottomWrap;
   private boolean newChatInput;
-  private Drawable classicInputBackground;
-  private Drawable classicBottomSpaceBackground;
   private ChatGlassDrawable inputGlass;
   private View composerGlassView;
-  private Drawable classicReplyBackground;
   private final android.graphics.Paint statusFadePaint = new android.graphics.Paint();
   private int statusFadeHeight, statusFadeColor;
 
@@ -501,7 +498,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override public boolean allowLayerTypeChanges () {
     // A cached page texture clips the glass outside the content bounds and freezes its source.
-    return !useFloatingChatHeader() && !Settings.instance().useNewChatInput();
+    return false;
   }
 
   public FrameLayoutFix videoLayer () { return videoLayer; }
@@ -537,16 +534,21 @@ public class MessagesController extends ViewController<MessagesController.Argume
   /** Establish the viewport before RecyclerView lays out a pending unread/history jump. */
   public boolean updateMeasuredFloatingInsets () {
     if (!newChatInput || inputView == null || inputView.getParent() != bottomWrap || inPreviewMode || isInForceTouchMode()) return false;
+    return messagesView.setOverlayPadding(floatingOverlayTop, calculateFloatingBottomInset());
+  }
+
+  private int calculateFloatingBottomInset () {
     int bottom = extraBottomInset;
     if (bottomWrap.getVisibility() == View.VISIBLE) {
       LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
       RelativeLayout.LayoutParams wrapParams = (RelativeLayout.LayoutParams) bottomWrap.getLayoutParams();
       int inputTop = bottomWrap.getPaddingTop() + inputParams.topMargin;
       float shown = replyBarVisible.getFloatValue() * (1f - getSearchTransformFactor());
-      bottom = Math.max(0, Math.round(bottomWrap.getMeasuredHeight() + wrapParams.bottomMargin + getKeyboardOffset() +
-        getReplyOffset() - inputTop * (1f - shown) + getAttachedFilesOffset() + Screen.dp(6f)));
+      bottom = org.thunderdog.challegram.util.ChatViewport.composerInset(bottomWrap.getMeasuredHeight(),
+        wrapParams.bottomMargin, inputTop, shown, getReplyOffset(), getKeyboardOffset(), getAttachedFilesOffset(), Screen.dp(6f));
     }
-    return messagesView.setOverlayPadding(floatingOverlayTop, bottom);
+    // Channel search controls can cover the list even when there is no composer.
+    return Math.max(bottom, Math.round(getSearchControlsOffset()));
   }
 
   private boolean syncFloatingLayout () {
@@ -560,7 +562,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         }
       }
     }
-    int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
+    int bottom = calculateFloatingBottomInset();
     if (composerGlassView != null) composerGlassView.setVisibility(newChatInput && bottomWrap.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
     if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
       float top = bottomWrap.getY() + inputView.getTop();
@@ -571,8 +573,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       Views.setLayoutHeight(composerGlassView, inputView.getHeight() + reserve);
       composerGlassView.setTranslationY(inputTop - reserve);
       inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
-      // Actual laid-out coordinates include IME/emoji translation exactly once.
-      bottom = Math.max(0, Math.round(messagesView.getBottom() + messagesView.getTranslationY() - top + getAttachedFilesOffset() + Screen.dp(6f)));
+      // Use the same geometry as measurement; stale child coordinates during an
+      // IME resize must not change the padding after a jump has been laid out.
     }
     messagesView.setOverlayPadding(floatingOverlayTop, bottom);
     // A pre-draw veto blocks the ENTIRE window, including another chat entering above us.
@@ -584,11 +586,18 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private final android.graphics.Rect floatingReplyClip = new android.graphics.Rect();
 
   private boolean useFloatingChatHeader () {
-    return !inPreviewMode && !isInForceTouchMode() && Settings.instance().useNewChatHeader();
+    return !inPreviewMode && !isInForceTouchMode();
   }
 
   public int getFloatingBottomInset () {
     return newChatInput && messagesView != null ? messagesView.getPaddingBottom() : 0;
+  }
+
+  public int getGlassBottomOverscan () {
+    if (!newChatInput || inputView == null) return getFloatingBottomInset();
+    // Keep the full multiline/reply surface, but exclude the opaque IME below it.
+    int surface = Math.round(inputView.getMeasuredHeight() + getReplyOffset() + Screen.dp(12f));
+    return Math.max(surface, Math.round(calculateFloatingBottomInset() - extraBottomInset - getKeyboardOffset()));
   }
 
   private void invalidateChatGlass () {
@@ -614,7 +623,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       int top = header > 0 ? header + listBarHeight + Screen.dp(6f) + getFloatingPlayerInset() : 0;
       int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
       floatingOverlayTop = top;
-      if (!newChatInput && !useFloatingChatHeader()) messagesView.setOverlayPadding(top, bottom);
+      messagesView.setOverlayPadding(top, newChatInput && inputView != null ? calculateFloatingBottomInset() : bottom);
       if (topGlassView != null) {
         // Include the status bar in the backdrop, but keep the island below it.
         Views.setTopMargin(topGlassView, -header);
@@ -663,37 +672,33 @@ public class MessagesController extends ViewController<MessagesController.Argume
     contentView.setClipChildren(!floatingHeader);
     contentView.setClipToPadding(!floatingHeader);
 
-    boolean enabled = Settings.instance().useNewChatInput();
     if (inputGlass == null) {
-      classicInputBackground = inputView.getBackground();
-      classicBottomSpaceBackground = bottomSpace.getBackground();
-      classicReplyBackground = replyBarView.getBackground();
       inputGlass = new ChatGlassDrawable(wallpaperView, composerGlassView, ColorId.filling);
       inputGlass.setMessages(messagesView);
       inputGlass.setVideoLayer(this::drawVideoForGlass);
     }
-    newChatInput = enabled;
-    recordButton.setGlassMode(enabled);
-    messageSenderButton.setGlassMode(enabled);
-    composerGlassView.setBackground(enabled ? inputGlass : null);
-    bottomBar.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
+    newChatInput = true;
+    recordButton.setGlassMode(true);
+    messageSenderButton.setGlassMode(true);
+    composerGlassView.setBackground(inputGlass);
+    bottomBar.setGlassSurface(this);
     for (CircleButton button : new CircleButton[] {scrollToBottomButton, mentionButton, reactionsButton}) {
-      if (button != null) button.setGlassSurface(Settings.instance().useNewChatActions() ? this : null);
+      if (button != null) button.setGlassSurface(this);
     }
     Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
     if (needBigPadding) manager.rebuildLastItem();
-    inputGlass.setEnabled(enabled);
-    inputView.setBackground(enabled ? null : classicInputBackground);
-    replyBarView.setBackground(enabled ? null : classicReplyBackground);
-    replyBarView.setFloatingSurface(enabled);
-    replyBarView.setAlpha(enabled ? replyBarVisible.getFloatValue() : 1f);
+    inputGlass.setEnabled(true);
+    inputView.setBackground(null);
+    replyBarView.setBackground(null);
+    replyBarView.setFloatingSurface(true);
+    replyBarView.setAlpha(replyBarVisible.getFloatValue());
     RelativeLayout.LayoutParams replyParams = (RelativeLayout.LayoutParams) replyBarView.getLayoutParams();
-    replyParams.leftMargin = replyParams.rightMargin = enabled ? Screen.dp(8f) : 0;
+    replyParams.leftMargin = replyParams.rightMargin = Screen.dp(8f);
     replyBarView.setLayoutParams(replyParams);
-    composerGlassView.setVisibility(enabled ? View.VISIBLE : View.GONE);
+    composerGlassView.setVisibility(View.VISIBLE);
     LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
-    int side = enabled ? Screen.dp(8f) : 0;
-    int gap = enabled ? Screen.dp(6f) : 0;
+    int side = Screen.dp(8f);
+    int gap = Screen.dp(6f);
     inputParams.setMargins(side, gap, side, gap);
     inputView.setLayoutParams(inputParams);
     for (View button : new View[] {emojiButton, attachButtons, sendButton, messageSenderButton}) {
@@ -701,21 +706,17 @@ public class MessagesController extends ViewController<MessagesController.Argume
       buttonParams.leftMargin = buttonParams.rightMargin = side;
       button.setLayoutParams(buttonParams);
     }
-    bottomSpace.setBackground(enabled ? null : classicBottomSpaceBackground);
-    bottomShadowView.setAlpha(enabled ? 0f : 1f);
-    if (!enabled && replyBarView != null) {
-      replyBarView.setClipBounds(null);
-      if (bottomWrap.getVisibility() == View.VISIBLE) replyBarView.setVisibility(View.VISIBLE);
-    }
+    bottomSpace.setBackground(null);
+    bottomShadowView.setAlpha(0f);
 
     RelativeLayout.LayoutParams listParams = (RelativeLayout.LayoutParams) messagesView.getLayoutParams();
     listParams.topMargin = -header;
-    listParams.addRule(RelativeLayout.ABOVE, enabled ? 0 : R.id.msg_bottom);
-    listParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, enabled ? RelativeLayout.TRUE : 0);
+    listParams.addRule(RelativeLayout.ABOVE, 0);
+    listParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, RelativeLayout.TRUE);
     messagesView.setLayoutParams(listParams);
     if (videoLayer != null) videoLayer.setLayoutParams(new RelativeLayout.LayoutParams(listParams));
-    messagesView.setClipToPadding(!(floatingHeader || enabled));
-    messagesView.setTranslationY(enabled ? 0f : -getReplyOffset() - getAttachedFilesOffset() - getKeyboardOffset());
+    messagesView.setClipToPadding(false);
+    messagesView.setTranslationY(0f);
 
     updateSavedTopBarParent();
     ViewGroup.MarginLayoutParams topParams = (ViewGroup.MarginLayoutParams) topBar.getLayoutParams();
@@ -7139,7 +7140,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   public int getActionBarHeight () {
-    return Screen.dp(!inPreviewMode && !isInForceTouchMode() && Settings.instance().useNewChatActions() ? 60f : 48f);
+    return Screen.dp(!inPreviewMode && !isInForceTouchMode() ? 60f : 48f);
   }
 
   private void updateBottomBarStyle () {
@@ -9971,7 +9972,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       bottomSpace.setVisibility(visible ? View.INVISIBLE : View.VISIBLE);
       bottomShadowView.setVisibility(visible ? View.INVISIBLE : View.VISIBLE);
       RelativeLayout.LayoutParams params = ((RelativeLayout.LayoutParams) messagesView.getLayoutParams());
-      params.addRule(RelativeLayout.ABOVE, visible ? 0 : R.id.msg_bottom);
+      params.addRule(RelativeLayout.ABOVE, newChatInput || visible ? 0 : R.id.msg_bottom);
       messagesView.setLayoutParams(params);
 
       params = ((RelativeLayout.LayoutParams) scrollToBottomButtonWrap.getLayoutParams());
@@ -10069,11 +10070,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void onKeyboardLayoutTranslation (float translationY) {
-    updateButtonsY();
-    updateReplyView();
     if (bottomWrap != null) {
       bottomWrap.setTranslationY(translationY);
     }
+    updateButtonsY();
+    updateReplyView();
   }
 
   private void updateBottomWrapOffset () {
@@ -10288,7 +10289,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public int getTopOffset () {
     // CollapseListView already applies the search visibility to each row.
     int total = topBar.getTotalVisualHeight();
-    return total + (useFloatingChatHeader() ? getGlassTopExtension() + Screen.dp(6f) + FloatingPlayerGeometry.gap(floatingPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0);
+    return useFloatingChatHeader() ? floatingOverlayTop : total;
   }
 
   public final void onMessagesFrameChanged () {
@@ -12896,6 +12897,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       searchControlsLayout.setTranslationY(translate ? (Screen.dp(49f) + extraBottomInset) * (1f - factor) : 0f);
       if (translate) {
         checkScrollButtonOffsets();
+        updateFloatingInsets();
       }
     }
   }

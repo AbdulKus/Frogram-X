@@ -1076,8 +1076,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         }
       };
     }
-    moreWrap.setGlassSurface(themeProvider instanceof org.thunderdog.challegram.ui.MessagesController &&
-      org.thunderdog.challegram.unsorted.Settings.instance().useNewChatMenu() ? (org.thunderdog.challegram.ui.MessagesController) themeProvider : null);
+    moreWrap.setGlassSurface(themeProvider instanceof org.thunderdog.challegram.ui.MessagesController ? (org.thunderdog.challegram.ui.MessagesController) themeProvider : null);
     moreWrap.setAnchorMode(MenuMoreWrap.ANCHOR_MODE_RIGHT);
     moreWrap.setRightNumber(buttonIndex);
     moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset() + controlsInset(themeProvider));
@@ -1201,14 +1200,17 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
 
   private void updateControlInsets () {
     ViewController<?> current = stack != null ? stack.getCurrent() : null;
-    int base = controlsInset(previewOpened ? baseItem : current);
+    ViewController<?> baseController = previewOpened ? baseItem : current;
+    int base = controlsInset(baseController);
     int next = controlsInset(previewItem);
     float progress = previewOpened ? (translateForward ? 1f - translationFactor : translationFactor) : 0f;
     Views.setTopMargin(backButton, getEffectiveTopOffset() + Math.round(base + (next - base) * progress));
     Views.setTopMargin(menu, getEffectiveTopOffset() + base);
     Views.setTopMargin(menuPreview, getEffectiveTopOffset() + next);
     if (title == textTitle) Views.setTopMargin(title, Screen.dp(15f) + getCurrentHeaderOffset() + base);
+    else if (title != null && baseController != null && baseController.inSearchMode()) Views.setTopMargin(title, getCurrentHeaderOffset() + base);
     if (preview == textPreview && preview != null) Views.setTopMargin(preview, Screen.dp(15f) + getCurrentHeaderOffset() + next);
+    else if (preview != null && previewItem != null && previewItem.inSearchMode()) Views.setTopMargin(preview, getCurrentHeaderOffset() + next);
   }
 
   private final int[] surfaceLocation = new int[2], headerLocation = new int[2];

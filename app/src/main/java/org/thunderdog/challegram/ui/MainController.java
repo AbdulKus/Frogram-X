@@ -200,10 +200,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     ListInsets (RecyclerView view) { top = view.getPaddingTop(); clip = view.getClipToPadding(); }
   }
 
-  @Override public boolean hasFloatingHeader () { return Settings.instance().useNewMainHeader(); }
+  @Override public boolean hasFloatingHeader () { return true; }
   @Override public boolean hasFloatingPlayer () { return hasFloatingHeader(); }
-  @Override public int getHeaderControlsInset () { return hasFloatingHeader() ? Screen.dp(4.5f) : 0; }
-  @Override public boolean allowLayerTypeChanges () { return !hasFloatingHeader(); }
+  @Override public int getHeaderControlsInset () { return Screen.dp(4.5f); }
+  @Override public boolean allowLayerTypeChanges () { return false; }
   @Override protected int getContentTopOverflow () {
     return hasFloatingHeader() ? getHeaderHeight() + context().getRootView().getTopInset() : 0;
   }
@@ -235,6 +235,15 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   private void invalidateMainGlass () {
     if (mainGlass != null) mainGlass.invalidateBackdrop();
     if (mainPlayerGlass != null) mainPlayerGlass.invalidateBackdrop();
+    for (org.thunderdog.challegram.widget.ChatGlassDrawable glass : composeGlass) glass.invalidateBackdrop();
+  }
+
+  private final java.util.ArrayList<org.thunderdog.challegram.widget.ChatGlassDrawable> composeGlass = new java.util.ArrayList<>();
+
+  public org.thunderdog.challegram.widget.ChatGlassDrawable createComposeGlass (View host) {
+    org.thunderdog.challegram.widget.ChatGlassDrawable glass = new org.thunderdog.challegram.widget.ChatGlassDrawable(mainWrap, host, ColorId.filling, this::drawMainBackdrop);
+    composeGlass.add(glass);
+    return glass;
   }
 
   private void drawListBackdrop (Canvas canvas, RecyclerView list, float alpha) {
@@ -1365,6 +1374,8 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   public void destroy () {
     if (mainGlass != null) mainGlass.release();
     if (mainPlayerGlass != null) mainPlayerGlass.release();
+    for (org.thunderdog.challegram.widget.ChatGlassDrawable glass : composeGlass) glass.release();
+    composeGlass.clear();
     for (RecyclerView list : glassLists.keySet()) {
       if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setBackdropInvalidationListener(null);
     }
