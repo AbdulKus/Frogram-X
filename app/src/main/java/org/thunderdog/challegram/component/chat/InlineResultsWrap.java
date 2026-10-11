@@ -92,8 +92,7 @@ public class InlineResultsWrap extends FrameLayoutFix implements View.OnClickLis
   private final android.graphics.Path surfaceClip = new android.graphics.Path();
 
   private void updateSurface () {
-    MessagesController controller = offsetProvider == null && !adapter.useDarkMode() &&
-      findMessagesController();
+    MessagesController controller = offsetProvider == null && !adapter.useDarkMode() ? findMessagesController() : null;
     if (controller == glassController && (controller != null || recyclerView.getPaddingLeft() == 0)) return;
     if (glass != null) glass.release();
     glassController = controller;
