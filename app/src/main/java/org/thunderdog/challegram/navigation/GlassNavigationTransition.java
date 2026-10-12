@@ -83,7 +83,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       root.getLocationInWindow(position);
       int rootX = position[0], rootY = position[1];
       view.getLocationInWindow(position);
-      float x = position[0] - rootX - page.getTranslationX(), y = position[1] - rootY - page.getTranslationY();
+      float x = position[0] - rootX - Math.round(page.getTranslationX()), y = position[1] - rootY - Math.round(page.getTranslationY());
       rect.set(x, y, x + view.getWidth(), y + height);
     }
 
