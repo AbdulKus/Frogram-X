@@ -116,10 +116,17 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
 
     private void refresh (View root) {
       for (HiddenView entry : hidden) entry.refreshAlpha();
-      for (Layer layer : top) capture(layer, root);
-      for (Layer layer : bottom) capture(layer, root);
       for (Surface entry : bottomSurfaces) entry.update(this, root);
       updateBounds(root);
+    }
+
+    private void captureForeground (View root, float visibility) {
+      // Incoming controls stay hidden until the shell has finished expanding.
+      // Capturing them during that expansion repeats software drawing, bitmap
+      // allocation and blur whenever a pinned/reply row changes height.
+      if (visibility <= 0f) return;
+      for (Layer layer : top) capture(layer, root);
+      for (Layer layer : bottom) capture(layer, root);
     }
 
     private void updateBounds (View root) {
@@ -312,6 +319,9 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     try {
       from.refresh(this);
       to.refresh(this);
+      geometry.retarget(to.bounds.bottom, progress);
+      from.captureForeground(this, GlassNavigationMotion.outgoing(progress));
+      to.captureForeground(this, geometry.incoming(progress));
       long now = SystemClock.uptimeMillis();
       if (now - lastBackdropUpdate >= 32L || progress == 0f || progress == 1f) {
         from.refreshBackdrop();
@@ -323,7 +333,6 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       finish();
       return true;
     }
-    geometry.retarget(to.bounds.bottom, progress);
     header.setGlassNavigationReveal(GlassNavigationMotion.outgoing(progress), geometry.incoming(progress));
     from.hideViews();
     to.hideViews();
@@ -337,7 +346,6 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       from.bounds.top + (to.bounds.top - from.bounds.top) * factor,
       from.bounds.right + (to.bounds.right - from.bounds.right) * factor,
       geometry.value(progress));
-    canvas.drawRect(0, 0, getWidth(), header.getEffectiveTopOffset() + Screen.dp(24f), status);
     int save = canvas.save();
     clip.reset();
     clip.addRoundRect(shell, Screen.dp(26f), Screen.dp(26f), Path.Direction.CW);
@@ -347,6 +355,9 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     // Chrome clips its fill itself and paints the full stroke outside that clip,
     // just like the settled drawable. An outer clip would cut the stroke in half.
     from.glass.drawNavigationChrome(canvas, shell, to.glass, factor);
+    // Settled surfaces draw their background first, then this status fade in
+    // View.onDraw. Keep that same order where the fade overlaps the glass.
+    canvas.drawRect(0, 0, getWidth(), header.getEffectiveTopOffset() + Screen.dp(24f), status);
     save = canvas.save();
     canvas.clipPath(clip);
     from.draw(canvas, from.top, GlassNavigationMotion.outgoing(progress));
