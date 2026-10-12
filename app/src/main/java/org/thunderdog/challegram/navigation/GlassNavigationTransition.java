@@ -265,7 +265,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       return true;
     }
     geometry.retarget(to.bounds.bottom, progress);
-    header.setGlassNavigationReveal(geometry.incoming(progress));
+    header.setGlassNavigationReveal(GlassNavigationMotion.outgoing(progress), geometry.incoming(progress));
     from.hideViews();
     to.hideViews();
     return true;
