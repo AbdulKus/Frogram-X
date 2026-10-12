@@ -686,6 +686,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       if (button != null) button.setGlassSurface(this);
     }
     Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
+    Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme + getFloatingBottomClearance());
     if (needBigPadding) manager.rebuildLastItem();
     inputGlass.setEnabled(true);
     inputView.setBackground(null);
@@ -699,7 +700,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
     int side = Screen.dp(8f);
     int gap = Screen.dp(6f);
-    inputParams.setMargins(side, gap, side, gap);
+    inputParams.setMargins(side, gap, side, gap + getFloatingBottomClearance());
     inputView.setLayoutParams(inputParams);
     for (View button : new View[] {emojiButton, attachButtons, sendButton, messageSenderButton}) {
       RelativeLayout.LayoutParams buttonParams = (RelativeLayout.LayoutParams) button.getLayoutParams();
@@ -808,6 +809,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         .bottomSurface(composerGlassView, inputGlass).bottom(replyBarView).bottom(bottomWrap).bottom(bottomBar)
         .bottom(emojiButton).bottom(attachButtons).bottom(sendButton).bottom(messageSenderButton)
         .bottom(reactionsButtonWrap).bottom(mentionButtonWrap).bottom(scrollToBottomButtonWrap)
+        .bottom(goToNextFoundMessageButtonBadge).bottom(goToPrevFoundMessageButtonBadge)
         .bottom(searchControlsLayout).freeze(inputGlass);
     for (java.lang.ref.WeakReference<ChatGlassDrawable> reference : extraGlass) scene.freeze(reference.get());
     return scene;
@@ -1099,7 +1101,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       c.setBottomInset(extraBottomInset, extraBottomInsetWithoutIme)
     );
     Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
-    Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme);
+    Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme + getFloatingBottomClearance());
     checkScrollButtonOffsets();
     updateMessagesViewInset();
     onMessagesFrameChanged();
@@ -1942,7 +1944,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
         updateBottomBarStyle();
       }
     };
-    Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme);
+    Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme + getFloatingBottomClearance());
     bottomBar.setOnClickListener(this);
     bottomBar.setLayoutParams(params);
     addThemeInvalidateListener(bottomBar);
@@ -7154,8 +7156,13 @@ public class MessagesController extends ViewController<MessagesController.Argume
     checkExtraPadding();
   }
 
+  private int getFloatingBottomClearance () {
+    return useFloatingChatHeader() ? Screen.dp(2f) : 0;
+  }
+
   public int getActionBarHeight () {
-    return Screen.dp(!inPreviewMode && !isInForceTouchMode() ? 60f : 48f);
+    // Reserve the raised surface in list/action geometry as well as its padding.
+    return Screen.dp(!inPreviewMode && !isInForceTouchMode() ? 60f : 48f) + getFloatingBottomClearance();
   }
 
   private void updateBottomBarStyle () {

@@ -16,6 +16,10 @@ public final class ChatViewportTest {
           0f, 0f, 0f, 0f, 6 * density);
         equal(61 * density + systemBottom, bottom, "IME counted once");
         int viewport = ChatViewport.height(screen, top, bottom);
+        int raisedBottom = ChatViewport.composerInset(63 * density + systemBottom, 0, 6 * density,
+          0f, 0f, 0f, 0f, 6 * density);
+        equal(bottom + 2 * density, raisedBottom, "rounded-screen clearance counted once with IME");
+        equal(viewport - 2 * density, ChatViewport.height(screen, top, raisedBottom), "raised composer preserves jump viewport");
         int message = 80 * density;
         int offset = (viewport - message) / 2;
         int previousMessages = 900 * density;
@@ -30,7 +34,9 @@ public final class ChatViewportTest {
       }
     }
     equal(135, ChatViewport.composerInset(85, 0, 6, 1f, 44f, 0f, 0f, 6), "reply row reserved once");
+    equal(137, ChatViewport.composerInset(87, 0, 6, 1f, 44f, 0f, 0f, 6), "raised reply shares composer clearance");
     equal(303, ChatViewport.composerInset(85, 0, 6, 0f, 0f, 218f, 0f, 6), "emoji translation reserved once");
+    equal(305, ChatViewport.composerInset(87, 0, 6, 0f, 0f, 218f, 0f, 6), "raised composer with emoji keyboard");
     equal(255, ChatViewport.composerInset(85, 0, 6, 0f, 0f, 0f, 170f, 6), "attachment tray");
     equal(0, ChatViewport.height(300, 140, 320), "landscape with tall IME");
     equal(0, ChatViewport.scrollBy(0, 90, 120, 400), "short chat remains at bottom");
