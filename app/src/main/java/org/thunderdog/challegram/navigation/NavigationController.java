@@ -81,6 +81,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   private ShadowView shadowView, shadowTop;
   private View fadeView;
   private FloatingButton floatingButton;
+  private GlassNavigationTransition glassTransition;
 
   private boolean isAnimating;
 
@@ -393,6 +394,8 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
       rootView.addView(shadowTop);
     }
 
+    glassTransition = new GlassNavigationTransition(context, headerView);
+    rootView.addView(glassTransition, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     rootView.addView(headerView);
 
     floatingButton = new FloatingButton(context);
@@ -456,6 +459,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
 
   public void destroy () {
     isDestroyed = true;
+    if (glassTransition != null) glassTransition.finish();
     ThemeManager.instance().removeThemeListener(this);
     getStack().clear(this);
     clearChildWrappers();
@@ -658,6 +662,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   }
 
   public void invalidateFloatingPlayers () {
+    if (glassTransition != null && glassTransition.isActive()) glassTransition.invalidate();
     if (childWrappers != null) {
       for (ViewController<?> controller : childWrappers) controller.invalidateFloatingPlayer();
     }
@@ -893,7 +898,14 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
     layoutIfRequested();
     onAfterShow();
 
-    preventNextLayouts(forward ? 1 : 2);
+    if ((direction == TRANSLATION_HORIZONTAL || direction == TRANSLATION_FADE) &&
+        left.hasFloatingHeader() && right.hasFloatingHeader() && !left.usePopupMode() && !right.usePopupMode()) {
+      glassTransition.begin(left, right, forward);
+    }
+
+    // Initial pinned/reply geometry can settle while the shared shell animates.
+    if (glassTransition.isActive()) completeNextLayout();
+    else preventNextLayouts(forward ? 1 : 2);
   }
 
   private void onAfterShow () {
@@ -984,6 +996,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
     final boolean[] isDone = new boolean[1];
     Runnable onDone = () -> {
       setFactor(forward ? 0f : 1f);
+      glassTransition.finish();
       isDone[0] = true;
       if (forward) {
         removeFadeView();
@@ -1089,6 +1102,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
         ((android.view.ActionMode) actionMode).finish();
       }
       if (!animating) {
+        if (glassTransition != null) glassTransition.finish();
         processor.checkRebaseMessage();
       }
     }
@@ -1096,6 +1110,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
 
   private void clearPreview () {
     setFactor(0f);
+    glassTransition.finish();
 
     headerView.clearPreview();
 
@@ -1309,6 +1324,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   private static final int FINISH_PREVIEW_FORCE = 3;
 
   private void finishTransaction (int mode) {
+    glassTransition.finish();
     completeNextLayout();
 
     preventLayout();
@@ -1394,6 +1410,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
     factor = MathUtils.clamp(factor);
 
     this.translationFactor = factor;
+    if (glassTransition != null && glassTransition.isActive()) glassTransition.setProgress(translatingForward ? 1f - factor : factor);
 
     float px;
     if (translationMode == TRANSLATION_VERTICAL) {

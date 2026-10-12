@@ -839,6 +839,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   public final void executeScheduledAnimation () {
+    if (!canExecuteScheduledAnimation()) return;
     if (scheduledAnimation != null) {
       scheduledAnimation.run();
       scheduledAnimation = null;
@@ -850,6 +851,8 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
       animationExecuteListeners.clear();
     }
   }
+
+  protected boolean canExecuteScheduledAnimation () { return true; }
 
   // Other
 
@@ -1281,6 +1284,8 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   public boolean hasFloatingPlayer () { return false; }
 
   public void invalidateFloatingPlayer () { }
+
+  public @Nullable GlassNavigationTransition.Scene createGlassNavigationScene () { return null; }
 
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
     return false;

@@ -232,6 +232,20 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     if (mainPlayerView != null) mainPlayerView.invalidate();
   }
 
+  @Override public org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene createGlassNavigationScene () {
+    if (mainGlassView == null || mainGlass == null) return null;
+    org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene scene =
+      new org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene(getValue(), mainGlassView, mainGlass)
+        .player(mainPlayerView, mainPlayerGlass).bottom(bottomBar).bottom(bottomBarSpace);
+    // The compose wrapper fills the screen; capture its small buttons and labels only.
+    if (composeWrap != null) {
+      for (int i = 0; i < composeWrap.getChildCount(); i++) scene.bottom(composeWrap.getChildAt(i));
+      scene.hide(composeWrap);
+    }
+    for (ChatGlassDrawable drawable : composeGlass) scene.freeze(drawable);
+    return scene;
+  }
+
   private void invalidateMainGlass () {
     if (mainGlass != null) mainGlass.invalidateBackdrop();
     if (mainPlayerGlass != null) mainPlayerGlass.invalidateBackdrop();

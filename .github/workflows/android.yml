@@ -55,11 +55,14 @@ jobs:
             app/src/main/java/org/thunderdog/challegram/util/GlassFrameCache.java \
             app/src/main/java/org/thunderdog/challegram/util/GlassSampling.java \
             app/src/main/java/org/thunderdog/challegram/util/ChatViewport.java \
+            app/src/main/java/org/thunderdog/challegram/util/GlassNavigationMotion.java \
+            app/src/main/java/org/thunderdog/challegram/util/AlphaBlur.java \
             app/src/main/java/org/thunderdog/challegram/util/ThreadHeaderVisibility.java \
             app/src/main/java/org/thunderdog/challegram/util/DampedSpring.java \
-            tests/graphics/GlassMathTest.java tests/graphics/ChatViewportTest.java
+            tests/graphics/GlassMathTest.java tests/graphics/ChatViewportTest.java tests/graphics/GlassNavigationTest.java
           java -cp "$RUNNER_TEMP/glass-tests" GlassMathTest
           java -cp "$RUNNER_TEMP/glass-tests" ChatViewportTest
+          java -cp "$RUNNER_TEMP/glass-tests" GlassNavigationTest
 
   build:
     name: Latest ARM64 APK

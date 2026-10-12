@@ -800,6 +800,19 @@ public class MessagesController extends ViewController<MessagesController.Argume
     return true;
   }
 
+  @Override public org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene createGlassNavigationScene () {
+    if (!useFloatingChatHeader() || topGlassView == null || headerGlass == null) return null;
+    org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene scene =
+      new org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene(getValue(), topGlassView, headerGlass)
+        .top(topBar, this::getTopBarSurfaceHeight).player(floatingPlayerView, playerGlass)
+        .bottomSurface(composerGlassView, inputGlass).bottom(replyBarView).bottom(bottomWrap).bottom(bottomBar)
+        .bottom(emojiButton).bottom(attachButtons).bottom(sendButton).bottom(messageSenderButton)
+        .bottom(reactionsButtonWrap).bottom(mentionButtonWrap).bottom(scrollToBottomButtonWrap)
+        .bottom(searchControlsLayout).freeze(inputGlass);
+    for (java.lang.ref.WeakReference<ChatGlassDrawable> reference : extraGlass) scene.freeze(reference.get());
+    return scene;
+  }
+
   private void drawStatusFade (Canvas c, int width) {
     int fadeHeight = context().getRootView().getTopInset() + Screen.dp(24f);
     int fadeColor = ChatGlassDrawable.surfaceColor(ColorId.filling);
@@ -2489,8 +2502,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public boolean needAsynchronousAnimation () {
-    return manager != null && !manager.isTotallyEmpty() && manager.getAdapter().getMessageCount() == 0;
+    return pendingDraftReply || manager != null && !manager.isTotallyEmpty() && manager.getAdapter().getMessageCount() == 0;
   }
+
+  @Override protected boolean canExecuteScheduledAnimation () { return !pendingDraftReply || getScheduledAnimation() == null; }
 
   private void openLinkedChat (boolean directMessages) {
     if (messageThread != null && messageThread.getChatId() != 0 && messageThread.getChatId() != messageThread.getContextChatId()) {
@@ -7898,6 +7913,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
   }
 
+  private boolean pendingDraftReply;
+  private int draftReplyRequest;
+
+  private void finishDraftReply (int request) {
+    if (request != draftReplyRequest) return;
+    pendingDraftReply = false;
+    if (!isDestroyed() && !needAsynchronousAnimation()) executeScheduledAnimation();
+  }
+
   private void forceDraftReply (final TdApi.InputMessageReplyTo replyTo) {
     final long currentChatId = chat.id;
     final long replyToChatId, replyToMessageId;
@@ -7930,11 +7954,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
         Td.assertInputMessageReplyTo_a271ad89();
         throw Td.unsupported(replyTo);
     }
+    final int request = ++draftReplyRequest;
+    pendingDraftReply = !isFocused();
     if (replyToChatId == currentChatId) {
       TGMessage foundMessage = manager.getAdapter().findMessageById(replyToMessageId);
       if (foundMessage != null) {
         foundMessage.getMessageWithProperties(msg -> runOnUiThreadOptional(() -> {
-          forceReply(msg, replyToQuote, replyToChecklistTaskId, replyToPollOptionId);
+          if (chat != null && chat.id == currentChatId && request == draftReplyRequest) forceReply(msg, replyToQuote, replyToChecklistTaskId, replyToPollOptionId);
+          finishDraftReply(request);
         }));
         return;
       }
@@ -7947,7 +7974,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
             TdApi.InputMessageReplyTo currentReplyTo = draftMessage != null ? draftMessage.replyTo : null;
             if (Td.equalsTo(replyTo, currentReplyTo)) {
               tdlib.getMessageProperties(foundReplyMessage, properties -> runOnUiThreadOptional(() -> {
-                if (properties != null) {
+                if (properties != null && chat != null && chat.id == currentChatId && request == draftReplyRequest) {
                   forceReply(
                     new MessageWithProperties(foundReplyMessage, properties),
                     replyToQuote,
@@ -7955,11 +7982,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
                     replyToPollOptionId
                   );
                 }
+                finishDraftReply(request);
               }));
             }
+            else finishDraftReply(request);
           }
+          else finishDraftReply(request);
         });
       }
+      else runOnUiThreadOptional(() -> finishDraftReply(request));
     });
   }
 
@@ -7969,7 +8000,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
       return;
     }
 
-    setReplyInfo(new ReplyInfo(tdlib, message, quote, checklistTaskId, pollOptionId), false);
+    // A reply arriving after the bounded navigation wait still grows/fades gently.
+    boolean animated = isFocused() || navigationController != null && navigationController.isAnimatingWithEffect();
+    setReplyInfo(new ReplyInfo(tdlib, message, quote, checklistTaskId, pollOptionId), animated);
   }
 
   private void setReplyInfo (ReplyInfo replyInfo, boolean animated) {

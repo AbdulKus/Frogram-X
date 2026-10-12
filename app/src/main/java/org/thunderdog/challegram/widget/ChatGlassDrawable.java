@@ -5,6 +5,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
@@ -66,6 +67,12 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private int lastX = Integer.MIN_VALUE, lastY, lastColor;
   private int lastMessagesX, lastMessagesY;
   private boolean enabled = true;
+  private boolean navigationFrozen;
+  private final RectF navigationSampleBounds = new RectF();
+  private final Path navigationClip = new Path();
+  private final Matrix navigationSheenMatrix = new Matrix();
+  private final Shader navigationSheen = new LinearGradient(0, 0, 0, 1,
+    new int[] {0x28ffffff, 0x06ffffff, 0x00000000}, null, Shader.TileMode.CLAMP);
   private ViewTreeObserver observer;
   private final ViewTreeObserver.OnPreDrawListener prepareFrame;
   private final int[] messagesPosition = new int[2];
@@ -112,7 +119,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     this.host = host;
     this.colorId = colorId;
     prepareFrame = () -> {
-      if (!released && enabled && host.isShown() && hasVisibleAlpha() && prepareBackdrop()) host.invalidate();
+      if (!released && enabled && !navigationFrozen && host.isShown() && hasVisibleAlpha() && prepareBackdrop()) host.invalidate();
       return true;
     };
     host.addOnAttachStateChangeListener(this);
@@ -150,6 +157,55 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     if (enabled) invalidateBackdrop();
   }
 
+  public void freezeForNavigation (boolean frozen) {
+    if (navigationFrozen == frozen) return;
+    if (frozen) prepareBackdrop();
+    navigationFrozen = frozen;
+    if (!frozen) invalidateBackdrop();
+  }
+
+  public void getNavigationBounds (RectF bounds) {
+    bounds.set(panel);
+  }
+
+  /** Render a cached backdrop into the shared shell without relayout or recapture. */
+  public void drawNavigationSurface (Canvas canvas, RectF bounds, float opacity) {
+    if (bounds.isEmpty() || opacity <= 0f) return;
+    int save = canvas.save();
+    float radius = Math.min(Screen.dp(26f), bounds.height() / 2f);
+    navigationClip.reset();
+    navigationClip.addRoundRect(bounds, radius, radius, Path.Direction.CW);
+    canvas.clipPath(navigationClip);
+    paint.setShader(null);
+    if (sample != null && !panel.isEmpty()) {
+      float scaleX = bounds.width() / panel.width(), scaleY = bounds.height() / panel.height();
+      navigationSampleBounds.set(bounds.left + (sampleBounds.left - panel.left) * scaleX,
+        bounds.top + (sampleBounds.top - panel.top) * scaleY,
+        bounds.left + (sampleBounds.right - panel.left) * scaleX,
+        bounds.top + (sampleBounds.bottom - panel.top) * scaleY);
+      paint.setColor(Color.WHITE);
+      paint.setAlpha(Math.round(opacity * 255f));
+      canvas.drawBitmap(sample, null, navigationSampleBounds, paint);
+    }
+    paint.setColor(surfaceColor(colorId));
+    paint.setAlpha(Math.round(opacity * 255f * (sample != null ? (Theme.isDark() ? .54f : .58f) : .82f)));
+    canvas.drawRect(bounds, paint);
+    navigationSheenMatrix.setScale(1f, bounds.height());
+    navigationSheenMatrix.postTranslate(0, bounds.top);
+    navigationSheen.setLocalMatrix(navigationSheenMatrix);
+    paint.setShader(navigationSheen);
+    paint.setAlpha(Math.round(opacity * 255f));
+    canvas.drawRect(bounds, paint);
+    paint.setShader(null);
+    canvas.restoreToCount(save);
+    paint.setStyle(Paint.Style.STROKE);
+    paint.setStrokeWidth(Screen.dp(1f));
+    paint.setColor(Theme.isDark() ? 0x38ffffff : ColorUtils.alphaColor(.28f, ColorUtils.fromToArgb(Theme.headerColor(), Theme.textAccentColor(), .25f)));
+    paint.setAlpha(Math.round(Color.alpha(paint.getColor()) * opacity));
+    canvas.drawRoundRect(bounds, radius, radius, paint);
+    paint.setStyle(Paint.Style.FILL);
+  }
+
   public void setMessages (MessagesRecyclerView messages) {
     this.messages = messages;
   }
@@ -177,7 +233,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     // Normally prepared by pre-draw. The fallback covers the very first bounds assignment.
     // Source invalidation during this draw belongs to the next pre-draw; never
     // replay the message list twice in the same frame.
-    if (sample == null || geometryDirty) prepareBackdrop();
+    if (sample == null || (!navigationFrozen && geometryDirty)) prepareBackdrop();
     if (sample != null) {
       paint.setColor(Color.WHITE);
       paint.setAlpha(alpha);
