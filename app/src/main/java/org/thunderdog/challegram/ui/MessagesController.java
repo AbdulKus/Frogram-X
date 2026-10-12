@@ -7157,7 +7157,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private int getFloatingBottomClearance () {
-    return useFloatingChatHeader() ? Screen.dp(2f) : 0;
+    return useFloatingChatHeader() ? Screen.dp(4f) : 0;
   }
 
   public int getActionBarHeight () {

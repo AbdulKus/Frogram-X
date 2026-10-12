@@ -5,11 +5,11 @@ public final class GlassNavigationMotion {
   private GlassNavigationMotion () { }
 
   public static float outgoing (float progress) {
-    return 1f - smooth(progress / .38f);
+    return 1f - smooth(progress / .5f);
   }
 
   public static float incoming (float progress) {
-    return smooth((progress - .64f) / .36f);
+    return smooth((progress - .35f) / .65f);
   }
 
   public static float geometry (float progress) {
@@ -32,8 +32,8 @@ public final class GlassNavigationMotion {
     }
 
     public float incoming (float progress) {
-      float gate = Math.max(.64f, curve.end);
-      return gate >= 1f ? (progress >= 1f ? 1f : 0f) : smooth((progress - gate) / (1f - gate));
+      float start = Math.min(.35f, curve.end);
+      return smooth((progress - start) / (1f - start));
     }
 
     private static final class Segment {

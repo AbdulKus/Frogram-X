@@ -118,11 +118,16 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     invalidate();
   }
 
-  void setGlassNavigationReveal (float alpha) {
+  void setGlassNavigationReveal (float outgoingAlpha, float incomingAlpha) {
     if (!glassNavigationActive || !previewOpened) return;
-    preview.setAlpha(alpha);
-    if (useMenuSwitch && useMenuPreview) menuPreview.setAlpha(alpha);
-    else if (!useMenuSwitch) menu.setAlpha(Math.max(title.getAlpha(), alpha));
+    title.setAlpha(outgoingAlpha);
+    preview.setAlpha(incomingAlpha);
+    if (useMenuSwitch && useMenuPreview) {
+      menu.setAlpha(outgoingAlpha);
+      menuPreview.setAlpha(incomingAlpha);
+    } else if (!useMenuSwitch) {
+      menu.setAlpha(Math.max(outgoingAlpha, incomingAlpha));
+    }
   }
 
   @Override protected boolean drawChild (Canvas canvas, View child, long drawingTime) {
