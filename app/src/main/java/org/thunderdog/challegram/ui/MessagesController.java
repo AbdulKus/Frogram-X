@@ -601,13 +601,17 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void invalidateChatGlass () {
+    invalidateChatGlass(null);
+  }
+
+  private void invalidateChatGlass (View changed) {
     for (int i = extraGlass.size() - 1; i >= 0; i--) {
       ChatGlassDrawable glass = extraGlass.get(i).get();
-      if (glass == null) extraGlass.remove(i); else glass.invalidateBackdrop();
+      if (glass == null) extraGlass.remove(i); else glass.invalidateBackdrop(changed);
     }
-    if (newChatInput && inputGlass != null) inputGlass.invalidateBackdrop();
-    if (headerGlass != null && useFloatingChatHeader()) headerGlass.invalidateBackdrop();
-    if (playerGlass != null && hasFloatingPlayer()) playerGlass.invalidateBackdrop();
+    if (newChatInput && inputGlass != null) inputGlass.invalidateBackdrop(changed);
+    if (headerGlass != null && useFloatingChatHeader()) headerGlass.invalidateBackdrop(changed);
+    if (playerGlass != null && hasFloatingPlayer()) playerGlass.invalidateBackdrop(changed);
   }
 
   private void updateFloatingInsets () {
@@ -2011,7 +2015,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
       applyNewChatUi();
       wallpaperView.setGlassInvalidationListener(this::invalidateChatGlass);
-      messagesView.setBackdropInvalidationListener(this::invalidateChatGlass);
+      messagesView.setBackdropRegionInvalidationListener(this::invalidateChatGlass);
       initSearchControls();
       contentView.addView(searchControlsLayout);
 

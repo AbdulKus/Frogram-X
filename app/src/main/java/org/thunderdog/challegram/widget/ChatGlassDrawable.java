@@ -76,6 +76,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private ViewTreeObserver observer;
   private final ViewTreeObserver.OnPreDrawListener prepareFrame;
   private final int[] messagesPosition = new int[2];
+  private final int[] changedPosition = new int[2];
   private final GlassFrameCache frames = new GlassFrameCache();
   private float topInset;
 
@@ -311,6 +312,23 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       backdropDirty = true;
       host.invalidate();
     }
+  }
+
+  /** Ignore animated rows outside the captured area, including the blur overscan. */
+  public void invalidateBackdrop (@Nullable View changed) {
+    if (released || !enabled) return;
+    if (changed == null || sample == null || geometryDirty || changed.getWindowToken() == null ||
+        !changed.getMatrix().isIdentity()) {
+      // Transformed rows can expose their previous position as well as the new
+      // one. Layout/scroll changes also use the full invalidation path.
+      invalidateBackdrop();
+      return;
+    }
+    host.getLocationInWindow(hostPosition);
+    changed.getLocationInWindow(changedPosition);
+    int left = changedPosition[0] - hostPosition[0], top = changedPosition[1] - hostPosition[1];
+    if (left < sampleBounds.right && left + changed.getWidth() > sampleBounds.left &&
+        top < sampleBounds.bottom && top + changed.getHeight() > sampleBounds.top) invalidateBackdrop();
   }
 
   private boolean prepareBackdrop () {

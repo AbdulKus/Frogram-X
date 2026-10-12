@@ -27,6 +27,7 @@ import me.vkryl.android.animator.Animated;
 
 public class CustomRecyclerView extends RecyclerView implements Animated {
   private Runnable backdropInvalidationListener;
+  private java.util.function.Consumer<View> backdropRegionInvalidationListener;
   private boolean capturingGlass;
   private boolean glassOverlay;
 
@@ -41,15 +42,27 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
 
   public void setBackdropInvalidationListener (@Nullable Runnable listener) {
     backdropInvalidationListener = listener;
+    backdropRegionInvalidationListener = null;
+  }
+
+  public void setBackdropRegionInvalidationListener (@Nullable java.util.function.Consumer<View> listener) {
+    backdropRegionInvalidationListener = listener;
+    backdropInvalidationListener = null;
   }
 
   private void invalidateBackdrop () {
-    if (!capturingGlass && backdropInvalidationListener != null) backdropInvalidationListener.run();
+    invalidateBackdrop(null);
+  }
+
+  private void invalidateBackdrop (@Nullable View changed) {
+    if (capturingGlass) return;
+    if (backdropRegionInvalidationListener != null) backdropRegionInvalidationListener.accept(changed);
+    else if (backdropInvalidationListener != null) backdropInvalidationListener.run();
   }
 
   @Override public void onDescendantInvalidated (View child, View target) {
     super.onDescendantInvalidated(child, target);
-    invalidateBackdrop();
+    invalidateBackdrop(child);
   }
 
   @Override public android.view.ViewParent invalidateChildInParent (int[] location, android.graphics.Rect dirty) {

@@ -248,9 +248,13 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   }
 
   private void invalidateMainGlass () {
-    if (mainGlass != null) mainGlass.invalidateBackdrop();
-    if (mainPlayerGlass != null) mainPlayerGlass.invalidateBackdrop();
-    for (org.thunderdog.challegram.widget.ChatGlassDrawable glass : composeGlass) glass.invalidateBackdrop();
+    invalidateMainGlass(null);
+  }
+
+  private void invalidateMainGlass (View changed) {
+    if (mainGlass != null) mainGlass.invalidateBackdrop(changed);
+    if (mainPlayerGlass != null) mainPlayerGlass.invalidateBackdrop(changed);
+    for (org.thunderdog.challegram.widget.ChatGlassDrawable glass : composeGlass) glass.invalidateBackdrop(changed);
   }
 
   private final java.util.ArrayList<org.thunderdog.challegram.widget.ChatGlassDrawable> composeGlass = new java.util.ArrayList<>();
@@ -287,7 +291,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   private void trackGlassList (RecyclerView list) {
     if (list == null || glassLists.containsKey(list)) return;
     glassLists.put(list, new ListInsets(list));
-    if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setBackdropInvalidationListener(this::invalidateMainGlass);
+    if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setBackdropRegionInvalidationListener(this::invalidateMainGlass);
     applyListInset(list, glassLists.get(list));
   }
 
