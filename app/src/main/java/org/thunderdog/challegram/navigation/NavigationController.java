@@ -61,6 +61,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
 
   static final int SLOW_HARD_TRANSITION_DURATION = 500;
   static final int HARD_TRANSITION_DURATION = 400; // 400; //400
+  private static final int GLASS_TRANSITION_DURATION = 350;
 
   static final int MINIMUM_DROP_DURATION = 60; //60
   static final int MAXIMUM_DROP_DURATION = 200; //200
@@ -1055,7 +1056,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
         break;
       }
       case TRANSLATION_HORIZONTAL: {
-        animator.setDuration(HARD_TRANSITION_DURATION);
+        animator.setDuration(glassTransition.getVisibility() == View.VISIBLE ? GLASS_TRANSITION_DURATION : HARD_TRANSITION_DURATION);
         animator.setInterpolator(AnimatorUtils.NAVIGATION_INTERPOLATOR);
         break;
       }

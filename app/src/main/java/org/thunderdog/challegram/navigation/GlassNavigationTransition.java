@@ -29,9 +29,11 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     private final ChatGlassDrawable glass;
     private final ArrayList<ChatGlassDrawable> drawables = new ArrayList<>();
     private final ArrayList<HiddenView> hidden = new ArrayList<>();
+    private final ArrayList<CachedView> cachedViews = new ArrayList<>();
     private final ArrayList<Layer> top = new ArrayList<>(), bottom = new ArrayList<>();
     private final ArrayList<Surface> bottomSurfaces = new ArrayList<>();
     private final RectF bounds = new RectF();
+    private final RectF playerBounds = new RectF(), playerContentBounds = new RectF();
     private final int[] position = new int[2];
     private ChatGlassDrawable playerGlass;
     private HiddenView player;
@@ -52,6 +54,15 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
 
     public Scene hide (View view) {
       if (view != null && findHidden(view) == null) hidden.add(new HiddenView(view));
+      return this;
+    }
+
+    /** Cache only scrolling content: the page's overflow and live chrome stay intact. */
+    public Scene cache (View view) {
+      if (view != null) {
+        for (CachedView entry : cachedViews) if (entry.view == view) return this;
+        cachedViews.add(new CachedView(view));
+      }
       return this;
     }
 
@@ -98,6 +109,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       for (ChatGlassDrawable drawable : drawables) drawable.freezeForNavigation(true);
       updateBounds(root);
       refresh(root);
+      if (root.isHardwareAccelerated()) for (CachedView entry : cachedViews) entry.prepare();
       prepared = true;
       return true;
     }
@@ -115,6 +127,11 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       float x = bounds.left, y = bounds.top;
       glass.getNavigationBounds(bounds);
       bounds.offset(x, y);
+      if (player != null && playerGlass != null && player.view.getHeight() > 0) {
+        position(player.view, root, playerContentBounds, player.view.getHeight());
+        playerGlass.getNavigationBounds(playerBounds);
+        playerBounds.offset(playerContentBounds.left, playerContentBounds.top);
+      }
     }
 
     private void capture (Layer layer, View root) {
@@ -147,6 +164,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     private void restore () {
       for (HiddenView entry : hidden) entry.restore();
       for (ChatGlassDrawable drawable : drawables) drawable.freezeForNavigation(false);
+      for (CachedView entry : cachedViews) entry.restore();
       prepared = false;
       for (Layer layer : top) layer.captured = false;
       for (Layer layer : bottom) layer.captured = false;
@@ -168,6 +186,25 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       if (alpha <= 0f) return;
       for (Surface entry : bottomSurfaces) if (entry.view.getVisibility() == VISIBLE) entry.glass.drawNavigationSurface(canvas, entry.bounds, alpha);
       draw(canvas, bottom, alpha);
+    }
+  }
+
+  private static final class CachedView {
+    final View view;
+    int originalLayerType;
+    boolean active;
+    CachedView (View view) { this.view = view; }
+    void prepare () {
+      if (active || view.getWidth() <= 0 || view.getHeight() <= 0 || view.getVisibility() != VISIBLE || view.getAlpha() <= 0f) return;
+      originalLayerType = view.getLayerType();
+      if (originalLayerType != LAYER_TYPE_NONE) return;
+      active = true;
+      view.setLayerType(LAYER_TYPE_HARDWARE, null);
+    }
+    void restore () {
+      if (!active) return;
+      view.setLayerType(originalLayerType, null);
+      active = false;
     }
   }
 
@@ -212,7 +249,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
   }
 
   private final HeaderView header;
-  private final RectF shell = new RectF(), playerBounds = new RectF();
+  private final RectF shell = new RectF(), playerBounds = new RectF(), playerContentBounds = new RectF();
   private final Path clip = new Path();
   private final Paint status = new Paint(Paint.ANTI_ALIAS_FLAG);
   private Scene from, to;
@@ -306,30 +343,55 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     clip.addRoundRect(shell, Screen.dp(26f), Screen.dp(26f), Path.Direction.CW);
     canvas.clipPath(clip);
     drawBackdrops(canvas, shell, false);
+    canvas.restoreToCount(save);
+    // Chrome clips its fill itself and paints the full stroke outside that clip,
+    // just like the settled drawable. An outer clip would cut the stroke in half.
     from.glass.drawNavigationChrome(canvas, shell, to.glass, factor);
+    save = canvas.save();
+    canvas.clipPath(clip);
     from.draw(canvas, from.top, GlassNavigationMotion.outgoing(progress));
     to.draw(canvas, to.top, geometry.incoming(progress));
     canvas.restoreToCount(save);
     from.drawBottom(canvas, GlassNavigationMotion.outgoing(progress));
     to.drawBottom(canvas, geometry.incoming(progress));
-    Scene playerScene = from.playerGlass != null ? from : to;
+    Scene playerScene = !from.playerBounds.isEmpty() ? from : to;
     float playerAlpha = Math.max(from.player != null && from.player.view.getVisibility() == VISIBLE ? from.player.alpha : 0f,
       to.player != null && to.player.view.getVisibility() == VISIBLE ? to.player.alpha : 0f);
     if (playerScene.playerGlass != null && playerAlpha > 0f) {
-      playerBounds.set(shell.left, shell.bottom + Screen.dp(6f), shell.right, shell.bottom + Screen.dp(6f) + HeaderView.getPlayerSize());
+      Scene playerFrom = from.playerBounds.isEmpty() ? playerScene : from;
+      Scene playerTo = to.playerBounds.isEmpty() ? playerScene : to;
+      // Use the actual player panel and content origins, including the half-dp
+      // stroke inset. Reconstructing them from header height shifts the endpoint.
+      playerBounds.set(shell.left + blend(playerFrom.playerBounds.left - playerFrom.bounds.left, playerTo.playerBounds.left - playerTo.bounds.left, factor),
+        shell.bottom + blend(playerFrom.playerBounds.top - playerFrom.bounds.bottom, playerTo.playerBounds.top - playerTo.bounds.bottom, factor),
+        shell.right + blend(playerFrom.playerBounds.right - playerFrom.bounds.right, playerTo.playerBounds.right - playerTo.bounds.right, factor), 0);
+      playerBounds.bottom = playerBounds.top + blend(playerFrom.playerBounds.height(), playerTo.playerBounds.height(), factor);
+      playerContentBounds.set(playerBounds.left + blend(playerFrom.playerContentBounds.left - playerFrom.playerBounds.left, playerTo.playerContentBounds.left - playerTo.playerBounds.left, factor),
+        playerBounds.top + blend(playerFrom.playerContentBounds.top - playerFrom.playerBounds.top, playerTo.playerContentBounds.top - playerTo.playerBounds.top, factor),
+        playerBounds.right + blend(playerFrom.playerContentBounds.right - playerFrom.playerBounds.right, playerTo.playerContentBounds.right - playerTo.playerBounds.right, factor),
+        playerBounds.bottom + blend(playerFrom.playerContentBounds.bottom - playerFrom.playerBounds.bottom, playerTo.playerContentBounds.bottom - playerTo.playerBounds.bottom, factor));
       save = canvas.save();
+      if (playerAlpha < 1f) canvas.saveLayerAlpha(0, playerContentBounds.top, getWidth(), playerContentBounds.bottom, Math.round(playerAlpha * 255f));
+      int backgroundSave = canvas.save();
       clip.reset();
-      clip.addRoundRect(playerBounds, Screen.dp(18f), Screen.dp(18f), Path.Direction.CW);
+      float radius = Math.min(Screen.dp(26f), playerBounds.height() / 2f);
+      clip.addRoundRect(playerBounds, radius, radius, Path.Direction.CW);
       canvas.clipPath(clip);
-      if (playerAlpha < 1f) canvas.saveLayerAlpha(playerBounds, Math.round(playerAlpha * 255f));
       drawBackdrops(canvas, playerBounds, true);
+      canvas.restoreToCount(backgroundSave);
       playerScene.playerGlass.drawNavigationChrome(canvas, playerBounds,
         to.playerGlass != null ? to.playerGlass : playerScene.playerGlass, factor);
-      canvas.translate(0, playerBounds.top);
-      header.getFilling().drawFloatingPlayer(canvas, HeaderView.getPlayerSize());
+      clip.reset();
+      clip.addRoundRect(playerContentBounds.left + Screen.dp(8f), playerContentBounds.top,
+        playerContentBounds.right - Screen.dp(8f), playerContentBounds.bottom, Screen.dp(18f), Screen.dp(18f), Path.Direction.CW);
+      canvas.clipPath(clip);
+      canvas.translate(playerContentBounds.left, playerContentBounds.top);
+      header.getFilling().drawFloatingPlayer(canvas, Math.round(playerContentBounds.height()));
       canvas.restoreToCount(save);
     }
   }
+
+  private static float blend (float from, float to, float factor) { return from + (to - from) * factor; }
 
   private void drawBackdrops (Canvas canvas, RectF area, boolean playerSurface) {
     // The right-hand page stays in front both while opening and while closing.

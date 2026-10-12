@@ -237,6 +237,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene scene =
       new org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene(getValue(), mainGlassView, mainGlass)
         .player(mainPlayerView, mainPlayerGlass).bottom(bottomBar).bottom(bottomBarSpace);
+    for (RecyclerView list : glassLists.keySet()) scene.cache(list);
     // The compose wrapper fills the screen; capture its small buttons and labels only.
     if (composeWrap != null) {
       for (int i = 0; i < composeWrap.getChildCount(); i++) scene.bottom(composeWrap.getChildAt(i));

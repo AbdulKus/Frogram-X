@@ -805,6 +805,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (!useFloatingChatHeader() || topGlassView == null || headerGlass == null) return null;
     org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene scene =
       new org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene(getValue(), topGlassView, headerGlass)
+        .cache(messagesView)
         .top(topBar, this::getTopBarSurfaceHeight).player(floatingPlayerView, playerGlass)
         .bottomSurface(composerGlassView, inputGlass).bottom(replyBarView).bottom(bottomWrap).bottom(bottomBar)
         .bottom(emojiButton).bottom(attachButtons).bottom(sendButton).bottom(messageSenderButton)
