@@ -1031,12 +1031,14 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
       animator.addUpdateListener(animation -> {
         if (!isDone[0]) {
           setFactor(1f - AnimatorUtils.getFraction(animation));
+          setGlassAnimationProgress(animation, 0f, 1f);
         }
       });
     } else {
       animator.addUpdateListener(animation -> {
         if (!isDone[0]) {
           setFactor(AnimatorUtils.getFraction(animation));
+          setGlassAnimationProgress(animation, 0f, 1f);
         }
       });
     }
@@ -1219,7 +1221,11 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
 
       final float startFactor = getFactor();
       animator = AnimatorUtils.simpleValueAnimator();
-      animator.addUpdateListener(animation -> setFactor(startFactor - startFactor * AnimatorUtils.getFraction(animation)));
+      final float glassStart = glassTransition.getProgress();
+      animator.addUpdateListener(animation -> {
+        setFactor(startFactor - startFactor * AnimatorUtils.getFraction(animation));
+        setGlassAnimationProgress(animation, glassStart, 0f);
+      });
       animator.setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR);
       animator.addListener(new AnimatorListenerAdapter() {
         @Override
@@ -1384,7 +1390,11 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
       final float startFactor = getFactor();
       final float diffFactor = 1f - startFactor;
       animator = AnimatorUtils.simpleValueAnimator();
-      animator.addUpdateListener(animation -> setFactor(startFactor + diffFactor * AnimatorUtils.getFraction(animation)));
+      final float glassStart = glassTransition.getProgress();
+      animator.addUpdateListener(animation -> {
+        setFactor(startFactor + diffFactor * AnimatorUtils.getFraction(animation));
+        setGlassAnimationProgress(animation, glassStart, 1f);
+      });
       animator.setInterpolator(AnimatorUtils.DECELERATE_INTERPOLATOR);
       animator.addListener(new AnimatorListenerAdapter() {
         @Override
@@ -1403,6 +1413,14 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   }
 
   private float translationFactor;
+
+  private void setGlassAnimationProgress (ValueAnimator animator, float start, float end) {
+    if (glassTransition != null && glassTransition.isActive()) {
+      // The page's easing must not compress the dissolve into the first few frames.
+      glassTransition.setProgress(org.thunderdog.challegram.util.GlassNavigationMotion.timeline(
+        animator.getCurrentPlayTime(), animator.getDuration(), start, end));
+    }
+  }
 
   public void setFactor (float factor) {
     if (this.translationFactor == factor) return;

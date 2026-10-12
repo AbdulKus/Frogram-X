@@ -17,6 +17,8 @@ final class GlassContentSnapshot {
   private final RectF target = new RectF();
   private int width, height, padding;
 
+  boolean capture (View view) { return capture(view, view.getHeight()); }
+
   boolean capture (View view, int visibleHeight) {
     width = view.getWidth();
     height = Math.min(view.getHeight(), visibleHeight);
@@ -36,6 +38,7 @@ final class GlassContentSnapshot {
     int blurWidth = Math.max(1, Math.round(paddedWidth / (float) Screen.dp(2f)));
     int blurHeight = Math.max(1, Math.round(paddedHeight / (float) Screen.dp(2f)));
     blurred = Bitmap.createBitmap(blurWidth, blurHeight, Bitmap.Config.ARGB_8888);
+    paint.setAlpha(255);
     new Canvas(blurred).drawBitmap(sharp, null, new Rect(0, 0, blurWidth, blurHeight), paint);
     int[] pixels = new int[blurWidth * blurHeight];
     blurred.getPixels(pixels, 0, blurWidth, 0, 0, blurWidth, blurHeight);

@@ -128,6 +128,8 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     } else if (!useMenuSwitch) {
       menu.setAlpha(Math.max(outgoingAlpha, incomingAlpha));
     }
+    // These alphas are baked into our foreground bitmaps, not child RenderNodes.
+    invalidate();
   }
 
   @Override protected boolean drawChild (Canvas canvas, View child, long drawingTime) {
@@ -136,9 +138,9 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       GlassContentSnapshot snapshot = glassNavigationSnapshots.get(child);
       if (snapshot == null && !glassNavigationSnapshots.containsKey(child)) {
         snapshot = new GlassContentSnapshot();
-        int height = Math.max(baseItem != null ? baseItem.getHeaderHeight() : 0, previewItem != null ? previewItem.getHeaderHeight() : 0);
         try {
-          if (!snapshot.capture(child, Math.max(height, Size.getHeaderPortraitSize()) + Screen.dp(6f))) snapshot = null;
+          // Custom chat headers include the status-bar offset inside the child.
+          if (!snapshot.capture(child)) snapshot = null;
         } catch (RuntimeException | OutOfMemoryError error) {
           android.util.Log.w("GlassNavigation", "Header foreground capture unavailable", error);
           snapshot = null;

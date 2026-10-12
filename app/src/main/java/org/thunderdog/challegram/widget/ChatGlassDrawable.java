@@ -168,6 +168,39 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     bounds.set(panel);
   }
 
+  public void refreshNavigationBackdrop () {
+    // Page translation cancels in the source coordinates. Only changed contents
+    // or geometry cause a new small capture; sliding reuses the existing texture.
+    prepareBackdrop();
+  }
+
+  public void drawNavigationBackdrop (Canvas canvas, RectF bounds, float pageX, int pageWidth, float opacity) {
+    if (bounds.isEmpty() || opacity <= 0f) return;
+    int save = canvas.save();
+    canvas.clipRect(pageX, bounds.top, pageX + pageWidth, bounds.bottom);
+    paint.setShader(null);
+    paint.setColor(Color.WHITE);
+    paint.setAlpha(Math.round(opacity * 255f));
+    if (sample != null && !panel.isEmpty()) {
+      float scaleX = bounds.width() / panel.width(), scaleY = bounds.height() / panel.height();
+      navigationSampleBounds.set(bounds.left + pageX + (sampleBounds.left - panel.left) * scaleX,
+        bounds.top + (sampleBounds.top - panel.top) * scaleY,
+        bounds.left + pageX + (sampleBounds.right - panel.left) * scaleX,
+        bounds.top + (sampleBounds.bottom - panel.top) * scaleY);
+      canvas.drawBitmap(sample, null, navigationSampleBounds, paint);
+    } else {
+      paint.setColor(surfaceColor(colorId));
+      paint.setAlpha(Math.round(opacity * 255f));
+      canvas.drawRect(bounds, paint);
+    }
+    canvas.restoreToCount(save);
+  }
+
+  public void drawNavigationChrome (Canvas canvas, RectF bounds, ChatGlassDrawable destination, float factor) {
+    int color = ColorUtils.fromToArgb(surfaceColor(colorId), surfaceColor(destination.colorId), factor);
+    drawNavigationChrome(canvas, bounds, 1f, color, sample != null || destination.sample != null);
+  }
+
   /** Render a cached backdrop into the shared shell without relayout or recapture. */
   public void drawNavigationSurface (Canvas canvas, RectF bounds, float opacity) {
     if (bounds.isEmpty() || opacity <= 0f) return;
@@ -187,8 +220,19 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       paint.setAlpha(Math.round(opacity * 255f));
       canvas.drawBitmap(sample, null, navigationSampleBounds, paint);
     }
-    paint.setColor(surfaceColor(colorId));
-    paint.setAlpha(Math.round(opacity * 255f * (sample != null ? (Theme.isDark() ? .54f : .58f) : .82f)));
+    canvas.restoreToCount(save);
+    drawNavigationChrome(canvas, bounds, opacity, surfaceColor(colorId), sample != null);
+  }
+
+  private void drawNavigationChrome (Canvas canvas, RectF bounds, float opacity, int color, boolean sampled) {
+    int save = canvas.save();
+    float radius = Math.min(Screen.dp(26f), bounds.height() / 2f);
+    navigationClip.reset();
+    navigationClip.addRoundRect(bounds, radius, radius, Path.Direction.CW);
+    canvas.clipPath(navigationClip);
+    paint.setShader(null);
+    paint.setColor(color);
+    paint.setAlpha(Math.round(opacity * 255f * (sampled ? (Theme.isDark() ? .54f : .58f) : .82f)));
     canvas.drawRect(bounds, paint);
     navigationSheenMatrix.setScale(1f, bounds.height());
     navigationSheenMatrix.postTranslate(0, bounds.top);

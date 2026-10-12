@@ -8,6 +8,7 @@ import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewTreeObserver;
 
@@ -133,6 +134,16 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       for (HiddenView entry : hidden) entry.hide();
     }
 
+    private void refreshBackdrop () {
+      glass.refreshNavigationBackdrop();
+      if (playerGlass != null) playerGlass.refreshNavigationBackdrop();
+    }
+
+    private void drawBackdrop (Canvas canvas, RectF area, boolean playerSurface) {
+      ChatGlassDrawable drawable = playerSurface ? playerGlass : glass;
+      if (drawable != null) drawable.drawNavigationBackdrop(canvas, area, page.getTranslationX(), page.getWidth(), page.getAlpha());
+    }
+
     private void restore () {
       for (HiddenView entry : hidden) entry.restore();
       for (ChatGlassDrawable drawable : drawables) drawable.freezeForNavigation(false);
@@ -205,10 +216,12 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
   private final Path clip = new Path();
   private final Paint status = new Paint(Paint.ANTI_ALIAS_FLAG);
   private Scene from, to;
+  private boolean forward;
   private float progress;
   private boolean prepared;
   private GlassNavigationMotion.Geometry geometry;
   private ViewTreeObserver observer;
+  private long lastBackdropUpdate;
 
   public GlassNavigationTransition (Context context, HeaderView header) {
     super(context);
@@ -223,8 +236,10 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     if (leftScene == null || rightScene == null) return;
     from = forward ? leftScene : rightScene;
     to = forward ? rightScene : leftScene;
+    this.forward = forward;
     progress = 0f;
     prepared = false;
+    lastBackdropUpdate = 0;
     int color = ChatGlassDrawable.surfaceColor(ColorId.filling);
     int fadeHeight = header.getEffectiveTopOffset() + Screen.dp(24f);
     status.setShader(new LinearGradient(0, 0, 0, Math.max(1, fadeHeight),
@@ -237,6 +252,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
   }
 
   public boolean isActive () { return from != null; }
+  public float getProgress () { return progress; }
 
   public void setProgress (float progress) {
     this.progress = Math.max(0f, Math.min(1f, progress));
@@ -259,6 +275,12 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     try {
       from.refresh(this);
       to.refresh(this);
+      long now = SystemClock.uptimeMillis();
+      if (now - lastBackdropUpdate >= 32L || progress == 0f || progress == 1f) {
+        from.refreshBackdrop();
+        to.refreshBackdrop();
+        lastBackdropUpdate = now;
+      }
     } catch (RuntimeException | OutOfMemoryError error) {
       android.util.Log.w("GlassNavigation", "Foreground update unavailable", error);
       finish();
@@ -279,12 +301,12 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       from.bounds.right + (to.bounds.right - from.bounds.right) * factor,
       geometry.value(progress));
     canvas.drawRect(0, 0, getWidth(), header.getEffectiveTopOffset() + Screen.dp(24f), status);
-    from.glass.drawNavigationSurface(canvas, shell, 1f);
-    to.glass.drawNavigationSurface(canvas, shell, factor);
     int save = canvas.save();
     clip.reset();
     clip.addRoundRect(shell, Screen.dp(26f), Screen.dp(26f), Path.Direction.CW);
     canvas.clipPath(clip);
+    drawBackdrops(canvas, shell, false);
+    from.glass.drawNavigationChrome(canvas, shell, to.glass, factor);
     from.draw(canvas, from.top, GlassNavigationMotion.outgoing(progress));
     to.draw(canvas, to.top, geometry.incoming(progress));
     canvas.restoreToCount(save);
@@ -295,16 +317,24 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       to.player != null && to.player.view.getVisibility() == VISIBLE ? to.player.alpha : 0f);
     if (playerScene.playerGlass != null && playerAlpha > 0f) {
       playerBounds.set(shell.left, shell.bottom + Screen.dp(6f), shell.right, shell.bottom + Screen.dp(6f) + HeaderView.getPlayerSize());
-      playerScene.playerGlass.drawNavigationSurface(canvas, playerBounds, playerAlpha);
       save = canvas.save();
       clip.reset();
       clip.addRoundRect(playerBounds, Screen.dp(18f), Screen.dp(18f), Path.Direction.CW);
       canvas.clipPath(clip);
       if (playerAlpha < 1f) canvas.saveLayerAlpha(playerBounds, Math.round(playerAlpha * 255f));
+      drawBackdrops(canvas, playerBounds, true);
+      playerScene.playerGlass.drawNavigationChrome(canvas, playerBounds,
+        to.playerGlass != null ? to.playerGlass : playerScene.playerGlass, factor);
       canvas.translate(0, playerBounds.top);
       header.getFilling().drawFloatingPlayer(canvas, HeaderView.getPlayerSize());
       canvas.restoreToCount(save);
     }
+  }
+
+  private void drawBackdrops (Canvas canvas, RectF area, boolean playerSurface) {
+    // The right-hand page stays in front both while opening and while closing.
+    (forward ? from : to).drawBackdrop(canvas, area, playerSurface);
+    (forward ? to : from).drawBackdrop(canvas, area, playerSurface);
   }
 
   public void finish () {
