@@ -159,7 +159,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
 
     private void refreshBackdrop () {
       glass.refreshNavigationBackdrop();
-      if (playerGlass != null) playerGlass.refreshNavigationBackdrop();
+      if (playerGlass != null && player.view.getVisibility() == VISIBLE && player.alpha > 0f) playerGlass.refreshNavigationBackdrop();
     }
 
     private void drawBackdrop (Canvas canvas, RectF area, boolean playerSurface) {

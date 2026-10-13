@@ -160,7 +160,9 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
   public void freezeForNavigation (boolean frozen) {
     if (navigationFrozen == frozen) return;
-    if (frozen) prepareBackdrop();
+    // Detached captures support offscreen preparation. Attached hidden controls
+    // must not replay the list just because another screen starts a transition.
+    if (frozen && (host.getWindowToken() == null || (host.isShown() && hasVisibleAlpha()))) prepareBackdrop();
     navigationFrozen = frozen;
     if (!frozen) invalidateBackdrop();
   }
