@@ -350,6 +350,10 @@ public class RoundVideoController extends BasePlaybackController implements
 
   public void detachVideoLayer (MessagesController controller) {
     if (videoController != controller) return;
+    if (isVideoHierarchyInLayout()) {
+      UI.post(() -> detachVideoLayer(controller));
+      return;
+    }
     setTargetView(null, false, false);
     if (targetController == controller) targetController = null;
     videoController = null;
@@ -1323,6 +1327,39 @@ public class RoundVideoController extends BasePlaybackController implements
   private boolean currentViewVisible;
   private MessagesController targetController;
 
+  private boolean layoutUpdatePosted, layoutUpdateCallListeners, layoutUpdateFirstTime;
+  private final Runnable deferredLayoutUpdate = this::applyDeferredLayoutUpdate;
+
+  private static boolean isHierarchyInLayout (View view) {
+    while (view != null) {
+      if (view.isInLayout()) return true;
+      android.view.ViewParent parent = view.getParent();
+      view = parent instanceof View ? (View) parent : null;
+    }
+    return false;
+  }
+
+  private boolean isVideoHierarchyInLayout () {
+    return isHierarchyInLayout(rootView) || isHierarchyInLayout(targetView);
+  }
+
+  private boolean deferLayoutUpdate (boolean callListeners, boolean firstTime) {
+    if (!layoutUpdatePosted && !isVideoHierarchyInLayout()) return false;
+    layoutUpdateCallListeners |= callListeners;
+    layoutUpdateFirstTime |= firstTime;
+    if (!layoutUpdatePosted) {
+      layoutUpdatePosted = true;
+      UI.post(deferredLayoutUpdate);
+    }
+    return true;
+  }
+
+  private void applyDeferredLayoutUpdate () {
+    boolean callListeners = layoutUpdateCallListeners, firstTime = layoutUpdateFirstTime;
+    layoutUpdatePosted = layoutUpdateCallListeners = layoutUpdateFirstTime = false;
+    if (object != null) checkCurrentViewVisible(callListeners, firstTime);
+  }
+
   public void setAttachedToView (MessageViewGroup viewGroup, MessagesController targetController) {
     this.targetController = targetController;
     setTargetView(viewGroup, true, false);
@@ -1388,6 +1425,9 @@ public class RoundVideoController extends BasePlaybackController implements
   }
 
   private void checkCurrentViewVisible (boolean callListeners, boolean firstTime) {
+    // Reparenting the video/overlay while an ancestor lays out its children
+    // invalidates FrameLayout's cached child count when returning from PiP.
+    if (deferLayoutUpdate(callListeners, firstTime)) return;
     ViewController<?> c = targetController != null ? targetController : context.navigation() != null ? context.navigation().getCurrentStackItem() : null;
     boolean isVisible = targetView != null && (c != null && c instanceof MessagesController && c.getChatId() == object.chatId) && layoutPlayer();
     if (this.currentViewVisible != isVisible || firstTime) {
@@ -1428,6 +1468,7 @@ public class RoundVideoController extends BasePlaybackController implements
   private float overlayTranslationY;
 
   private boolean layoutPlayer () {
+    if (deferLayoutUpdate(true, false)) return currentViewVisible;
     TGMessage msg = targetView.getMessageView().getMessage();
 
     final float translationX = targetView.getVideoPlayerView().getTranslationX();
