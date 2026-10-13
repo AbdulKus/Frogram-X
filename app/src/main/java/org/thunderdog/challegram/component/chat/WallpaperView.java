@@ -365,13 +365,31 @@ public class WallpaperView extends View implements ThemeChangeListener, ChatStyl
     glassInvalidationListener = listener;
   }
 
+  private void invalidateGlass () {
+    if (glassInvalidationListener != null) glassInvalidationListener.run();
+  }
+
+  @Override public void invalidate () {
+    super.invalidate();
+    invalidateGlass();
+  }
+
+  @Override public void invalidate (android.graphics.Rect dirty) {
+    super.invalidate(dirty);
+    invalidateGlass();
+  }
+
+  @Override public void invalidate (int left, int top, int right, int bottom) {
+    super.invalidate(left, top, right, bottom);
+    invalidateGlass();
+  }
+
   @Override
   protected void onDraw (Canvas c) {
     int save = c.save();
     c.clipRect(0, 0, getWidth(), getHeight());
     drawForGlass(c);
     c.restoreToCount(save);
-    if (glassInvalidationListener != null) glassInvalidationListener.run();
   }
 
   /** Draw only the wallpaper; do not recursively invalidate its glass consumers. */

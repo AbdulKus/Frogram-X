@@ -513,6 +513,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   public void invalidateVideoBackdrop () { invalidateChatGlass(); }
 
+  public void invalidateVideoBackdrop (android.graphics.RectF boundsInWindow) {
+    invalidateChatGlass(null, boundsInWindow);
+  }
+
   private void drawVideoForGlass (Canvas canvas) {
     context().getRoundVideoController().drawForGlass(this, canvas);
   }
@@ -531,6 +535,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private int floatingOverlayTop, glassControlsColor;
   public static int getGlassIconColorId () { return Theme.isDark() ? ColorId.icon : ColorId.text; }
 
+  private View getComposerContent () {
+    return actionShowing && actionButtonWrap != null ? actionButtonWrap : inputView;
+  }
+
   /** Establish the viewport before RecyclerView lays out a pending unread/history jump. */
   public boolean updateMeasuredFloatingInsets () {
     if (!newChatInput || inputView == null || inputView.getParent() != bottomWrap || inPreviewMode || isInForceTouchMode()) return false;
@@ -540,7 +548,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private int calculateFloatingBottomInset () {
     int bottom = extraBottomInset;
     if (bottomWrap.getVisibility() == View.VISIBLE) {
-      LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
+      View composer = getComposerContent();
+      LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) composer.getLayoutParams();
       RelativeLayout.LayoutParams wrapParams = (RelativeLayout.LayoutParams) bottomWrap.getLayoutParams();
       int inputTop = bottomWrap.getPaddingTop() + inputParams.topMargin;
       float shown = replyBarVisible.getFloatValue() * (1f - getSearchTransformFactor());
@@ -565,12 +574,13 @@ public class MessagesController extends ViewController<MessagesController.Argume
     int bottom = calculateFloatingBottomInset();
     if (composerGlassView != null) composerGlassView.setVisibility(newChatInput && bottomWrap.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
     if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
-      float top = bottomWrap.getY() + inputView.getTop();
+      View composer = getComposerContent();
+      float top = bottomWrap.getY() + composer.getTop();
       if (getReplyOffset() > 0f) top = Math.min(top, replyBarView.getY());
       // Reserve the reply row once; animate the drawable inset, never the View height.
-      float inputTop = bottomWrap.getY() + inputView.getTop();
-      int reserve = replyBarView != null ? replyBarView.getLayoutParams().height + Math.max(0, inputView.getTop()) : 0;
-      Views.setLayoutHeight(composerGlassView, inputView.getHeight() + reserve);
+      float inputTop = bottomWrap.getY() + composer.getTop();
+      int reserve = replyBarView != null ? replyBarView.getLayoutParams().height + Math.max(0, composer.getTop()) : 0;
+      Views.setLayoutHeight(composerGlassView, composer.getHeight() + reserve);
       composerGlassView.setTranslationY(inputTop - reserve);
       inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
       // Use the same geometry as measurement; stale child coordinates during an
@@ -596,7 +606,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   public int getGlassBottomOverscan () {
     if (!newChatInput || inputView == null) return getFloatingBottomInset();
     // Keep the full multiline/reply surface, but exclude the opaque IME below it.
-    int surface = Math.round(inputView.getMeasuredHeight() + getReplyOffset() + Screen.dp(12f));
+    int surface = Math.round(getComposerContent().getMeasuredHeight() + getReplyOffset() + Screen.dp(12f));
     return Math.max(surface, Math.round(calculateFloatingBottomInset() - extraBottomInset - getKeyboardOffset()));
   }
 
@@ -605,13 +615,21 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void invalidateChatGlass (View changed) {
+    invalidateChatGlass(changed, null);
+  }
+
+  private static void invalidateGlass (ChatGlassDrawable glass, View changed, android.graphics.RectF region) {
+    if (region != null) glass.invalidateBackdropRegion(region); else glass.invalidateBackdrop(changed);
+  }
+
+  private void invalidateChatGlass (View changed, android.graphics.RectF region) {
     for (int i = extraGlass.size() - 1; i >= 0; i--) {
       ChatGlassDrawable glass = extraGlass.get(i).get();
-      if (glass == null) extraGlass.remove(i); else glass.invalidateBackdrop(changed);
+      if (glass == null) extraGlass.remove(i); else invalidateGlass(glass, changed, region);
     }
-    if (newChatInput && inputGlass != null) inputGlass.invalidateBackdrop(changed);
-    if (headerGlass != null && useFloatingChatHeader()) headerGlass.invalidateBackdrop(changed);
-    if (playerGlass != null && hasFloatingPlayer()) playerGlass.invalidateBackdrop(changed);
+    if (newChatInput && inputGlass != null) invalidateGlass(inputGlass, changed, region);
+    if (headerGlass != null && useFloatingChatHeader()) invalidateGlass(headerGlass, changed, region);
+    if (playerGlass != null && hasFloatingPlayer()) invalidateGlass(playerGlass, changed, region);
   }
 
   private void updateFloatingInsets () {
@@ -706,6 +724,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
     int gap = Screen.dp(6f);
     inputParams.setMargins(side, gap, side, gap + getFloatingBottomClearance());
     inputView.setLayoutParams(inputParams);
+    if (actionButtonWrap != null) {
+      LinearLayout.LayoutParams actionParams = (LinearLayout.LayoutParams) actionButtonWrap.getLayoutParams();
+      actionParams.setMargins(side, gap, side, gap + getFloatingBottomClearance());
+      actionButtonWrap.setLayoutParams(actionParams);
+      RippleSupport.setTransparentSelector(actionButton, Screen.dp(24f), null);
+    }
     for (View button : new View[] {emojiButton, attachButtons, sendButton, messageSenderButton}) {
       RelativeLayout.LayoutParams buttonParams = (RelativeLayout.LayoutParams) button.getLayoutParams();
       buttonParams.leftMargin = buttonParams.rightMargin = side;
@@ -7296,7 +7320,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
     if (actionButtonWrap == null) {
       actionButtonWrap = new FrameLayoutFix(context());
-      actionButtonWrap.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(49f)));
+      LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(49f));
+      if (useFloatingChatHeader()) actionParams.setMargins(Screen.dp(8f), Screen.dp(6f), Screen.dp(8f), Screen.dp(6f) + getFloatingBottomClearance());
+      actionButtonWrap.setLayoutParams(actionParams);
 
       actionButton = new NoScrollTextView(context());
       actionButton.setId(R.id.btn_chatAction);
@@ -7305,7 +7331,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       actionButton.setTypeface(Fonts.getRobotoMedium());
       actionButton.setPadding(Screen.dp(12f), 0, Screen.dp(12f), 0);
       // actionButton.setSingleLine(false);
-      RippleSupport.setSimpleWhiteBackground(actionButton, this);
+      if (useFloatingChatHeader()) RippleSupport.setTransparentSelector(actionButton, Screen.dp(24f), null);
+      else RippleSupport.setSimpleWhiteBackground(actionButton, this);
       actionButton.setEllipsize(TextUtils.TruncateAt.END);
       actionButton.setGravity(Gravity.CENTER);
       actionButton.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));

@@ -8,10 +8,13 @@ public final class GlassNavigationTest {
   }
 
   public static void main (String[] args) {
-    for (int hz : new int[] {30, 60, 90, 120}) {
-      float first = GlassNavigationMotion.timeline(Math.round(1000f / hz), 400L, 0f, 1f);
-      if (GlassNavigationMotion.outgoing(first) < .8f) throw new AssertionError("header disappears at first frame");
+    for (int hz : new int[] {30, 60, 90, 120, 144}) {
+      float first = GlassNavigationMotion.timeline(Math.round(1000f / hz), 350L, 0f, 1f);
+      if (GlassNavigationMotion.outgoing(first) < .7f) throw new AssertionError("header disappears at first frame");
     }
+    if (GlassNavigationMotion.incoming(.5f) < .2f || GlassNavigationMotion.incomingBottom(.5f) < .3f)
+      throw new AssertionError("chrome is still absent halfway through the page slide");
+    equal(1f, GlassNavigationMotion.incomingBottom(.84f), "composer settles before the page animation ends");
     equal(.5f, GlassNavigationMotion.timeline(200, 400, 0f, 1f), "chrome uses elapsed time, independently of page easing");
     equal(.3f, GlassNavigationMotion.timeline(100, 200, .6f, 0f), "cancel continues from swipe progress");
     equal(.8f, GlassNavigationMotion.timeline(100, 200, .6f, 1f), "completion continues from swipe progress");
@@ -44,6 +47,8 @@ public final class GlassNavigationTest {
       equal(86 * density, late.value(0f), "cancel after retarget restores original shell");
       equal(182 * density, late.value(1f), "retarget completes");
       equal(1f, late.incoming(1f), "late pin incoming completes");
+      if (GlassNavigationMotion.incomingBottom(.75f) < .9f)
+        throw new AssertionError("late pins must not hide the incoming composer");
     }
     AlphaBlur blur = new AlphaBlur();
     for (int[] size : new int[][] {{1, 1}, {1, 31}, {31, 1}, {37, 19}}) {

@@ -104,37 +104,46 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   private View preview;
   private ViewController<?> previewItem, baseItem;
   private boolean glassNavigationActive;
+  private float glassOutgoingAlpha = 1f, glassIncomingAlpha;
   private final java.util.IdentityHashMap<View, GlassContentSnapshot> glassNavigationSnapshots = new java.util.IdentityHashMap<>();
 
   void setGlassNavigationActive (boolean active) {
     if (glassNavigationActive == active) return;
     glassNavigationActive = active;
     glassNavigationSnapshots.clear();
+    if (active) {
+      glassOutgoingAlpha = 1f;
+      glassIncomingAlpha = 0f;
+      // drawChild presents cached foregrounds. Changing child alpha here would
+      // still invalidate the original RenderNodes and their overlapping layers.
+      if (title != null) title.setAlpha(1f);
+      if (preview != null) preview.setAlpha(1f);
+      if (menu != null) menu.setAlpha(1f);
+      if (menuPreview != null) menuPreview.setAlpha(1f);
+    }
     if (active && shareHeader && title != preview) {
       shareHeader = false;
       title.setVisibility(View.VISIBLE);
     }
-    if (active && previewOpened) setTranslation(translationFactor);
+    if (previewOpened) setTranslation(translationFactor);
     invalidate();
   }
 
   void setGlassNavigationReveal (float outgoingAlpha, float incomingAlpha) {
     if (!glassNavigationActive || !previewOpened) return;
-    title.setAlpha(outgoingAlpha);
-    preview.setAlpha(incomingAlpha);
-    if (useMenuSwitch && useMenuPreview) {
-      menu.setAlpha(outgoingAlpha);
-      menuPreview.setAlpha(incomingAlpha);
-    } else if (!useMenuSwitch) {
-      menu.setAlpha(Math.max(outgoingAlpha, incomingAlpha));
-    }
+    if (glassOutgoingAlpha == outgoingAlpha && glassIncomingAlpha == incomingAlpha) return;
+    glassOutgoingAlpha = outgoingAlpha;
+    glassIncomingAlpha = incomingAlpha;
     // These alphas are baked into our foreground bitmaps, not child RenderNodes.
     invalidate();
   }
 
   @Override protected boolean drawChild (Canvas canvas, View child, long drawingTime) {
     if (glassNavigationActive && (child == title || child == preview || child == menu || child == menuPreview)) {
-      if (child.getAlpha() <= 0f) return true;
+      float visibility = child == title && child == preview ? Math.max(glassOutgoingAlpha, glassIncomingAlpha) :
+        child == title ? glassOutgoingAlpha : child == preview || child == menuPreview ? glassIncomingAlpha :
+        useMenuSwitch ? glassOutgoingAlpha : Math.max(glassOutgoingAlpha, glassIncomingAlpha);
+      if (visibility <= 0f) return true;
       GlassContentSnapshot snapshot = glassNavigationSnapshots.get(child);
       if (snapshot == null && !glassNavigationSnapshots.containsKey(child)) {
         snapshot = new GlassContentSnapshot();
@@ -148,9 +157,14 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         glassNavigationSnapshots.put(child, snapshot);
       }
       if (snapshot != null) {
-        snapshot.draw(canvas, child.getLeft(), child.getTop(), child.getAlpha());
+        snapshot.draw(canvas, child.getLeft(), child.getTop(), visibility);
         return true;
       }
+      int save = canvas.saveLayerAlpha(child.getX(), child.getY(), child.getX() + child.getWidth(),
+        child.getY() + child.getHeight(), Math.round(255f * visibility));
+      boolean result = super.drawChild(canvas, child, drawingTime);
+      canvas.restoreToCount(save);
+      return result;
     }
     return super.drawChild(canvas, child, drawingTime);
   }
@@ -1626,7 +1640,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       floatSwitch.setHeightFactor(getHeightFactor(fromHeight), baseHasFloat ? 1f - raptor : raptor, false);
     }
 
-    switch (glassNavigationActive ? MODE_FADE : translationMode) {
+    if (!glassNavigationActive) switch (translationMode) {
       case MODE_HORIZONTAL: {
         if (forceRtlAnimation || Lang.rtl()) {
           if (translateForward) {
@@ -1684,27 +1698,23 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       title.setTranslationY(0f);
       preview.setTranslationX(0f);
       preview.setTranslationY(0f);
-      title.setAlpha(org.thunderdog.challegram.util.GlassNavigationMotion.outgoing(raptor));
-      preview.setAlpha(org.thunderdog.challegram.util.GlassNavigationMotion.incoming(raptor));
     }
 
     if (useMenuSwitch) {
       if (useMenu) {
-        menu.setAlpha(glassNavigationActive ? org.thunderdog.challegram.util.GlassNavigationMotion.outgoing(raptor) : 1f - raptor);
+        if (!glassNavigationActive) menu.setAlpha(1f - raptor);
         if (translationMode == MODE_VERTICAL) {
           //noinspection ResourceType
           menu.setTranslationY(translateForward ? -(Size.getHeaderPortraitSize() + getEffectiveTopOffset()) * raptor : currentY * raptor);
         }
       }
       if (useMenuPreview) {
-        menuPreview.setAlpha(glassNavigationActive ? org.thunderdog.challegram.util.GlassNavigationMotion.incoming(raptor) : raptor);
+        if (!glassNavigationActive) menuPreview.setAlpha(raptor);
         if (translationMode == MODE_VERTICAL) {
           //noinspection ResourceType
           menuPreview.setTranslationY(translateForward ? currentY * (1f - raptor) : -((Size.getHeaderPortraitSize() + getEffectiveTopOffset()) * (1f - raptor)));
         }
       }
-    } else if (glassNavigationActive) {
-      menu.setAlpha(Math.max(org.thunderdog.challegram.util.GlassNavigationMotion.outgoing(raptor), org.thunderdog.challegram.util.GlassNavigationMotion.incoming(raptor)));
     }
 
     if (useBackFade) {

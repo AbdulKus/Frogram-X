@@ -120,13 +120,12 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       updateBounds(root);
     }
 
-    private void captureForeground (View root, float visibility) {
+    private void captureForeground (View root, float topVisibility, float bottomVisibility) {
       // Incoming controls stay hidden until the shell has finished expanding.
       // Capturing them during that expansion repeats software drawing, bitmap
       // allocation and blur whenever a pinned/reply row changes height.
-      if (visibility <= 0f) return;
-      for (Layer layer : top) capture(layer, root);
-      for (Layer layer : bottom) capture(layer, root);
+      if (topVisibility > 0f) for (Layer layer : top) capture(layer, root);
+      if (bottomVisibility > 0f) for (Layer layer : bottom) capture(layer, root);
     }
 
     private void updateBounds (View root) {
@@ -320,8 +319,9 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       from.refresh(this);
       to.refresh(this);
       geometry.retarget(to.bounds.bottom, progress);
-      from.captureForeground(this, GlassNavigationMotion.outgoing(progress));
-      to.captureForeground(this, geometry.incoming(progress));
+      float outgoing = GlassNavigationMotion.outgoing(progress);
+      from.captureForeground(this, outgoing, outgoing);
+      to.captureForeground(this, geometry.incoming(progress), GlassNavigationMotion.incomingBottom(progress));
       long now = SystemClock.uptimeMillis();
       if (now - lastBackdropUpdate >= 32L || progress == 0f || progress == 1f) {
         from.refreshBackdrop();
@@ -364,7 +364,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     to.draw(canvas, to.top, geometry.incoming(progress));
     canvas.restoreToCount(save);
     from.drawBottom(canvas, GlassNavigationMotion.outgoing(progress));
-    to.drawBottom(canvas, geometry.incoming(progress));
+    to.drawBottom(canvas, GlassNavigationMotion.incomingBottom(progress));
     Scene playerScene = !from.playerBounds.isEmpty() ? from : to;
     float playerAlpha = Math.max(from.player != null && from.player.view.getVisibility() == VISIBLE ? from.player.alpha : 0f,
       to.player != null && to.player.view.getVisibility() == VISIBLE ? to.player.alpha : 0f);

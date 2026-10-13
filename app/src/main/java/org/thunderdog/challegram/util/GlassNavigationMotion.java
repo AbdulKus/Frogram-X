@@ -10,26 +10,31 @@ public final class GlassNavigationMotion {
   }
 
   public static float outgoing (float progress) {
-    return 1f - smooth(progress / .5f);
+    return 1f - smooth(progress / .28f);
   }
 
   public static float incoming (float progress) {
-    return smooth((progress - .64f) / .36f);
+    return reveal(progress, .34f, .88f);
+  }
+
+  /** The composer does not need to wait for pinned rows in the upper shell. */
+  public static float incomingBottom (float progress) {
+    return reveal(progress, .28f, .84f);
   }
 
   public static float geometry (float progress) {
-    return smooth(progress / .58f);
+    return smooth(progress / .32f);
   }
 
   /** A late pinned row retargets the shell and keeps incoming text behind the gate. */
   public static final class Geometry {
     private Segment curve;
 
-    public Geometry (float from, float to) { curve = new Segment(from, to, 0f, .58f, null); }
+    public Geometry (float from, float to) { curve = new Segment(from, to, 0f, .32f, null); }
 
     public void retarget (float target, float progress) {
       if (target == curve.to) return;
-      curve = new Segment(value(progress), target, progress, Math.min(1f, Math.max(.58f, progress + .18f)), curve);
+      curve = new Segment(value(progress), target, progress, Math.min(1f, Math.max(.32f, progress + .18f)), curve);
     }
 
     public float value (float progress) {
@@ -37,8 +42,8 @@ public final class GlassNavigationMotion {
     }
 
     public float incoming (float progress) {
-      float gate = Math.max(.64f, curve.end);
-      return gate >= 1f ? (progress >= 1f ? 1f : 0f) : smooth((progress - gate) / (1f - gate));
+      float gate = Math.max(.34f, curve.end);
+      return gate >= 1f ? (progress >= 1f ? 1f : 0f) : reveal(progress, gate, Math.max(.88f, gate + (1f - gate) * .8f));
     }
 
     private static final class Segment {
@@ -53,6 +58,10 @@ public final class GlassNavigationMotion {
         return from + (to - from) * factor;
       }
     }
+  }
+
+  private static float reveal (float progress, float start, float end) {
+    return smooth((progress - start) / (end - start));
   }
 
   private static float smooth (float factor) {

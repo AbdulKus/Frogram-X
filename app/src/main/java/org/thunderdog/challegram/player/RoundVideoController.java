@@ -72,6 +72,7 @@ import org.thunderdog.challegram.ui.MessagesController;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.v.MessagesRecyclerView;
 import org.thunderdog.challegram.widget.CircleFrameLayout;
+import org.thunderdog.challegram.widget.GlassVideoSnapshot;
 import org.thunderdog.challegram.widget.ImageReceiverView;
 import org.thunderdog.challegram.widget.RectFrameLayout;
 
@@ -114,7 +115,7 @@ public class RoundVideoController extends BasePlaybackController implements
   @Override
   protected void startPlayback (Tdlib tdlib, TdApi.Message message, boolean byUserRequest, boolean hadObject, Tdlib previousTdlib, int previousFileId) {
     float currentProgress = 0f;
-    capturedVideoRevision = -1;
+    glassVideoSnapshot.reset();
     videoFrameRevision++;
 
     if (texturePrepared) {
@@ -313,14 +314,25 @@ public class RoundVideoController extends BasePlaybackController implements
   private final RectF glassVideoRect = new RectF();
   private final Path glassVideoClip = new Path();
   private final Paint glassVideoPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-  private Bitmap glassVideoFrame;
-  private long videoFrameRevision, capturedVideoRevision = -1;
+  private final RectF glassVideoWindowRect = new RectF();
+  private final GlassVideoSnapshot glassVideoSnapshot = new GlassVideoSnapshot();
+  private final Runnable glassVideoReady = this::invalidateVideoFrameBackdrop;
+  private long videoFrameRevision;
   private final java.util.concurrent.atomic.AtomicBoolean frameUpdatePosted = new java.util.concurrent.atomic.AtomicBoolean();
   private final Runnable glassFrameUpdate = () -> {
     frameUpdatePosted.set(false);
     videoFrameRevision++;
-    if (videoController != null) videoController.invalidateVideoBackdrop();
+    if (!isPlayingThroughPip && mainVisibilityFactor > 0f) invalidateVideoFrameBackdrop();
   };
+
+  private void invalidateVideoFrameBackdrop () {
+    if (videoController == null || mainTextureView == null || mainPlayerView == null) return;
+    mainTextureView.getLocationInWindow(textureLocation);
+    glassVideoWindowRect.set(textureLocation[0], textureLocation[1],
+      textureLocation[0] + mainTextureView.getWidth() * mainPlayerView.getScaleX(),
+      textureLocation[1] + mainTextureView.getHeight() * mainPlayerView.getScaleY());
+    videoController.invalidateVideoBackdrop(glassVideoWindowRect);
+  }
 
   private void attachVideoLayer (MessagesController controller) {
     FrameLayoutFix parent = controller.videoLayer();
@@ -330,7 +342,7 @@ public class RoundVideoController extends BasePlaybackController implements
       rootView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
       parent.addView(rootView);
       videoController = controller;
-      capturedVideoRevision = -1;
+      glassVideoSnapshot.reset();
     }
   }
 
@@ -339,6 +351,7 @@ public class RoundVideoController extends BasePlaybackController implements
     setTargetView(null, false, false);
     if (targetController == controller) targetController = null;
     videoController = null;
+    glassVideoSnapshot.reset();
     if (rootView != null) {
       if (rootView.getParent() instanceof ViewGroup) ((ViewGroup) rootView.getParent()).removeView(rootView);
       FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -362,22 +375,16 @@ public class RoundVideoController extends BasePlaybackController implements
     float height = texture.getHeight() * mainPlayerView.getScaleY();
     glassVideoRect.set(left, top, left + width, top + height);
     if (!canvas.quickReject(glassVideoRect, Canvas.EdgeType.AA)) {
-      if (glassVideoFrame == null) glassVideoFrame = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
-      if (capturedVideoRevision != videoFrameRevision) {
-        try {
-          if (texture.getBitmap(glassVideoFrame) != null) capturedVideoRevision = videoFrameRevision;
-        } catch (IllegalStateException ignored) {
-          // The decoder can replace its surface while moving to or from PiP.
-          return;
-        }
+      Bitmap frame = glassVideoSnapshot.frame(texture, videoFrameRevision, glassVideoReady);
+      if (frame != null) {
+        int save = canvas.save();
+        glassVideoClip.reset();
+        glassVideoClip.addOval(glassVideoRect, Path.Direction.CW);
+        canvas.clipPath(glassVideoClip);
+        glassVideoPaint.setAlpha(Math.round(255f * mainVisibilityFactor));
+        canvas.drawBitmap(frame, null, glassVideoRect, glassVideoPaint);
+        canvas.restoreToCount(save);
       }
-      int save = canvas.save();
-      glassVideoClip.reset();
-      glassVideoClip.addOval(glassVideoRect, Path.Direction.CW);
-      canvas.clipPath(glassVideoClip);
-      glassVideoPaint.setAlpha(Math.round(255f * mainVisibilityFactor));
-      canvas.drawBitmap(glassVideoFrame, null, glassVideoRect, glassVideoPaint);
-      canvas.restoreToCount(save);
     }
     if (currentOwnedOverlay != null) {
       MessageOverlayView overlay = currentOwnedOverlay.getOverlayView();
@@ -652,8 +659,7 @@ public class RoundVideoController extends BasePlaybackController implements
     videoController = null;
     handler.removeCallbacks(glassFrameUpdate);
     frameUpdatePosted.set(false);
-    glassVideoFrame = null;
-    capturedVideoRevision = -1;
+    glassVideoSnapshot.reset();
     rootView = null;
     mainPlayerView = null; mainTextureView = null; mainProgressView = null;
 
@@ -930,6 +936,7 @@ public class RoundVideoController extends BasePlaybackController implements
       this.mainVisibilityFactor = factor;
       if (texturePrepared) {
         mainPlayerView.setAlpha(factor);
+        invalidateVideoFrameBackdrop();
       }
     }
   }

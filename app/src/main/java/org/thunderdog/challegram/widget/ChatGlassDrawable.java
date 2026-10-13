@@ -331,6 +331,18 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
         top < sampleBounds.bottom && top + changed.getHeight() > sampleBounds.top) invalidateBackdrop();
   }
 
+  /** Content-only changes (video frames) already have their transformed window bounds. */
+  public void invalidateBackdropRegion (RectF region) {
+    if (released || !enabled || region.isEmpty()) return;
+    if (sample == null || geometryDirty) {
+      invalidateBackdrop();
+      return;
+    }
+    host.getLocationInWindow(hostPosition);
+    if (region.left < hostPosition[0] + sampleBounds.right && region.right > hostPosition[0] + sampleBounds.left &&
+        region.top < hostPosition[1] + sampleBounds.bottom && region.bottom > hostPosition[1] + sampleBounds.top) invalidateBackdrop();
+  }
+
   private boolean prepareBackdrop () {
     if (released || !enabled || panel.isEmpty() || (sourceView.getWidth() == 0 && (messages == null || messages.getWidth() == 0))) return false;
     host.getLocationInWindow(hostPosition);
