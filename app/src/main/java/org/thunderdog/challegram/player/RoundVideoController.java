@@ -319,11 +319,13 @@ public class RoundVideoController extends BasePlaybackController implements
   private final Runnable glassVideoReady = this::invalidateVideoFrameBackdrop;
   private long videoFrameRevision;
   private final java.util.concurrent.atomic.AtomicBoolean frameUpdatePosted = new java.util.concurrent.atomic.AtomicBoolean();
-  private final Runnable glassFrameUpdate = () -> {
+  private final Runnable glassFrameUpdate = this::onGlassFrameUpdate;
+
+  private void onGlassFrameUpdate () {
     frameUpdatePosted.set(false);
     videoFrameRevision++;
     if (!isPlayingThroughPip && mainVisibilityFactor > 0f) invalidateVideoFrameBackdrop();
-  };
+  }
 
   private void invalidateVideoFrameBackdrop () {
     if (videoController == null || mainTextureView == null || mainPlayerView == null) return;
