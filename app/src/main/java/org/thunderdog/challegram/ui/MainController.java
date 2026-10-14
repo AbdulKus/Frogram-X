@@ -299,7 +299,11 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       FloatingPlayerGeometry.inset(mainPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0);
     if (list instanceof CustomRecyclerView) ((CustomRecyclerView) list).setGlassOverlay(hasFloatingHeader());
     if (list.getPaddingTop() != top) list.setPadding(list.getPaddingLeft(), top, list.getPaddingRight(), list.getPaddingBottom());
-    list.setClipToPadding(hasFloatingHeader() ? false : original.clip);
+    boolean clip = hasFloatingHeader() ? false : original.clip;
+    // RecyclerView requests layout even when this value did not change. This
+    // method runs from the wrapper's layout listener, so repeating the setter
+    // schedules another wrapper layout and keeps the whole window busy.
+    if (list.getClipToPadding() != clip) list.setClipToPadding(clip);
   }
 
   private void updateMainGlassGeometry () {
