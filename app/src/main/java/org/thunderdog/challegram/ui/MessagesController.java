@@ -1171,6 +1171,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   protected View onCreateView (final Context context) {
+    org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.chat.createViews");
+    try {
+      return createMessagesView(context);
+    } finally {
+      org.thunderdog.challegram.util.PerformanceTrace.end();
+    }
+  }
+
+  private View createMessagesView (final Context context) {
     if (!isInForceTouchMode()) {
       UI.setSoftInputMode(UI.getContext(context), Config.DEFAULT_WINDOW_PARAMS);
     }

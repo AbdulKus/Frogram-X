@@ -2133,6 +2133,15 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
   }
 
   private void openChat (TdApi.Chat chat) {
+    org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.chat.click");
+    try {
+      openChatImpl(chat);
+    } finally {
+      org.thunderdog.challegram.util.PerformanceTrace.end();
+    }
+  }
+
+  private void openChatImpl (TdApi.Chat chat) {
     int highlightMode;
     Object shareItem = pickerDelegate != null ? pickerDelegate.getShareItem() : null;
     TdlibUi.ChatOpenParameters params;

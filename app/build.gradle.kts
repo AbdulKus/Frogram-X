@@ -519,6 +519,7 @@ gradle.projectsEvaluated {
 }
 
 dependencies {
+  flavorImplementation(null, null, libs.androidx.profileinstaller, libs.androidx.profileinstaller)
   legacyImplementation(libs.androidx.multidex)
   implementation(project(":extension:${config.extension}"))
   // TDLib: https://github.com/tdlib/td/blob/master/CHANGELOG.md

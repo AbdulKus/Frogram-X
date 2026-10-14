@@ -738,7 +738,7 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
   }
 
   public void setMessageList (@Nullable MessageListManager messageList) {
-    if (this.messageList == messageList)
+    if (this.messageList == messageList && this.staticList == null)
       return;
     clearMessageList();
     this.messageList = messageList;
@@ -788,6 +788,7 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
       }
     }
     clearMessageList();
+    staticList = entries;
     collapse(false);
     canExpand.setValue(false, false);
     countAnimator.forceFactor(0);

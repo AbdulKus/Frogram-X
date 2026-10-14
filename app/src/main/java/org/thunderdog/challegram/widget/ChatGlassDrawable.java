@@ -346,6 +346,15 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   }
 
   private boolean prepareBackdrop () {
+    org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.glass.backdrop");
+    try {
+      return prepareBackdropContents();
+    } finally {
+      org.thunderdog.challegram.util.PerformanceTrace.end();
+    }
+  }
+
+  private boolean prepareBackdropContents () {
     if (released || !enabled || panel.isEmpty() || (sourceView.getWidth() == 0 && (messages == null || messages.getWidth() == 0))) return false;
     host.getLocationInWindow(hostPosition);
     sourceView.getLocationInWindow(wallpaperPosition);

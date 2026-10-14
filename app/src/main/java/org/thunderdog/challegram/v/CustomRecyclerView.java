@@ -36,7 +36,9 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
   }
 
   @Override public void setClipToPadding (boolean clip) {
-    super.setClipToPadding(clip && !glassOverlay);
+    boolean effectiveClip = clip && !glassOverlay;
+    // RecyclerView requests layout even when its clipping flag is unchanged.
+    if (getClipToPadding() != effectiveClip) super.setClipToPadding(effectiveClip);
   }
 
 

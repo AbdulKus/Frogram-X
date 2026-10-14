@@ -2249,14 +2249,19 @@ public class TdlibUi extends Handler {
     } else {
       arguments = new MessagesController.Arguments(tdlib, chatList, chat, messageThread, messageTopicId, filter);
     }
-    controller.setArguments(arguments
-      .setScheduled(onlyScheduled)
-      .referrer(referrer)
-      .voiceChatInvitation(voiceChatInvitation)
-      .fillDraft(forceDraft)
-    );
-
-    View view = controller.getValue();
+    final View view;
+    org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.chat.prepare");
+    try {
+      controller.setArguments(arguments
+        .setScheduled(onlyScheduled)
+        .referrer(referrer)
+        .voiceChatInvitation(voiceChatInvitation)
+        .fillDraft(forceDraft)
+      );
+      view = controller.getValue();
+    } finally {
+      org.thunderdog.challegram.util.PerformanceTrace.end();
+    }
     if (controller.context().isNavigationBusy()) {
       if (params != null) {
         params.onDone();

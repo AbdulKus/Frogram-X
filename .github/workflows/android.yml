@@ -38,6 +38,7 @@ jobs:
       - name: Test APK manifest and release selection
         run: |
           python3 -B -m unittest discover -s tests/updates -p 'test_*.py'
+          python3 -B -m unittest discover -s tests/performance -p 'test_*.py'
           curl --fail --silent --show-error --location --retry 3 \
             https://repo.maven.apache.org/maven2/org/json/json/20250517/json-20250517.jar -o "$RUNNER_TEMP/json.jar"
           echo "3ea61b2a06e31edf1c91134fe9106b0ebb16628be169f3db75bc7a2b06b45796  $RUNNER_TEMP/json.jar" | sha256sum --check
@@ -259,6 +260,7 @@ jobs:
             exit 1
           fi
           cp "${APKS[0]}" artifacts/
+          python3 -B scripts/verify-baseline-profile.py "${APKS[0]}"
           (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
 
       - name: Generate update manifest

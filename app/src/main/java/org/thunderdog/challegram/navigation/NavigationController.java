@@ -1007,6 +1007,15 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   private static final boolean USE_ASYNC_IN_STEP_2 = false;
 
   void animateNavigate (final ViewController<?> controller, int direction, final boolean forward, final int rebase, final boolean fastAnimation) {
+    org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.navigation.start");
+    try {
+      animateNavigateImpl(controller, direction, forward, rebase, fastAnimation);
+    } finally {
+      org.thunderdog.challegram.util.PerformanceTrace.end();
+    }
+  }
+
+  private void animateNavigateImpl (final ViewController<?> controller, int direction, final boolean forward, final int rebase, final boolean fastAnimation) {
     final ViewController<?> left, right;
 
     if (forward) {

@@ -20,6 +20,15 @@ final class GlassContentSnapshot {
   boolean capture (View view) { return capture(view, view.getHeight()); }
 
   boolean capture (View view, int visibleHeight) {
+    org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.glass.foreground");
+    try {
+      return captureContents(view, visibleHeight);
+    } finally {
+      org.thunderdog.challegram.util.PerformanceTrace.end();
+    }
+  }
+
+  private boolean captureContents (View view, int visibleHeight) {
     width = view.getWidth();
     height = Math.min(view.getHeight(), visibleHeight);
     if (width <= 0 || height <= 0) return false;
