@@ -143,6 +143,8 @@
     tools:targetApi="37"
     tools:ignore="RtlEnabled">
 
+    <profileable android:shell="true" tools:targetApi="29" />
+
     <meta-data
       android:name="firebase_analytics_collection_deactivated"
       android:value="true" />

@@ -29,6 +29,8 @@ in navigation latency. See the official [manual measurement guide](https://devel
 
 ## Measuring the delay before the slide
 
+Release builds enable `profileable android:shell="true"` on Android 10+ so an
+authorized ADB shell can collect app sections without a debuggable build.
 System traces with `atrace_apps: "org.frogram.messenger"` now include these
 non-identifying sections:
 
