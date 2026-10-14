@@ -69,3 +69,30 @@ Additional trace points distinguish `Frogram.chat.initialMessages`,
 `Frogram.chat.localViewportReady`, `Frogram.chat.historyReady`,
 `Frogram.chat.awaitHistory`, `Frogram.chat.awaitDraft` and
 `Frogram.chat.readyForNavigation`. They contain no chat identifiers.
+
+The physical-device sample used to validate build 150 did not hit either the
+early-signal race or the filled-local-page shortcut. Initial messages generally
+became available at navigation start; some loads reached the existing timeout.
+These conditional correctness fixes do not explain away the remaining history
+preparation delay. Waiting for ready history remains the selected behavior.
+
+## Software text replay in glass samples
+
+An ART sampling trace on build 150 attributed about 493 ms of 676 ms sampled
+software `drawTextRun` time to chat-list rows replayed by glass capture. These
+are sampling wall durations, not exact CPU measurements or frame-rate figures.
+
+`Text.draw` already clips titles and other opted-in text to their text area.
+When that intersection is empty on a software canvas, it now stops before
+background, spoiler and glyph rendering. It still updates quote and touch
+coordinates and clears coordinate-dependent caches before returning, and restores
+the saved canvas. Visible text, hardware recording and text without this clip
+retain their existing rendering path. No glyph bounds are approximated.
+
+The JVM regression executes the production clipping prelude. A native Android
+comparison against build 150 also passed 480 pixel-equality cases across LTR/RTL,
+five densities, transforms, partial/empty clips and multilingual italic text;
+hardware behavior and coordinate bookkeeping were checked separately. In the
+emulator's isolated fully-clipped-text benchmark, the median for 1,000 draws
+was 80.75 ms before and 0.49 ms after. This isolates avoidable work, not the
+overall chat transition; device frame measurements are still needed for that.

@@ -2496,6 +2496,7 @@ public class Text implements Runnable, Emoji.CountLimiter, CounterTextPart, List
 
     final boolean needRestore = BitwiseUtils.hasFlag(textFlags, FLAG_NEED_CLIP_TEXT_AREA);
     final int saveCount;
+    boolean textClipVisible = true;
     if (needRestore) {
       saveCount = Views.save(c);
       int bound = Screen.dp(4f);
@@ -2507,10 +2508,10 @@ public class Text implements Runnable, Emoji.CountLimiter, CounterTextPart, List
       }
       if (isFullyRtl() && startX != endX) {
         // c.drawRect(endX - lineMargin - getWidth() - bound, startY - bound, endX + bound, startY + getHeight() + bound, Paints.strokeSmallPaint(0xFF000000));
-        c.clipRect(endX - lineMargin - getWidth() - bound, startY - bound, endX + bound, startY + getHeight() + bound);
+        textClipVisible = c.clipRect(endX - lineMargin - getWidth() - bound, startY - bound, endX + bound, startY + getHeight() + bound);
       } else {
         // c.drawRect(startX - bound, startY - bound, startX + getWidth() + bound + lineMargin, startY + getHeight() + bound, Paints.strokeSmallPaint(0xFF000000));
-        c.clipRect(startX - bound, startY - bound, startX + getWidth() + bound + lineMargin, startY + getHeight() + bound);
+        textClipVisible = c.clipRect(startX - bound, startY - bound, startX + getWidth() + bound + lineMargin, startY + getHeight() + bound);
       }
 
     } else {
@@ -2531,6 +2532,14 @@ public class Text implements Runnable, Emoji.CountLimiter, CounterTextPart, List
       this.lastStartX = startX;
       this.lastEndX = endX;
       this.lastEndXBottomPadding = endXBottomPadding;
+    }
+
+    // Glass samples replay rows on a software canvas with a very small clip.
+    // Keep the draw coordinates above current for touch/tooltip geometry, but
+    // do not shape glyphs or start media batches after our own clip is empty.
+    if (needRestore && !textClipVisible && !c.isHardwareAccelerated()) {
+      Views.restore(c, saveCount);
+      return;
     }
 
     final boolean center = (textFlags & FLAG_ALIGN_CENTER) != 0;
