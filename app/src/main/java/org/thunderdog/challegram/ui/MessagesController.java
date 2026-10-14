@@ -2541,7 +2541,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public boolean needAsynchronousAnimation () {
-    return pendingDraftReply || manager != null && !manager.isTotallyEmpty() && manager.getAdapter().getMessageCount() == 0;
+    boolean waiting = pendingDraftReply || manager != null && !manager.hasNavigationReadySignal() && !manager.isTotallyEmpty() && manager.getAdapter().getMessageCount() == 0;
+    org.thunderdog.challegram.util.PerformanceTrace.begin(waiting ? (pendingDraftReply ? "Frogram.chat.awaitDraft" : "Frogram.chat.awaitHistory") : "Frogram.chat.readyForNavigation");
+    org.thunderdog.challegram.util.PerformanceTrace.end();
+    return waiting;
   }
 
   @Override protected boolean canExecuteScheduledAnimation () { return !pendingDraftReply || getScheduledAnimation() == null; }

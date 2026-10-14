@@ -1133,6 +1133,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   // Private Loaders
 
   private void loadFromStart (MessageId fromId, TGMessage startMessage) {
+    navigationReadySignal = false;
     adapter.reset(startMessage);
     scrollToPositionWithOffsetImpl(0, 0);
     loader.loadFromStart(fromId);
@@ -1140,6 +1141,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   private void loadFromMessage (MessageId messageId, int highlightMode, boolean force) {
+    if (force) navigationReadySignal = false;
     if (force) {
       adapter.reset(null);
     }
@@ -1200,11 +1202,21 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   private boolean awaitingForPinnedMessages;
+  private boolean navigationReadySignal;
+
+  public boolean hasNavigationReadySignal () {
+    return navigationReadySignal;
+  }
 
   private void onChatAwaitFinish () {
     // FIXME once TDLib will have onlyLocal flag in SearchChatMessages query
     boolean pinnedReceived = true; // pinnedMessages == null || pinnedMessages.hasReceivedInitialChunk();
     if (pinnedReceived) {
+      // The loader can finish before NavigationController registers its runnable.
+      // Remember the same readiness signal that would release an existing wait.
+      navigationReadySignal = true;
+      org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.chat.historyReady");
+      org.thunderdog.challegram.util.PerformanceTrace.end();
       controller.executeScheduledAnimation();
     } else {
       awaitingForPinnedMessages = true;
@@ -1285,7 +1297,16 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
         } else {
           scrollToMessage(scrollPosition, scrollMessage, highlightMode == HIGHLIGHT_MODE_NONE ? HIGHLIGHT_MODE_START : highlightMode, false, false);
         }
-        if (!willRepeat) {
+        if (size > 0) {
+          org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.chat.initialMessages");
+          org.thunderdog.challegram.util.PerformanceTrace.end();
+        }
+        boolean localViewportReady = willRepeat && hasInitialViewportContent(items, scrollPosition, scrollMessage, scrollMessageId);
+        if (localViewportReady) {
+          org.thunderdog.challegram.util.PerformanceTrace.begin("Frogram.chat.localViewportReady");
+          org.thunderdog.challegram.util.PerformanceTrace.end();
+        }
+        if (!willRepeat || localViewportReady) {
           onChatAwaitFinish();
         }
         viewMessages(false);
@@ -1310,6 +1331,21 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
   }
 
   // Bot info
+
+  private boolean hasInitialViewportContent (List<TGMessage> items, int scrollPosition, TGMessage scrollMessage, MessageId scrollMessageId) {
+    // A local page may contain fewer messages than the requested chunk and still
+    // fill the screen. Keep loading in the background without delaying navigation.
+    // Restored/unread/highlight anchors retain the original readiness policy.
+    if (scrollPosition != 0 || scrollMessage != null || (scrollMessageId != null && !scrollMessageId.isHistoryEnd())) return false;
+    int viewportHeight = getRecyclerHeight();
+    if (viewportHeight <= 0) return false;
+    long contentHeight = 0;
+    for (TGMessage item : items) {
+      contentHeight += item.getHeight();
+      if (contentHeight >= viewportHeight) return true;
+    }
+    return false;
+  }
 
   private TGMessage headerMessage;
   private boolean insertMessageOnLoad;

@@ -47,3 +47,25 @@ be the existing asynchronous history/draft-reply readiness gate. Keep this
 separate from time spent executing on the UI thread. Sections record static
 names only and perform no logging or capture outside an active system trace.
 The slide duration and readiness timeout are unchanged by these markers.
+
+## History readiness
+
+Physical-device traces across different chats showed 150–520 ms between the
+click and navigation start, while click handling itself took 3–14 ms. Keep this
+separate from the frame cost of the slide and from the small cached test chat.
+
+The loader's existing ready signal is now retained for the current initial load:
+a signal received before the navigation runnable is registered must not be lost.
+New initial/forced anchor loads reset it. Pending draft replies still block the
+transition until their existing completion callback or timeout.
+
+A partial local page can also release an existing wait when it fills the full
+recycler height at the history-end anchor. Loading continues normally. Short
+pages, unknown viewport geometry, unread/highlight targets and restored scroll
+positions retain the original completion policy. This does not shorten the
+500 ms fallback or alter the slide duration.
+
+Additional trace points distinguish `Frogram.chat.initialMessages`,
+`Frogram.chat.localViewportReady`, `Frogram.chat.historyReady`,
+`Frogram.chat.awaitHistory`, `Frogram.chat.awaitDraft` and
+`Frogram.chat.readyForNavigation`. They contain no chat identifiers.
