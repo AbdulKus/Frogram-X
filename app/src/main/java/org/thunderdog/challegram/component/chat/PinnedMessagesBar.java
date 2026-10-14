@@ -702,6 +702,9 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
         return false;
       }
       Entry b = (Entry) obj;
+      if (localPickedFile != b.localPickedFile || !tgx.td.Td.equalsTo(quote, b.quote)) {
+        return false;
+      }
       if (isMessage() != b.isMessage() || isLinkPreview() != b.isLinkPreview()) {
         return false;
       }

@@ -30,6 +30,7 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
   private java.util.function.Consumer<View> backdropRegionInvalidationListener;
   private boolean capturingGlass;
   private boolean glassOverlay;
+  private boolean clippingInitialized;
 
   public void setGlassOverlay (boolean enabled) {
     glassOverlay = enabled;
@@ -38,7 +39,13 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
   @Override public void setClipToPadding (boolean clip) {
     boolean effectiveClip = clip && !glassOverlay;
     // RecyclerView requests layout even when its clipping flag is unchanged.
-    if (getClipToPadding() != effectiveClip) super.setClipToPadding(effectiveClip);
+    // RecyclerView calls this override from its constructor, before its own
+    // clipping flag and ViewGroup's flag necessarily agree. Forward that first
+    // call even when the value returned by getClipToPadding() already matches.
+    if (!clippingInitialized || getClipToPadding() != effectiveClip) {
+      super.setClipToPadding(effectiveClip);
+      clippingInitialized = true;
+    }
   }
 
 

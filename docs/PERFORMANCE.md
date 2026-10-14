@@ -7,7 +7,8 @@ The maintained Telegram X base is `0583baf9104ed9b4423f671c58d38dc99f153b7a`
 - [bf670928](https://github.com/TGX-Android/Telegram-X/commit/bf6709283238eba9ae4cd812b015a516309c05f2):
   retain the static pinned/preview list so unchanged comment previews reuse the
   existing adapter contents, and update the retained preview's forced title.
-  Clearing a static list also bypasses the dynamic-list identity fast path.
+  Clearing a static list also bypasses the dynamic-list identity fast path;
+  changing the quote or locally picked media invalidates the retained preview.
 - [d132af88](https://github.com/TGX-Android/Telegram-X/commit/d132af883b8408760f1ff716021fa20ff86f392a):
   the latest upstream baseline profile. `scripts/update-baseline-profile.py`
   imports it into AGP's standard `app/src/main/baseline-prof.txt` location and adds

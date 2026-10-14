@@ -30,6 +30,7 @@ class PreviewRegressionTest(unittest.TestCase):
         source = FIXTURE.replace("PINNED_METHODS", pinned_methods)
         source = source.replace("DISPLAY_METHOD", method(preview, "private void setDisplayData ("))
         source = source.replace("TITLE_METHOD", method(preview, "public boolean setForcedTitle ("))
+        source = source.replace("ENTRY_EQUALS", method(pinned, "public boolean equals (@Nullable Object obj)").replace("tgx.td.Td.equalsTo", "Objects.equals"))
         javac, java = shutil.which("javac"), shutil.which("java")
         self.assertIsNotNone(javac, "JDK required")
         with tempfile.TemporaryDirectory(prefix="frogram-preview-regression-") as directory:
@@ -48,8 +49,13 @@ public class PreviewRegression {
   static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
   static class RecyclerView { static final int NO_POSITION=-1; LinearLayoutManager manager=new LinearLayoutManager(); Object getLayoutManager(){return manager;} }
   static class LinearLayoutManager { int scrolls; void scrollToPositionWithOffset(int p,int o){scrolls++;} }
-  static class TdApi { static class Message {long chatId=1;} }
-  static class Entry {int id,subscribed,destroyed;Entry(int id){this.id=id;}void subscribeToUpdates(){subscribed++;}void performDestroy(){destroyed++;}public boolean equals(Object o){return o instanceof Entry&&((Entry)o).id==id;} }
+  static class TdApi { static class Message {long chatId=1,id;} }
+  static class Entry {
+    int subscribed,destroyed;TdApi.Message message=new TdApi.Message();Object quote,localPickedFile,linkPreviewContext;String linkPreviewUrl;
+    Entry(int id){message.id=id;}boolean isMessage(){return message!=null;}boolean isLinkPreview(){return linkPreviewUrl!=null;}
+    void subscribeToUpdates(){subscribed++;}void performDestroy(){destroyed++;}
+    ENTRY_EQUALS
+  }
   static class ListItem { }
   static class MessageListManager extends ArrayList<TdApi.Message> {
     int added,removed,loaded;int getTotalCount(){return size();}int getCount(){return size();}Object tdlib(){return null;}
@@ -63,7 +69,7 @@ public class PreviewRegression {
     void collapse(boolean b){} ListItem itemOf(Entry e){return new ListItem();}ListItem itemOf(Object t,TdApi.Message m){return new ListItem();}
     PINNED_METHODS
   }
-  static class StringUtils {static boolean equalsOrBothEmpty(String a,String b){return Objects.equals(a,b)||(a==null||a.isEmpty())&&(b==null||b.isEmpty());} }
+  static class StringUtils {static boolean equalsTo(String a,String b){return Objects.equals(a,b);}static boolean equalsOrBothEmpty(String a,String b){return Objects.equals(a,b)||(a==null||a.isEmpty())&&(b==null||b.isEmpty());} }
   static class BitwiseUtils {static boolean hasFlag(int n,int f){return (n&f)!=0;} }
   static class Options {static final int NO_UPDATES=1,DISABLE_MESSAGE_PREVIEW=2;}
   static class Link {void removeReference(Object o){}void addReference(Object o){}boolean isLoading(){return false;} }
@@ -95,6 +101,11 @@ public class PreviewRegression {
     p.setMessageList(dynamic);check(p.messagesAdapter.changes==changes&&dynamic.added==1&&dynamic.loaded==1,"same dynamic manager must be reused");
     p.setStaticMessageList(Collections.singletonList(new Entry(3)),-1);check(dynamic.removed==1,"switching list kind detaches dynamic listener");
     p.setStaticMessageList(Collections.emptyList(),-1);check(p.staticList==null&&p.messagesAdapter.count==0,"empty static list clears rows");
+    Entry quoted=new Entry(4);quoted.quote="selected text";p.setStaticMessageList(Collections.singletonList(quoted),-1);changes=p.messagesAdapter.changes;
+    Entry differentQuote=new Entry(4);differentQuote.quote="different text";p.setStaticMessageList(Collections.singletonList(differentQuote),-1);
+    check(p.messagesAdapter.changes==changes+1,"changing a quote on the same message must refresh preview");
+    Entry differentFile=new Entry(4);differentFile.quote="different text";differentFile.localPickedFile=new Object();p.setStaticMessageList(Collections.singletonList(differentFile),-1);
+    check(p.messagesAdapter.changes==changes+2,"changing local picked media on the same message must refresh preview");
     Preview preview=new Preview();DisplayData retained=new DisplayData("before");preview.setDisplayData(retained);int builds=preview.builds;
     preview.setDisplayData(new DisplayData("after"));check(preview.data==retained&&"after".equals(retained.forcedTitle),"changed title must update retained data");
     check(preview.titleUpdates==1&&preview.builds==builds,"title update must not rebuild equal content");
