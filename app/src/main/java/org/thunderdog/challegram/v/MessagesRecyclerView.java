@@ -112,18 +112,31 @@ public class MessagesRecyclerView extends RecyclerView implements FactorAnimator
   public boolean setOverlayPadding (int top, int bottom) {
     if (getPaddingTop() == top && getPaddingBottom() == bottom) return false;
     LayoutManager layout = getLayoutManager();
-    boolean keepBottom = false;
+    int anchorPosition = RecyclerView.NO_POSITION, anchorOffset = 0;
     if (layout instanceof MessagesLayoutManager && !isComputingLayout() && getScrollState() == SCROLL_STATE_IDLE) {
       MessagesLayoutManager messagesLayout = (MessagesLayoutManager) layout;
       View lastMessage = messagesLayout.findViewByPosition(0);
-      keepBottom = !messagesLayout.hasPendingScroll() && lastMessage != null &&
-        Math.abs(messagesLayout.getDecoratedBottom(lastMessage) - (getHeight() - getPaddingBottom())) <= Screen.dp(2f);
+      if (!messagesLayout.hasPendingScroll()) {
+        if (lastMessage != null &&
+            Math.abs(messagesLayout.getDecoratedBottom(lastMessage) - (getHeight() - getPaddingBottom())) <= Screen.dp(2f)) {
+          anchorPosition = 0;
+        } else if (top != getPaddingTop() && bottom == getPaddingBottom() && !hasPendingAdapterUpdates()) {
+          // Older messages must stay at the same screen position too. A reverse
+          // layout otherwise adds the change in padded height to its end anchor.
+          int position = messagesLayout.findFirstVisibleItemPosition();
+          View anchor = messagesLayout.findViewByPosition(position);
+          if (anchor != null) {
+            anchorPosition = position;
+            anchorOffset = getHeight() - bottom - messagesLayout.getDecoratedBottom(anchor);
+          }
+        }
+      }
     }
     setPadding(getPaddingLeft(), top, getPaddingRight(), bottom);
     // The reverse layout's end anchor also moves when only its top padding
     // changes (for example, when playback ends and the player panel disappears).
     // Keep the last message above the composer without replacing a history jump.
-    if (keepBottom) ((MessagesLayoutManager) layout).scrollToPositionWithOffset(0, 0);
+    if (anchorPosition != RecyclerView.NO_POSITION) ((MessagesLayoutManager) layout).scrollToPositionWithOffset(anchorPosition, anchorOffset);
     return true;
   }
 
