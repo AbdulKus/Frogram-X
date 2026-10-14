@@ -83,6 +83,21 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   private View fadeView;
   private FloatingButton floatingButton;
   private GlassNavigationTransition glassTransition;
+  private ViewController<?> pendingHeaderBack;
+
+  boolean isOpeningGlassPage () {
+    return isAnimating && translatingForward && glassTransition != null && glassTransition.isActive() &&
+      !headerView.inSearchMode() && !headerView.inSelectMode();
+  }
+
+  void requestHeaderBack (ViewController<?> expected) {
+    if (isDestroyed || expected == null || getCurrentStackItem() != expected) return;
+    if (isAnimating) {
+      if (translatingForward) pendingHeaderBack = expected;
+    } else if (getStackSize() > 1) {
+      UI.getContext(context).performBackPress(true);
+    }
+  }
 
   private boolean isAnimating;
 
@@ -460,6 +475,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
 
   public void destroy () {
     isDestroyed = true;
+    pendingHeaderBack = null;
     if (glassTransition != null) glassTransition.finish();
     ThemeManager.instance().removeThemeListener(this);
     getStack().clear(this);
@@ -1107,6 +1123,16 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
       if (!animating) {
         if (glassTransition != null) glassTransition.finish();
         processor.checkRebaseMessage();
+        if (pendingHeaderBack != null) {
+          ViewController<?> expected = pendingHeaderBack;
+          pendingHeaderBack = null;
+          // Complete the current stack transaction before handling one early tap.
+          // Repeated taps during the same opening never remove multiple pages.
+          UI.post(() -> {
+            if (!isDestroyed && !isAnimating && getCurrentStackItem() == expected &&
+                UI.getContext(context).getActivityState() == UI.State.RESUMED) requestHeaderBack(expected);
+          });
+        }
       }
     }
   }

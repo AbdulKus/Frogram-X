@@ -17,6 +17,7 @@ package org.thunderdog.challegram.navigation;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 
 import org.thunderdog.challegram.BaseActivity;
 import org.thunderdog.challegram.core.Lang;
@@ -52,6 +53,68 @@ public class InterceptLayout extends FrameLayoutFix implements FactorAnimator.St
   }
 
   private boolean disallowIntercept;
+
+  private BackHeaderButton capturedHeaderBack;
+  private ViewController<?> capturedBackTarget;
+  private float backDownX, backDownY;
+  private boolean backTouchMoved;
+  private final int[] backPosition = new int[2];
+
+  private void clearHeaderBackTouch () {
+    if (capturedHeaderBack != null) capturedHeaderBack.setPressed(false);
+    capturedHeaderBack = null;
+    capturedBackTarget = null;
+    backTouchMoved = false;
+  }
+
+  @Override
+  public boolean dispatchTouchEvent (MotionEvent event) {
+    int action = event.getActionMasked();
+    BaseActivity context = (BaseActivity) getContext();
+    NavigationController navigation = context.navigation();
+    if (action == MotionEvent.ACTION_DOWN) {
+      clearHeaderBackTouch();
+      // The old interception swallowed a tap even after the new page looked
+      // ready. Keep just this back tap and finish the opening before returning.
+      if (!isBlocked() && !context.isPasscodeShowing() && navigation != null && navigation.isOpeningGlassPage()) {
+        BackHeaderButton back = navigation.getHeaderView().getBackButton();
+        if (back != null && back.isShown() && back.isEnabled() && back.getAlpha() > 0f && back.getFactor() > 0f) {
+          back.getLocationOnScreen(backPosition);
+          float x = event.getRawX() - backPosition[0], y = event.getRawY() - backPosition[1];
+          if (x >= 0f && x < back.getWidth() && y >= 0f && y < back.getHeight()) {
+            capturedHeaderBack = back;
+            capturedBackTarget = navigation.getCurrentStackItem();
+            backDownX = event.getRawX();
+            backDownY = event.getRawY();
+            back.drawableHotspotChanged(x, y);
+            back.setPressed(true);
+            navigation.getHeaderView().onBackTouchDown(event);
+          }
+        }
+      }
+    }
+    if (capturedHeaderBack != null) {
+      float dx = event.getRawX() - backDownX, dy = event.getRawY() - backDownY;
+      int slop = ViewConfiguration.get(context).getScaledTouchSlop();
+      if (event.getPointerCount() > 1 || dx * dx + dy * dy > slop * slop) {
+        backTouchMoved = true;
+        capturedHeaderBack.setPressed(false);
+      }
+      if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+        boolean commit = action == MotionEvent.ACTION_UP && !backTouchMoved;
+        ViewController<?> expected = capturedBackTarget;
+        clearHeaderBackTouch();
+        if (commit && navigation != null) navigation.requestHeaderBack(expected);
+      }
+      return true;
+    }
+    return super.dispatchTouchEvent(event);
+  }
+
+  @Override protected void onDetachedFromWindow () {
+    clearHeaderBackTouch();
+    super.onDetachedFromWindow();
+  }
 
   /*@Override
   public void requestDisallowInterceptTouchEvent (boolean disallowIntercept) {
