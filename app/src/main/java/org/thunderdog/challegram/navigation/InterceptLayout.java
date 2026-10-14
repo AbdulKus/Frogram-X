@@ -78,7 +78,7 @@ public class InterceptLayout extends FrameLayoutFix implements FactorAnimator.St
       // ready. Keep just this back tap and finish the opening before returning.
       if (!isBlocked() && !context.isPasscodeShowing() && navigation != null && navigation.isOpeningGlassPage()) {
         BackHeaderButton back = navigation.getHeaderView().getBackButton();
-        if (back != null && back.isShown() && back.isEnabled() && back.getAlpha() > 0f && back.getFactor() > 0f) {
+        if (back != null && back.isShown() && back.isEnabled() && back.getAlpha() > 0f) {
           back.getLocationOnScreen(backPosition);
           float x = event.getRawX() - backPosition[0], y = event.getRawY() - backPosition[1];
           if (x >= 0f && x < back.getWidth() && y >= 0f && y < back.getHeight()) {

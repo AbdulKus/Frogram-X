@@ -86,8 +86,12 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
   private ViewController<?> pendingHeaderBack;
 
   boolean isOpeningGlassPage () {
-    return isAnimating && translatingForward && glassTransition != null && glassTransition.isActive() &&
-      !headerView.inSearchMode() && !headerView.inSelectMode();
+    if (!isAnimating || !translatingForward || headerView.inSearchMode() || headerView.inSelectMode()) return false;
+    ViewController<?> incoming = getCurrentStackItem(), outgoing = getPreviousStackItem();
+    // Loading can postpone begin() while navigation already blocks touches.
+    // The incoming controller, rather than the old menu icon, owns this tap.
+    return incoming != null && outgoing != null && incoming.hasFloatingHeader() && outgoing.hasFloatingHeader() &&
+      !incoming.usePopupMode() && !outgoing.usePopupMode() && incoming.getBackButton() == BackHeaderButton.TYPE_BACK;
   }
 
   void requestHeaderBack (ViewController<?> expected) {
@@ -938,6 +942,7 @@ public class NavigationController implements Future<View>, ThemeChangeListener, 
     hideContextualPopups();
 
     final boolean forward = (mode & MODE_BACKWARD) != MODE_BACKWARD;
+    translatingForward = forward;
     final boolean fastAnimation;
     int direction;
 
