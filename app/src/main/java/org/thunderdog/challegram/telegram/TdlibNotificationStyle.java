@@ -610,7 +610,10 @@ public class TdlibNotificationStyle implements TdlibNotificationStyleDelegate, F
         if (isSummary) {
           behavior = allowPreview || settings == null ? NotificationCompat.GROUP_ALERT_CHILDREN : NotificationCompat.GROUP_ALERT_SUMMARY;
         } else {
-          behavior = needNotification ? NotificationCompat.GROUP_ALERT_CHILDREN : NotificationCompat.GROUP_ALERT_SUMMARY;
+          // A quiet content/avatar refresh must keep the same alerting owner.
+          // Switching an active child to GROUP_ALERT_SUMMARY retracts its banner.
+          // setOnlyAlertOnce above prevents the refresh from sounding again.
+          behavior = NotificationCompat.GROUP_ALERT_CHILDREN;
         }
         builder.setGroupAlertBehavior(behavior);
         TDLib.Tag.notifications("displaying notification with behavior:%d", behavior);

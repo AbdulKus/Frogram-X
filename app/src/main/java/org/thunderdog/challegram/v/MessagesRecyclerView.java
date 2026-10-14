@@ -113,15 +113,16 @@ public class MessagesRecyclerView extends RecyclerView implements FactorAnimator
     if (getPaddingTop() == top && getPaddingBottom() == bottom) return false;
     LayoutManager layout = getLayoutManager();
     boolean keepBottom = false;
-    if (bottom != getPaddingBottom() && layout instanceof MessagesLayoutManager && !isComputingLayout() && getScrollState() == SCROLL_STATE_IDLE) {
+    if (layout instanceof MessagesLayoutManager && !isComputingLayout() && getScrollState() == SCROLL_STATE_IDLE) {
       MessagesLayoutManager messagesLayout = (MessagesLayoutManager) layout;
       View lastMessage = messagesLayout.findViewByPosition(0);
       keepBottom = !messagesLayout.hasPendingScroll() && lastMessage != null &&
         Math.abs(messagesLayout.getDecoratedBottom(lastMessage) - (getHeight() - getPaddingBottom())) <= Screen.dp(2f);
     }
     setPadding(getPaddingLeft(), top, getPaddingRight(), bottom);
-    // Keep an already bottom-aligned conversation above the composer as its
-    // height changes. Never overwrite an explicit unread/search/history target.
+    // The reverse layout's end anchor also moves when only its top padding
+    // changes (for example, when playback ends and the player panel disappears).
+    // Keep the last message above the composer without replacing a history jump.
     if (keepBottom) ((MessagesLayoutManager) layout).scrollToPositionWithOffset(0, 0);
     return true;
   }

@@ -29,7 +29,6 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     private final ChatGlassDrawable glass;
     private final ArrayList<ChatGlassDrawable> drawables = new ArrayList<>();
     private final ArrayList<HiddenView> hidden = new ArrayList<>();
-    private final ArrayList<CachedView> cachedViews = new ArrayList<>();
     private final ArrayList<Layer> top = new ArrayList<>(), bottom = new ArrayList<>();
     private final ArrayList<Surface> bottomSurfaces = new ArrayList<>();
     private final RectF bounds = new RectF();
@@ -54,15 +53,6 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
 
     public Scene hide (View view) {
       if (view != null && findHidden(view) == null) hidden.add(new HiddenView(view));
-      return this;
-    }
-
-    /** Cache only scrolling content: the page's overflow and live chrome stay intact. */
-    public Scene cache (View view) {
-      if (view != null) {
-        for (CachedView entry : cachedViews) if (entry.view == view) return this;
-        cachedViews.add(new CachedView(view));
-      }
       return this;
     }
 
@@ -109,7 +99,9 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       for (ChatGlassDrawable drawable : drawables) drawable.freezeForNavigation(true);
       updateBounds(root);
       refresh(root);
-      if (root.isHardwareAccelerated()) for (CachedView entry : cachedViews) entry.prepare();
+      // RecyclerView already reuses its children's hardware display lists.
+      // A temporary layer for the entire list allocates/uploads a full-screen
+      // texture at the first frame and rebuilds it for every animated row.
       prepared = true;
       return true;
     }
@@ -170,7 +162,6 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     private void restore () {
       for (HiddenView entry : hidden) entry.restore();
       for (ChatGlassDrawable drawable : drawables) drawable.freezeForNavigation(false);
-      for (CachedView entry : cachedViews) entry.restore();
       prepared = false;
       for (Layer layer : top) layer.captured = false;
       for (Layer layer : bottom) layer.captured = false;
@@ -192,25 +183,6 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       if (alpha <= 0f) return;
       for (Surface entry : bottomSurfaces) if (entry.view.getVisibility() == VISIBLE) entry.glass.drawNavigationSurface(canvas, entry.bounds, alpha);
       draw(canvas, bottom, alpha);
-    }
-  }
-
-  private static final class CachedView {
-    final View view;
-    int originalLayerType;
-    boolean active;
-    CachedView (View view) { this.view = view; }
-    void prepare () {
-      if (active || view.getWidth() <= 0 || view.getHeight() <= 0 || view.getVisibility() != VISIBLE || view.getAlpha() <= 0f) return;
-      originalLayerType = view.getLayerType();
-      if (originalLayerType != LAYER_TYPE_NONE) return;
-      active = true;
-      view.setLayerType(LAYER_TYPE_HARDWARE, null);
-    }
-    void restore () {
-      if (!active) return;
-      view.setLayerType(originalLayerType, null);
-      active = false;
     }
   }
 
