@@ -11,6 +11,9 @@ import subprocess
 UPSTREAM = "d132af883b8408760f1ff716021fa20ff86f392a"
 SOURCE = "app/src/main/generated/baselineProfiles/baseline-prof.txt"
 EXTRA = """
+HSPLorg/thunderdog/challegram/ui/MessagesController;->createMessagesView(Landroid/content/Context;)Landroid/view/View;
+HPLorg/thunderdog/challegram/ui/ChatsController;->openChatImpl(Lorg/drinkless/tdlib/TdApi$Chat;)V
+HPLorg/thunderdog/challegram/navigation/NavigationController;->animateNavigateImpl(Lorg/thunderdog/challegram/navigation/ViewController;IZIZ)V
 HPLorg/thunderdog/challegram/navigation/GlassNavigationTransition;->onPreDraw()Z
 HPLorg/thunderdog/challegram/navigation/GlassNavigationTransition;->onDraw(Landroid/graphics/Canvas;)V
 HPLorg/thunderdog/challegram/navigation/GlassContentSnapshot;->capture(Landroid/view/View;I)Z

@@ -12,7 +12,8 @@ The maintained Telegram X base is `0583baf9104ed9b4423f671c58d38dc99f153b7a`
 - [d132af88](https://github.com/TGX-Android/Telegram-X/commit/d132af883b8408760f1ff716021fa20ff86f392a):
   the latest upstream baseline profile. `scripts/update-baseline-profile.py`
   imports it into AGP's standard `app/src/main/baseline-prof.txt` location and adds
-  eight explicit Frogram glass methods. R8 rewrites the rules for the release
+  eleven explicit Frogram navigation methods, including the traced creation
+  and opening implementations. R8 rewrites the rules for the release
   DEX; unmatched upstream methods are omitted. ProfileInstaller is enabled for
   the Marshmallow/latest flavors so APK installations also receive the profile.
 
