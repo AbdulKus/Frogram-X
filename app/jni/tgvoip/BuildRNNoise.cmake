@@ -15,3 +15,11 @@ add_library(rnnoise STATIC
 target_include_directories(rnnoise PUBLIC
   "${RNNOISE_DIR}/include"
 )
+
+# RNNoise vendors an Opus FFT implementation. Group audio pulls both it and
+# libopus into tgcallsjni; keep RNNoise's FFT definitions and callers isolated.
+target_compile_definitions(rnnoise PRIVATE
+  opus_fft_c=rnnoise_opus_fft_c
+  opus_fft_impl=rnnoise_opus_fft_impl
+  opus_ifft_c=rnnoise_opus_ifft_c
+)
