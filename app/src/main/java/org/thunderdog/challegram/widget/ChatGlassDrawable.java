@@ -230,7 +230,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   public void drawNavigationSurface (Canvas canvas, RectF bounds, float opacity) {
     if (bounds.isEmpty() || opacity <= 0f) return;
     int save = canvas.save();
-    float radius = Math.min(Screen.dp(26f), bounds.height() / 2f);
+    float radius = getRadius(bounds);
     navigationClip.reset();
     navigationClip.addRoundRect(bounds, radius, radius, Path.Direction.CW);
     canvas.clipPath(navigationClip);
@@ -251,7 +251,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
   private void drawNavigationChrome (Canvas canvas, RectF bounds, float opacity, int color, boolean sampled) {
     int save = canvas.save();
-    float radius = Math.min(Screen.dp(26f), bounds.height() / 2f);
+    float radius = getRadius(bounds);
     navigationClip.reset();
     navigationClip.addRoundRect(bounds, radius, radius, Path.Direction.CW);
     canvas.clipPath(navigationClip);
@@ -279,6 +279,28 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     this.messages = messages;
   }
 
+  private float customRadius = -1f;
+
+  public void setRadius (float radius) {
+    if (this.customRadius != radius) {
+      this.customRadius = radius;
+      if (!panel.isEmpty()) {
+        clip.reset();
+        float r = getRadius();
+        clip.addRoundRect(panel, r, r, Path.Direction.CW);
+        invalidateSelf();
+      }
+    }
+  }
+
+  public float getRadius () {
+    return customRadius >= 0f ? Math.min(customRadius, panel.height() / 2f) : Math.min(Screen.dp(26f), panel.height() / 2f);
+  }
+
+  private float getRadius (RectF bounds) {
+    return customRadius >= 0f ? Math.min(customRadius, bounds.height() / 2f) : Math.min(Screen.dp(26f), bounds.height() / 2f);
+  }
+
   @Override protected void onBoundsChange (Rect bounds) {
     backdropDirty = true;
     geometryDirty = true;
@@ -287,7 +309,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     panel.top = Math.min(panel.bottom, panel.top + topInset);
     panel.inset(Screen.dp(.5f), Screen.dp(.5f));
     clip.reset();
-    float radius = Math.min(Screen.dp(26f), panel.height() / 2f);
+    float radius = getRadius();
     clip.addRoundRect(panel, radius, radius, Path.Direction.CW);
     sheen = new LinearGradient(0, panel.top, 0, panel.bottom,
       new int[] {0x28ffffff, 0x06ffffff, 0x00000000}, null, Shader.TileMode.CLAMP);
@@ -295,7 +317,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
   @Override public void draw (@NonNull Canvas canvas) {
     if (panel.isEmpty()) return;
-    float radius = Math.min(Screen.dp(26f), panel.height() / 2f);
+    float radius = getRadius();
     int save = canvas.save();
     canvas.clipPath(clip);
     paint.setShader(null);

@@ -188,6 +188,9 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   public void setGlassBackground (java.util.function.BiFunction<View, Integer, ChatGlassDrawable> glassFactory) {
     if (hasGlassBackground()) return;
     setBackground(null);
+    setClickable(true);
+    setClipToPadding(false);
+    setClipChildren(false);
     setPadding(Screen.dp(GLASS_PADDING), Screen.dp(GLASS_PADDING), Screen.dp(GLASS_PADDING), 0);
     glassSurface = new View(getContext());
     glassSurface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -197,7 +200,9 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     int out = inset - Screen.dp(GLASS_PADDING);
     params.setMargins(out, out, out, 0);
     addView(glassSurface, 0, params);
-    glassSurface.setBackground(glassFactory.apply(glassSurface, ColorId.filling));
+    ChatGlassDrawable glass = glassFactory.apply(glassSurface, ColorId.filling);
+    glass.setRadius(Screen.dp(20f));
+    glassSurface.setBackground(glass);
     for (int a = 0; a < buttons.size(); a++) {
       Button button = buttons.valueAt(a);
       button.setGlassStyle(parent, button.getId() == R.id.btn_frogramAi);
