@@ -16,7 +16,10 @@ package org.thunderdog.challegram.component.emoji;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Outline;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewOutlineProvider;
 
 import org.thunderdog.challegram.data.TGGif;
 import org.thunderdog.challegram.loader.ImageReceiver;
@@ -27,6 +30,12 @@ import org.thunderdog.challegram.widget.BaseView;
 import me.vkryl.android.util.ClickHelper;
 
 public class GifView extends BaseView {
+  private static final ViewOutlineProvider TILE_OUTLINE = new ViewOutlineProvider() {
+    @Override public void getOutline (View view, Outline outline) {
+      outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), Screen.dp(12));
+    }
+  };
+
   private TGGif gif;
   private GifReceiver receiver;
   private ImageReceiver preview;
@@ -35,6 +44,11 @@ public class GifView extends BaseView {
     super(context, null);
     receiver = new GifReceiver(this);
     preview = new ImageReceiver(this, 0);
+  }
+
+  public void setRoundedTile () {
+    setOutlineProvider(TILE_OUTLINE);
+    setClipToOutline(true);
   }
 
   private ClickHelper helper;

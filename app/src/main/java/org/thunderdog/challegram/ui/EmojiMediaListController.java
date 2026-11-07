@@ -408,6 +408,8 @@ public class EmojiMediaListController extends ViewController<EmojiLayout> implem
 
       gifsView = new RecyclerView(context()); // (RecyclerView) Views.inflate(R.layout.recycler, contentView);
       gifsView.setItemAnimator(null);
+      int sidePadding = Screen.dp(8f);
+      gifsView.setPadding(sidePadding, 0, sidePadding, 0);
       Views.applyBottomInset(gifsView, extraBottomInset);
       gifsView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
       gifsView.setHasFixedSize(true);
@@ -434,9 +436,14 @@ public class EmojiMediaListController extends ViewController<EmojiLayout> implem
         @Override
         public void getItemOffsets (@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
           int position = parent.getChildAdapterPosition(view);
-          outRect.top = manager.isFirstRow(position) ? Screen.dp(4f) + EmojiLayout.getHeaderSize() : 0;
-          outRect.right = manager.isLastInRow(position) ? 0 : Screen.dp(3f);
-          outRect.bottom = Screen.dp(3f);
+          if (position == RecyclerView.NO_POSITION) return;
+          int spacing = Screen.dp(6f);
+          outRect.top = manager.isFirstRow(position) ? EmojiLayout.getHeaderSize() + spacing : 0;
+          if (!manager.isLastInRow(position)) {
+            if (parent.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) outRect.left = spacing;
+            else outRect.right = spacing;
+          }
+          outRect.bottom = spacing;
         }
       });
       gifsView.setLayoutManager(manager);

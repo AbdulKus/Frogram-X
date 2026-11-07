@@ -19,10 +19,12 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -39,6 +41,7 @@ import org.thunderdog.challegram.tool.Drawables;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Views;
+import org.thunderdog.challegram.widget.ChatGlassDrawable;
 
 import me.vkryl.android.AnimatorUtils;
 import me.vkryl.android.ViewUtils;
@@ -84,6 +87,7 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
   private BarItem[] items;
   private int index;
   private Callback callback;
+  private final boolean floatingStyle;
 
   // Paints
   // private final TextPaint textPaint;
@@ -104,8 +108,9 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
 
   private static final float TEXT_SIZE = 14f;
 
-  public MediaBottomBar (Context context) {
+  public MediaBottomBar (Context context, boolean floatingStyle) {
     super(context);
+    this.floatingStyle = floatingStyle;
 
     flingDetector = new GestureDetector(context, this);
 
@@ -418,6 +423,28 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
   private class MediaBottomBarBackground extends Drawable {
     private Paint iconPaint;
     private int iconColor;
+    private final GradientDrawable surface = new GradientDrawable();
+    private int surfaceBase, surfaceTop, surfaceStroke;
+
+    private void drawSurface (Canvas canvas, int width, int height) {
+      canvas.drawRect(0, 0, width, height, Paints.fillingPaint(Theme.fillingColor()));
+
+      int base = ChatGlassDrawable.surfaceColor(ColorId.filling);
+      int top = ColorUtils.compositeColor(base, ColorUtils.alphaColor(Theme.isDark() ? .09f : .40f, Color.WHITE));
+      int stroke = ColorUtils.alphaColor(Theme.isDark() ? .18f : .12f, Theme.textAccentColor());
+      if (surfaceBase != base || surfaceTop != top || surfaceStroke != stroke) {
+        surfaceBase = base;
+        surfaceTop = top;
+        surfaceStroke = stroke;
+        surface.setColors(new int[] {top, base});
+        surface.setCornerRadius(Screen.dp(21));
+        surface.setStroke(Screen.dp(1), stroke);
+      }
+      int side = Screen.dp(8);
+      int vertical = Screen.dp(3);
+      surface.setBounds(side, vertical, width - side, MediaBottomBar.this.barHeight - vertical);
+      surface.draw(canvas);
+    }
 
     @Override
     public void draw (@NonNull Canvas c) {
@@ -431,24 +458,22 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
       int centerY = barHeight / 2;
       int barHeight = MediaBottomBar.this.barHeight + MediaBottomBar.this.getPaddingBottom();
 
+      if (floatingStyle) drawSurface(c, barWidth, barHeight);
       if (overlayFactor != 1f) {
-        int backgroundColor = Theme.getColor(items[index].backgroundColorId);
+        if (!floatingStyle) {
+          int backgroundColor = Theme.getColor(items[index].backgroundColorId);
+          if (factor == 0f) {
+            c.drawRect(0, 0, barWidth, barHeight, Paints.fillingPaint(backgroundColor));
+          } else {
+            int toColor = Theme.getColor(toItem.backgroundColorId);
+            c.drawRect(0, 0, barWidth, barHeight, Paints.fillingPaint(ColorUtils.compositeColor(backgroundColor, ColorUtils.alphaColor(factor, toColor))));
 
-
-        if (factor == 0f) {
-          c.drawRect(0, 0, barWidth, barHeight, Paints.fillingPaint(backgroundColor));
-        } else {
-          int toColor = Theme.getColor(toItem.backgroundColorId);
-
-          c.drawRect(0, 0, barWidth, barHeight, Paints.fillingPaint(ColorUtils.compositeColor(backgroundColor, ColorUtils.alphaColor(factor, toColor))));
-
-          float cx = touchCenterX;
-          float cy = centerY - (int) ((float) (iconActivePadding - fromItem.paddingTop) * factor);
-
-          float x = cx + (centerX - cx) * factor;
-          float y = cy + (centerY - cy) * factor;
-
-          c.drawCircle(x, y, circleRadius * factor, Paints.fillingPaint(toColor));
+            float cx = touchCenterX;
+            float cy = centerY - (int) ((float) (iconActivePadding - fromItem.paddingTop) * factor);
+            float x = cx + (centerX - cx) * factor;
+            float y = cy + (centerY - cy) * factor;
+            c.drawCircle(x, y, circleRadius * factor, Paints.fillingPaint(toColor));
+          }
         }
 
         int cx = itemStartX;
@@ -456,9 +481,22 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
           int itemWidth = itemNormalWidth + Math.round((float) itemActiveDiff * item.factor);
           int itemCenterX = cx + itemWidth / 2;
 
+          if (floatingStyle && item.factor > 0f) {
+            int edge = Screen.dp(11);
+            int padding = Screen.dp(3);
+            int left = Math.max(edge, cx + padding);
+            int right = Math.min(barWidth - edge, cx + itemWidth - padding);
+            float radius = Screen.dp(16);
+            int selectedColor = ColorUtils.alphaColor(.12f * item.factor * (1f - overlayFactor), Theme.textAccentColor());
+            c.drawRoundRect(left, Screen.dp(6), right, MediaBottomBar.this.barHeight - Screen.dp(6),
+              radius, radius, Paints.fillingPaint(selectedColor));
+          }
+
           int iconCenterY = item.factor == 0f ? centerY : centerY - (int) ((float) (iconActivePadding - item.paddingTop) * item.factor);
           int iconAlpha = item.factor == 1f ? 255 : 255 - (int) ((255f * .25f) * (1f - item.factor));
-          int color = Theme.getColor(ColorId.attachText);
+          int color = floatingStyle ? ColorUtils.fromToArgb(Theme.iconColor(), Theme.textAccentColor(), item.factor) :
+            Theme.getColor(ColorId.attachText);
+          if (floatingStyle) iconAlpha = Math.round(iconAlpha * (1f - overlayFactor));
           Paint bitmapPaint = iconPaint != null && iconColor == color ? iconPaint : (iconPaint = Paints.createPorterDuffPaint(iconPaint, iconColor = color));
           bitmapPaint.setAlpha(iconAlpha);
           if (item.icon != null) {
@@ -469,7 +507,8 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
 
           if (item.factor == 1f) {
             int textX = itemCenterX - (int) (item.measuredWidth * .5f);
-            c.drawText(item.name, textX, textY, Paints.getRegularTextPaint(TEXT_SIZE, color));
+            int textColor = floatingStyle ? ColorUtils.alphaColor(1f - overlayFactor, color) : color;
+            c.drawText(item.name, textX, textY, Paints.getRegularTextPaint(TEXT_SIZE, textColor));
           } else if (item.factor >= TEXT_THRESHOLD) {
             c.save();
             c.translate(itemCenterX, textY);
@@ -479,6 +518,7 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
 
             int textX = -(int) (item.measuredWidth * .5f);
             float textFactor = (item.factor - TEXT_THRESHOLD) / (1f - TEXT_THRESHOLD);
+            if (floatingStyle) textFactor *= 1f - overlayFactor;
 
             c.drawText(item.name, textX, 0, Paints.getRegularTextPaint(TEXT_SIZE, ColorUtils.alphaColor(textFactor, color)));
             c.restore();
@@ -488,7 +528,7 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
         }
       }
 
-      if (overlayFactor != 0f) {
+      if (!floatingStyle && overlayFactor != 0f) {
         final int fillingColor = Theme.fillingColor();
         if (overlayFactor != 1f) {
           c.drawCircle(overlayCenterX + (centerX - overlayCenterX) * overlayFactor, overlayCenterY + (centerY - overlayCenterY) * overlayFactor, overlayRadius * overlayFactor, Paints.fillingPaint(fillingColor));
@@ -517,6 +557,7 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
   }
 
   public int getCurrentColor ()  {
+    if (floatingStyle) return Theme.fillingColor();
     int backgroundColor = Theme.getColor(items[index].backgroundColorId);
     if (factor != 0f) {
       int toColor = Theme.getColor(toItem.backgroundColorId);

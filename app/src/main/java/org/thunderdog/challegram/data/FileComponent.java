@@ -962,8 +962,8 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     return Screen.dp(FileProgressComponent.DEFAULT_FILE_RADIUS) * 2;
   }
 
-  private static int getPreviewOffset () {
-    return Screen.dp(12f);
+  private int getPreviewOffset () {
+    return Screen.dp(hasTranscription() ? 8f : 12f);
   }
 
   public static ImageFile createFullPreview (Tdlib tdlib, TdApi.Document doc) {

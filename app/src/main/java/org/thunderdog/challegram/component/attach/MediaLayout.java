@@ -276,12 +276,14 @@ public class MediaLayout extends FrameLayoutFix implements
     controllers = new MediaBottomBaseController<?>[items.length];
 
     if (mode == MODE_DEFAULT) {
-      bottomBar = new MediaBottomBar(getContext());
+      boolean floatingStyle = this.mode == MODE_DEFAULT && target != null;
+      bottomBar = new MediaBottomBar(getContext(), floatingStyle);
       bottomBar.setBottomInset(extraBottomInsetWithoutIme);
       bottomBar.setItems(items, index);
       bottomBar.setCallback(this);
       shadowView = new ShadowView(getContext());
       shadowView.setSimpleTopShadow(true);
+      if (floatingStyle) shadowView.setVisibility(View.GONE);
       themeListeners.addThemeInvalidateListener(bottomBar);
       FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(shadowView.getLayoutParams());
       params.bottomMargin = bottomBar.getLayoutParams().height;

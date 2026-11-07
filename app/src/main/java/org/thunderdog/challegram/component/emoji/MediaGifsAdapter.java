@@ -176,6 +176,7 @@ public class MediaGifsAdapter extends RecyclerView.Adapter<MediaGifsAdapter.GifH
       switch (viewType) {
         case 0: {
           GifView view = new GifView(context);
+          view.setRoundedTile();
           if (delegate != null) {
             view.initWithDelegate(delegate);
           } else {
