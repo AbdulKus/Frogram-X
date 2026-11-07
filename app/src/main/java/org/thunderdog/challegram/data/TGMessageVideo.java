@@ -624,8 +624,11 @@ public class TGMessageVideo extends TGMessage implements FileProgressComponent.S
     centerX = Math.max(radius, Math.min(view.getWidth() - radius, centerX));
     int touchRadius = radius + Screen.dp(3);
     transcriptHit.set(centerX - touchRadius, centerY - touchRadius, centerX + touchRadius, centerY + touchRadius);
-    canvas.drawCircle(centerX, centerY, radius, Paints.fillingPaint(ColorUtils.alphaColor(opacity, getBubbleTimeColor())));
-    int iconColor = ColorUtils.alphaColor(opacity * (MessagesController.canTranscribe(getMessage()) ? 1f : .5f), getBubbleTimeTextColor());
+    boolean bubbles = useBubbles();
+    int backgroundColor = bubbles ? getBubbleTimeColor() : Theme.getColor(ColorId.bubble_mediaTime_noWallpaper);
+    int foregroundColor = bubbles ? getBubbleTimeTextColor() : Theme.getColor(ColorId.bubble_mediaTimeText_noWallpaper);
+    canvas.drawCircle(centerX, centerY, radius, Paints.fillingPaint(ColorUtils.alphaColor(opacity, backgroundColor)));
+    int iconColor = ColorUtils.alphaColor(opacity * (MessagesController.canTranscribe(getMessage()) ? 1f : .5f), foregroundColor);
     if (controller.isTranscribingVideo(getMessage())) {
       int ring = Screen.dp(5.5f);
       canvas.drawArc(centerX - ring, centerY - ring, centerX + ring, centerY + ring,
