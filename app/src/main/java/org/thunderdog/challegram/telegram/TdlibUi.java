@@ -194,11 +194,15 @@ import tgx.td.data.MessageWithProperties;
 
 public class TdlibUi extends Handler {
   private final Tdlib tdlib;
+  private final SavedGifLibrary savedGifs;
 
   /*package*/ TdlibUi (Tdlib tdlib) {
     super(Looper.getMainLooper());
     this.tdlib = tdlib;
+    this.savedGifs = new SavedGifLibrary(tdlib);
   }
+
+  public SavedGifLibrary savedGifs () { return savedGifs; }
 
   public void execute (Runnable runnable) {
     if (UI.inUiThread()) {
@@ -7558,30 +7562,19 @@ public class TdlibUi extends Handler {
   }
 
   public void saveGifs (List<TD.DownloadedFile> downloadedFiles) {
-    AtomicInteger remaining = new AtomicInteger(downloadedFiles.size());
-    AtomicInteger successful = new AtomicInteger(0);
-    for (TD.DownloadedFile downloadedFile : downloadedFiles) {
-      tdlib.client().send(new TdApi.AddSavedAnimation(new TdApi.InputFileId(downloadedFile.getFileId())), object -> {
-        switch (object.getConstructor()) {
-          case TdApi.Ok.CONSTRUCTOR:
-            successful.incrementAndGet();
-            break;
-          case TdApi.Error.CONSTRUCTOR:
-            UI.showError(object);
-            break;
-        }
-        if (remaining.decrementAndGet() == 0) {
-          if (successful.get() == 1) {
-            UI.showToast(R.string.GifSaved, Toast.LENGTH_SHORT);
-          } else {
-            UI.showToast(Lang.pluralBold(R.string.XGifSaved, downloadedFiles.size()), Toast.LENGTH_SHORT);
-          }
-        }
-      });
+    List<TdApi.Animation> animations = new ArrayList<>();
+    for (TD.DownloadedFile downloaded : downloadedFiles) {
+      if (downloaded.getAnimation() != null) animations.add(downloaded.getAnimation());
     }
+    savedGifs.save(animations);
   }
 
-  public void saveGif (int fileId) {
+  public void saveGif (TdApi.Animation animation, int fileId) {
+    if (animation != null) savedGifs.save(java.util.Collections.singletonList(animation));
+    else saveGif(fileId);
+  }
+
+  private void saveGif (int fileId) {
     if (fileId == 0) {
       return;
     }

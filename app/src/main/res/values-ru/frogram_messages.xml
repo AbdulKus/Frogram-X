@@ -49,4 +49,17 @@
   <string name="FrogramCallCloseVolume">Закрыть регулировку громкости</string>
   <string name="FrogramFormattingPasteLink">Вставьте ссылку…</string>
   <string name="FrogramFormattingMultipleLinks">Несколько ссылок</string>
+  <string name="FrogramCallHeadset">Гарнитура</string>
+  <string name="FrogramCallBluetooth">Bluetooth</string>
+  <string name="FrogramSavedGifs">Сохранённые GIF</string>
+  <string name="FrogramGifExport">Экспорт GIF</string>
+  <string name="FrogramGifImport">Импорт GIF</string>
+  <string name="FrogramGifBackupHint">Перенос сохранённых GIF между устройствами с одним аккаунтом Telegram. В копии хранятся ссылки на файлы Telegram.</string>
+  <string name="FrogramGifExported">Копия GIF экспортирована.</string>
+  <string name="FrogramGifBackupFailed">Не удалось прочитать или записать копию GIF для этого аккаунта.</string>
+  <string name="FrogramGifImported">Добавлено в локальную коллекцию: %1$d. Недоступно: %2$d.</string>
+  <string name="FrogramGifSaveFailed">Не удалось сохранить GIF.</string>
+  <string name="FrogramGifRemoveFailed">Не удалось удалить GIF.</string>
+  <string name="FrogramGifArchive">Сохранить текущие GIF в базу</string>
+  <string name="FrogramGifArchived">Добавлено в базу: %1$d. Автосохранение включено.</string>
 </resources>

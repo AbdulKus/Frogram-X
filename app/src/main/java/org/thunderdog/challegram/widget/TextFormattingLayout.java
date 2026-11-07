@@ -656,7 +656,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     protected void drawDrawable (Canvas canvas, float cx, float cy, float alpha) {
       if (drawable != null) {
         int color = glassStyle ?
-          ColorUtils.fromToArgb(Theme.textAccentColor(), Theme.textLinkColor(), primary ? 1f : isActive.getFloatValue()) :
+          ColorUtils.fromToArgb(Theme.textAccentColor(), Theme.textLinkColor(), isActive.getFloatValue()) :
           ColorUtils.fromToArgb(Theme.iconColor(), Theme.getColor(ColorId.iconActive), isActive.getFloatValue());
         color = ColorUtils.alphaColor(alpha, color);
         Drawables.drawCentered(canvas, drawable, cx, cy, needDrawWithoutRepainting ? null : Paints.getPorterDuffPaint(color));

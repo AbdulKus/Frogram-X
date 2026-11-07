@@ -157,7 +157,7 @@ public final class GroupVoiceDialog {
     microphone.setText(Lang.getString(session.muted ? R.string.FrogramCallUnmute : R.string.FrogramCallMute));
     speaker.setEnabled(session.connected);
     speaker.setAlpha(speaker.isEnabled() ? 1f : .45f);
-    speaker.setText(Lang.getString(session.isSpeakerOn() ? R.string.FrogramCallSpeakerOn : R.string.FrogramCallSpeaker));
+    speaker.setText(Lang.getString(session.audioRouteLabel()));
 
     if (volumeKey != null && !session.participants.containsKey(volumeKey)) volumeKey = null;
     List<String> keys = new ArrayList<>(session.participants.keySet());

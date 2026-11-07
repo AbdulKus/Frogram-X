@@ -478,11 +478,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
     transcription.setVoiceTranscriptExpanded(message, expanded);
   }
 
-  public void transcribeVoice (TdApi.Message message, RunnableBool working, RunnableData<String> result) {
-    transcription.start(message, new MessageTranscription.Listener() {
+  public void transcribeVoice (TdApi.Message message, boolean start, RunnableBool working, RunnableData<String> result) {
+    MessageTranscription.Listener listener = new MessageTranscription.Listener() {
       @Override public void onWorking (boolean value) { working.runWithBool(value); }
       @Override public void onResult (String text) {
-        setVoiceTranscriptExpanded(message, true);
+        if (isDestroyed() || message.chatId != getChatId()) return;
+        if (start) setVoiceTranscriptExpanded(message, true);
         result.runWithData(text);
         if (message.chatId == getChatId()) {
           TGMessage current = manager.getAdapter().findMessageById(message.id);
@@ -491,7 +492,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
           }
         }
       }
-    });
+    };
+    if (start) transcription.start(message, listener);
+    else transcription.observeVoice(message, listener);
   }
 
   public boolean isTranscribingVideo (TdApi.Message message) {
@@ -4990,7 +4993,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public void destroy () {
-    transcription.cancel();
+    transcription.detach();
     context().getRoundVideoController().detachVideoLayer(this);
     // MainActivity caches this controller per account. Ordinary chat close also
     // calls destroy(), but keeps its Views for the next chat. release() is terminal.

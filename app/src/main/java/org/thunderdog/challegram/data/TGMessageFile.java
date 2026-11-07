@@ -80,6 +80,7 @@ public class TGMessageFile extends TGMessage {
     private int transcriptHeight;
     private TextWrapper transcriptText;
     private boolean waitingForTranscript;
+    private boolean observedTranscript;
     private TextWrapper captionWrapper;
     private long captionMediaKeyOffset;
     private final VariableFloat lastLineWidth = new VariableFloat(0);
@@ -126,8 +127,19 @@ public class TGMessageFile extends TGMessage {
         setTranscriptExpanded(!transcriptExpanded);
         return;
       }
-      waitingForTranscript = true;
-      ((MessagesController) controller()).transcribeVoice(message, working -> {
+      subscribeTranscript(message, true);
+    }
+
+    void observeTranscript () {
+      if (observedTranscript || transcriptText != null || !component.hasTranscription()) return;
+      TdApi.Message message = getMessage(messageId);
+      if (!MessagesController.canTranscribe(message)) return;
+      observedTranscript = true;
+      subscribeTranscript(message, false);
+    }
+
+    private void subscribeTranscript (TdApi.Message message, boolean start) {
+      ((MessagesController) controller()).transcribeVoice(message, start, working -> {
         if (!isDestroyed()) {
           waitingForTranscript = working;
           component.setTranscribing(working);
@@ -623,6 +635,7 @@ public class TGMessageFile extends TGMessage {
   protected void onMessageAttachedToView (@NonNull MessageView view, boolean attached) {
     for (CaptionedFile file : filesList) {
       file.component.getFileProgress().notifyInvalidateTargetsChanged();
+      if (attached) file.observeTranscript();
     }
   }
 

@@ -282,6 +282,7 @@ public class EmojiMediaListController extends ViewController<EmojiLayout> implem
       }
     }
 
+    tdlib.listeners().subscribeForAnimationsUpdates(this);
     loadGIFs(); // to show or hide GIF section
     loadStickers(); // to show sections
     trendingSetsController.loadTrending(0, 20, 0); // to show blue badge?
@@ -461,11 +462,7 @@ public class EmojiMediaListController extends ViewController<EmojiLayout> implem
     if (c != null) {
       c.showOptions(Lang.getString(R.string.RemoveGifConfirm), new int[]{R.id.btn_deleteGif, R.id.btn_cancel}, new String[]{Lang.getString(R.string.Delete), Lang.getString(R.string.Cancel)}, new int[]{OptionColor.RED, OptionColor.NORMAL}, new int[] {R.drawable.baseline_delete_24, R.drawable.baseline_cancel_24}, (itemView, id) -> {
         if (id == R.id.btn_deleteGif) {
-          gifsAdapter.removeSavedGif(animation.animation.id);
-          if (gifsAdapter.getItemCount() == 0) {
-            showStickers();
-          }
-          tdlib.send(new TdApi.RemoveSavedAnimation(new TdApi.InputFileId(animation.animation.id)), tdlib.typedOkHandler());
+          tdlib.ui().savedGifs().remove(animation);
         }
         return true;
       });
@@ -648,6 +645,7 @@ public class EmojiMediaListController extends ViewController<EmojiLayout> implem
   public void destroy () {
     super.destroy();
     tdlib.listeners().unsubscribeFromGlobalUpdates(this);
+    tdlib.listeners().unsubscribeFromAnimationsUpdates(this);
     stickersController.destroy();
     trendingSetsController.destroy();
   }
@@ -1447,38 +1445,30 @@ public class EmojiMediaListController extends ViewController<EmojiLayout> implem
   @Override
   public void onSavedAnimationsUpdated (int[] animationIds) {
     runOnUiThreadOptional(() -> {
-      if (gifsView != null) {
-        loadGIFs();
-      }
+      loadGIFs();
     });
   }
 
   private boolean loadingGIFs;
+  private boolean reloadGIFs;
   private ArrayList<TGGif> gifs;
 
   private void loadGIFs () {
-    if (!loadingGIFs) {
-      loadingGIFs = true;
-      tdlib.client().send(new TdApi.GetSavedAnimations(), result -> {
-        switch (result.getConstructor()) {
-          case TdApi.Animations.CONSTRUCTOR: {
-            TdApi.Animation[] animations = ((TdApi.Animations) result).animations;
-            final ArrayList<TGGif> gifs = new ArrayList<>(animations.length);
-            for (TdApi.Animation animation : animations) {
-              gifs.add(new TGGif(tdlib, animation));
-            }
-            runOnUiThreadOptional(() -> {
-              setGIFs(gifs);
-            });
-            break;
-          }
-          case TdApi.Error.CONSTRUCTOR: {
-            UI.showError(result);
-            break;
-          }
-        }
-      });
+    if (loadingGIFs) {
+      reloadGIFs = true;
+      return;
     }
+    loadingGIFs = true;
+    tdlib.ui().savedGifs().load(animations -> {
+      if (isDestroyed()) return;
+      ArrayList<TGGif> gifs = new ArrayList<>(animations.size());
+      for (TdApi.Animation animation : animations) gifs.add(new TGGif(tdlib, animation));
+      setGIFs(gifs);
+      if (reloadGIFs) {
+        reloadGIFs = false;
+        loadGIFs();
+      }
+    });
   }
 
   private void setGIFs (ArrayList<TGGif> gifs) {
@@ -1488,7 +1478,6 @@ public class EmojiMediaListController extends ViewController<EmojiLayout> implem
     if (gifs.isEmpty() && contentView.getCurrentSection() == SECTION_GIFS) {
       showStickers();
     }
-    tdlib.listeners().subscribeForAnimationsUpdates(this);
   }
 
   // When user clicked

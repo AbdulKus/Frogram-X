@@ -777,7 +777,14 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     }
 
     progress.setRequestedAlpha(alpha);
-    progress.setBounds(startX, startY, startX + previewSize, startY + previewSize);
+    if (hasTranscription()) {
+      int playSize = Screen.dp(42);
+      int playX = startX + (previewSize - playSize) / 2;
+      int playY = startY + Screen.dp(2);
+      progress.setBounds(playX, playY, playX + playSize, playY + playSize);
+    } else {
+      progress.setBounds(startX, startY, startX + previewSize, startY + previewSize);
+    }
     progress.draw(view, c);
 
     if (checkFactor != 0f) {

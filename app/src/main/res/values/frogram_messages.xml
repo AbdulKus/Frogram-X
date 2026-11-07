@@ -52,4 +52,21 @@
   <string name="FrogramCallCloseVolume">Close volume control</string>
   <string name="FrogramFormattingPasteLink">Paste a link…</string>
   <string name="FrogramFormattingMultipleLinks">Multiple links</string>
+  <string name="FrogramCallHeadset">Headset</string>
+  <string name="FrogramCallBluetooth">Bluetooth</string>
+  <item name="btn_frogramSavedGifs" type="id" />
+  <item name="btn_frogramGifExport" type="id" />
+  <item name="btn_frogramGifImport" type="id" />
+  <string name="FrogramSavedGifs">Saved GIFs</string>
+  <string name="FrogramGifExport">Export GIFs</string>
+  <string name="FrogramGifImport">Import GIFs</string>
+  <string name="FrogramGifBackupHint">Move saved GIFs to another device with the same Telegram account. The backup contains references to Telegram files.</string>
+  <string name="FrogramGifExported">GIF backup exported.</string>
+  <string name="FrogramGifBackupFailed">Could not read or write this GIF backup for this account.</string>
+  <string name="FrogramGifImported">Added to the local library: %1$d. Unavailable: %2$d.</string>
+  <string name="FrogramGifSaveFailed">Could not save these GIFs.</string>
+  <string name="FrogramGifRemoveFailed">Could not remove this GIF.</string>
+  <item name="btn_frogramGifArchive" type="id" />
+  <string name="FrogramGifArchive">Back up current GIFs locally</string>
+  <string name="FrogramGifArchived">GIFs added to this device: %1$d. Automatic backup enabled.</string>
 </resources>

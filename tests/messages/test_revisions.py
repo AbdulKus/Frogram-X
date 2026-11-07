@@ -70,7 +70,7 @@ class RevisionQueriesTest(unittest.TestCase):
     def test_message_and_account_deletion(self):
         self.insert(1,2,3,100,'one')
         self.insert(2,2,3,100,'two')
-        deletion = re.search(r'database\(\).delete\("revisions", "(account=\? AND chat=\? AND message=\?)"', SOURCE)[1]
+        deletion = re.search(r'db.delete\("revisions", "(account=\? AND chat=\? AND message=\?)"', SOURCE)[1]
         self.db.execute('DELETE FROM revisions WHERE '+deletion,(1,2,3))
         self.assertEqual(self.db.execute(self.history,('1','2','3')).fetchall(),[])
         self.assertEqual(len(self.db.execute(self.history,('2','2','3')).fetchall()),1)
@@ -81,6 +81,34 @@ class RevisionQueriesTest(unittest.TestCase):
         where = re.search(r'db.delete\("revisions", "(observed < \?)"',SOURCE)[1]
         self.db.execute('DELETE FROM revisions WHERE '+where,(100,))
         self.assertEqual(self.db.execute(self.history,('1','2','3')).fetchall(),[(100,'boundary')])
+
+class LocalLibraryStorageTest(unittest.TestCase):
+    def test_transcript_expiry_and_user_isolation(self):
+        with sqlite3.connect(':memory:') as db:
+            create = re.search(r'db.execSQL\("(CREATE TABLE transcripts[^"]+)"\)', SOURCE)[1]
+            lookup = re.search(r'db.query\("transcripts", new String\[\] \{"text"\},\s+"([^"]+)"', SOURCE)[1]
+            db.execute(create)
+            db.executemany('INSERT INTO transcripts VALUES (?,?,?,?,?,?)', [
+                (1, 100, 2, 3, 499, 'expired'), (1, 100, 2, 4, 500, 'retained'),
+                (1, 101, 2, 3, 600, 'another login'), (2, 100, 2, 3, 600, 'another account'),
+            ])
+            query = 'SELECT text FROM transcripts WHERE ' + lookup
+            self.assertEqual(db.execute(query, (1, 100, 2, 3, 500)).fetchall(), [])
+            self.assertEqual(db.execute(query, (1, 100, 2, 4, 500)).fetchall(), [('retained',)])
+
+    def test_gif_snapshot_and_import_share_stable_account_key(self):
+        source = (ROOT / 'app/src/main/java/org/thunderdog/challegram/telegram/SavedGifLibrary.java').read_text()
+        with sqlite3.connect(':memory:') as db:
+            create = re.search(r'db.execSQL\("(CREATE TABLE gifs[^"]+)"\)', source)[1]
+            db.execute(create)
+            insert = 'INSERT OR IGNORE INTO gifs VALUES (?,?,?,?,?,?,?,?)'
+            items = [(10, f'uid-{i}', f'remote-{i}', 'video/mp4', 'gif.mp4', 200, 200, 2) for i in range(1200)]
+            db.executemany(insert, items)
+            db.executemany(insert, items[:400])
+            db.execute(insert, (20, *items[0][1:]))
+            self.assertEqual(db.execute('SELECT account, COUNT(*) FROM gifs GROUP BY account').fetchall(), [
+                (10, 1200), (20, 1),
+            ])
 
 class ResourcesTest(unittest.TestCase):
     def test_translation_keys_and_format_arguments_match(self):

@@ -39,6 +39,7 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   public Runnable changed;
   private GroupVoiceEngine engine;
   private AudioManager audio;
+  private GroupVoiceAudioRoute audioRoute;
   private int previousMode;
   private boolean previousSpeaker;
   private boolean audioConfigured;
@@ -109,7 +110,8 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
         if (audio.requestAudioFocus(focus, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) throw new IllegalStateException("Audio focus unavailable");
         audioConfigured = true;
         audio.setMode(AudioManager.MODE_IN_COMMUNICATION);
-        audio.setSpeakerphoneOn(true);
+        audioRoute = new GroupVoiceAudioRoute(UI.getAppContext(), audio, this::notifyChanged);
+        audioRoute.start();
         PowerManager power = (PowerManager) UI.getAppContext().getSystemService(Context.POWER_SERVICE);
         wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FrogramX:GroupVoice");
         wakeLock.setReferenceCounted(false);
@@ -164,6 +166,7 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   @Override public void onState (boolean value) {
     if (ended) return;
     connected = value;
+    if (audioRoute != null) audioRoute.setConnected(value);
     android.util.Log.i("FrogramGroupVoice", "RTC connected: " + value);
     status = Lang.getString(value ? R.string.FrogramCallConnected : R.string.FrogramCallConnecting);
     if (!value) {
@@ -193,6 +196,7 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
 
   private void rejoin () {
     connected = false;
+    if (audioRoute != null) audioRoute.setConnected(false);
     speaking.clear();
     muted = true;
     status = Lang.getString(R.string.FrogramCallConnecting);
@@ -213,14 +217,17 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   }
 
   public void toggleSpeaker () {
-    if (audioConfigured && !ended) {
-      audio.setSpeakerphoneOn(!isSpeakerOn());
-      notifyChanged();
-    }
+    if (audioRoute != null && !ended) audioRoute.cycle();
   }
 
-  public boolean isSpeakerOn () {
-    return audioConfigured && audio.isSpeakerphoneOn();
+  public int audioRouteLabel () {
+    if (audioRoute == null) return R.string.FrogramCallSpeaker;
+    return switch (audioRoute.current()) {
+      case SPEAKER -> R.string.FrogramCallSpeakerOn;
+      case EARPIECE -> R.string.FrogramCallSpeaker;
+      case HEADSET -> R.string.FrogramCallHeadset;
+      case BLUETOOTH -> R.string.FrogramCallBluetooth;
+    };
   }
 
   public boolean canToggleMute () {
@@ -295,6 +302,11 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     tdlib.listeners().removeAuthorizationChangeListener(this);
     tdlib.decrementCallReferenceCount();
     if (audioConfigured) {
+      if (audioRoute != null) {
+        try { audioRoute.stop(); }
+        catch (RuntimeException routeError) { android.util.Log.w("FrogramGroupVoice", "Unable to reset audio routing", routeError); }
+        audioRoute = null;
+      }
       audio.abandonAudioFocus(focus);
       audio.setSpeakerphoneOn(previousSpeaker);
       audio.setMode(previousMode);

@@ -21,18 +21,72 @@ public final class MessageRevisionStore {
   private static final ExecutorService IO = Executors.newSingleThreadExecutor();
   private static SQLiteOpenHelper helper;
   private static long lastPruned;
+  private static long lastTranscriptPrune;
+  private static final long TRANSCRIPT_TTL = 7L * 86400000L;
 
   private static SQLiteDatabase database () {
     if (helper == null) {
-      helper = new SQLiteOpenHelper(UI.getAppContext(), "message-revisions.db", null, 1) {
+      helper = new SQLiteOpenHelper(UI.getAppContext(), "message-revisions.db", null, 2) {
         @Override public void onCreate (SQLiteDatabase db) {
           db.execSQL("CREATE TABLE revisions (sequence INTEGER PRIMARY KEY AUTOINCREMENT, account INTEGER NOT NULL, chat INTEGER NOT NULL, message INTEGER NOT NULL, observed INTEGER NOT NULL, text TEXT NOT NULL)");
           db.execSQL("CREATE INDEX revisions_message ON revisions(account, chat, message, sequence)");
+          createTranscripts(db);
         }
-        @Override public void onUpgrade (SQLiteDatabase db, int oldVersion, int newVersion) { }
+        @Override public void onUpgrade (SQLiteDatabase db, int oldVersion, int newVersion) {
+          if (oldVersion < 2) createTranscripts(db);
+        }
       };
     }
     return helper.getWritableDatabase();
+  }
+
+  private static void createTranscripts (SQLiteDatabase db) {
+    db.execSQL("CREATE TABLE transcripts (account INTEGER NOT NULL, user INTEGER NOT NULL, chat INTEGER NOT NULL, message INTEGER NOT NULL, observed INTEGER NOT NULL, text TEXT NOT NULL, PRIMARY KEY(account, user, chat, message))");
+    db.execSQL("CREATE INDEX transcripts_age ON transcripts(observed)");
+  }
+
+  private static void pruneTranscripts (SQLiteDatabase db, long now) {
+    if (now < lastTranscriptPrune || now - lastTranscriptPrune >= 3600000L) {
+      db.delete("transcripts", "observed < ?", new String[] {Long.toString(now - TRANSCRIPT_TTL)});
+      lastTranscriptPrune = now;
+    }
+  }
+
+  public static void loadTranscript (int account, long user, long chat, long message, java.util.function.Consumer<String> callback) {
+    IO.execute(() -> {
+      String text = null;
+      try {
+        SQLiteDatabase db = database();
+        long now = System.currentTimeMillis();
+        pruneTranscripts(db, now);
+        try (Cursor cursor = db.query("transcripts", new String[] {"text"},
+            "account=? AND user=? AND chat=? AND message=? AND observed>=?",
+            new String[] {Integer.toString(account), Long.toString(user), Long.toString(chat), Long.toString(message), Long.toString(now - TRANSCRIPT_TTL)},
+            null, null, null)) {
+          if (cursor.moveToFirst()) text = cursor.getString(0);
+        }
+      } catch (RuntimeException ignored) { }
+      String result = text;
+      UI.post(() -> callback.accept(result));
+    });
+  }
+
+  public static void saveTranscript (int account, long user, long chat, long message, String text) {
+    IO.execute(() -> {
+      try {
+        SQLiteDatabase db = database();
+        long now = System.currentTimeMillis();
+        pruneTranscripts(db, now);
+        ContentValues values = new ContentValues();
+        values.put("account", account);
+        values.put("user", user);
+        values.put("chat", chat);
+        values.put("message", message);
+        values.put("observed", now);
+        values.put("text", text);
+        db.replaceOrThrow("transcripts", null, values);
+      } catch (RuntimeException ignored) { }
+    });
   }
 
   public static void observe (int account, TdApi.Message message) {
@@ -106,14 +160,24 @@ public final class MessageRevisionStore {
 
   public static void clearAccount (int account) {
     IO.execute(() -> {
-      try { database().delete("revisions", "account=?", new String[] {Integer.toString(account)}); }
+      try {
+        SQLiteDatabase db = database();
+        String[] args = {Integer.toString(account)};
+        db.delete("revisions", "account=?", args);
+        db.delete("transcripts", "account=?", args);
+      }
       catch (RuntimeException ignored) { }
     });
   }
 
   public static void clearChat (int account, long chat) {
     IO.execute(() -> {
-      try { database().delete("revisions", "account=? AND chat=?", new String[] {Integer.toString(account), Long.toString(chat)}); }
+      try {
+        SQLiteDatabase db = database();
+        String[] args = {Integer.toString(account), Long.toString(chat)};
+        db.delete("revisions", "account=? AND chat=?", args);
+        db.delete("transcripts", "account=? AND chat=?", args);
+      }
       catch (RuntimeException ignored) { }
     });
   }
@@ -122,7 +186,12 @@ public final class MessageRevisionStore {
     final long[] ids = messageIds.clone();
     IO.execute(() -> {
       try {
-        for (long message : ids) database().delete("revisions", "account=? AND chat=? AND message=?", keys(account, chat, message));
+        SQLiteDatabase db = database();
+        for (long message : ids) {
+          String[] args = keys(account, chat, message);
+          db.delete("revisions", "account=? AND chat=? AND message=?", args);
+          db.delete("transcripts", "account=? AND chat=? AND message=?", args);
+        }
       } catch (RuntimeException ignored) { }
     });
   }

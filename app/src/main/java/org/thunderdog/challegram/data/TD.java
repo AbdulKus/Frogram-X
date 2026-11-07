@@ -3929,6 +3929,7 @@ public class TD {
     private final String mimeType;
     private final long fileSize;
     private final TdApi.FileType fileType;
+    private TdApi.Animation animation;
 
     public DownloadedFile (Tdlib tdlib, TdApi.File file, String mimeType, TdApi.FileType fileType) {
       this.tdlib = tdlib;
@@ -3947,7 +3948,13 @@ public class TD {
     }
 
     public static DownloadedFile valueOf (Tdlib tdlib, TdApi.Animation animation) {
-      return new DownloadedFile(tdlib, animation.animation, animation.mimeType, new TdApi.FileTypeAnimation());
+      DownloadedFile result = new DownloadedFile(tdlib, animation.animation, animation.mimeType, new TdApi.FileTypeAnimation());
+      result.animation = animation;
+      return result;
+    }
+
+    public TdApi.Animation getAnimation () {
+      return animation;
     }
 
     public static DownloadedFile valueOf (Tdlib tdlib, TdApi.Video video) {

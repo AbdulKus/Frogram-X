@@ -10,12 +10,14 @@ import org.thunderdog.challegram.R;
 import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
+import org.thunderdog.challegram.telegram.AuthorizationListener;
+import org.thunderdog.challegram.telegram.MessageRevisionStore;
+import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.util.OfflineSpeech;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import me.vkryl.core.lambda.RunnableBool;
@@ -29,9 +31,11 @@ final class MessageTranscription {
   }
 
   private final MessagesController owner;
-  private final Map<Pair<Long, Long>, Request> requests = new HashMap<>();
-  private record TranscriptKey(long userId, long chatId, long messageId) {}
-  private static final LruCache<TranscriptKey, String> recentTranscripts = new LruCache<>(128);
+  private record TranscriptKey(int account, long userId, long chatId, long messageId) {}
+  private record CachedTranscript(String text, long expires) {}
+  // Requests and their UI subscriptions are confined to the main thread.
+  private static final Map<TranscriptKey, Request> requests = new HashMap<>();
+  private static final LruCache<TranscriptKey, CachedTranscript> recentTranscripts = new LruCache<>(128);
 
   private final LruCache<Pair<Long, Long>, Boolean> collapsed = new LruCache<>(64);
 
@@ -48,28 +52,28 @@ final class MessageTranscription {
   }
 
   private TranscriptKey transcriptKey (TdApi.Message message) {
-    return new TranscriptKey(owner.tdlib().myUserId(true), message.chatId, message.id);
+    return new TranscriptKey(owner.tdlib().id(), owner.tdlib().myUserId(true), message.chatId, message.id);
   }
 
-  private String cachedText (TdApi.Message message) {
-    TranscriptKey key = transcriptKey(message);
-    return key.userId() != 0 ? recentTranscripts.get(key) : null;
+  private static String cachedText (TranscriptKey key) {
+    if (key.userId() == 0) return null;
+    CachedTranscript cached = recentTranscripts.get(key);
+    return cached != null && cached.expires() > System.currentTimeMillis() ? cached.text() : null;
   }
 
-  private void cacheText (TdApi.Message message, String text) {
-    TranscriptKey key = transcriptKey(message);
-    if (key.userId() != 0) recentTranscripts.put(key, text);
+  private static boolean canPersist (TranscriptKey key, TdApi.Message message) {
+    return key.userId() != 0 && message.canBeSaved && message.autoDeleteIn <= 0;
   }
 
   boolean isWorking (TdApi.Message message) {
     if (requests.isEmpty()) return false;
-    Request request = requests.get(Pair.create(message.chatId, message.id));
+    Request request = requests.get(transcriptKey(message));
     return request != null && request.working;
   }
 
   String openedVoiceTranscript (TdApi.Message message) {
     Pair<Long, Long> key = Pair.create(message.chatId, message.id);
-    return collapsed.get(key) == null ? cachedText(message) : null;
+    return collapsed.get(key) == null ? cachedText(transcriptKey(message)) : null;
   }
 
   void setVoiceTranscriptExpanded (TdApi.Message message, boolean expanded) {
@@ -78,31 +82,41 @@ final class MessageTranscription {
     else collapsed.put(key, true);
   }
 
-  void start (TdApi.Message message, Listener listener) {
+  void observeVoice (TdApi.Message message, Listener listener) {
     if (!canTranscribe(message) || owner.isDestroyed()) return;
-    Pair<Long, Long> key = Pair.create(message.chatId, message.id);
-    String text = cachedText(message);
-    TdApi.SpeechRecognitionResult cached = recognitionResult(message);
-    if (cached instanceof TdApi.SpeechRecognitionResultText) {
-      text = ((TdApi.SpeechRecognitionResultText) cached).text;
-    }
-    if (text != null) {
-      cacheText(message, text);
-      listener.onWorking(false);
-      if (!text.trim().isEmpty()) listener.onResult(text);
-      else UI.showToast(R.string.FrogramTranscriptionEmpty, android.widget.Toast.LENGTH_SHORT);
-      return;
-    }
+    TranscriptKey key = transcriptKey(message);
     Request existing = requests.get(key);
     if (existing != null) {
-      existing.listeners.add(listener);
-      listener.onWorking(existing.working);
+      existing.subscribe(this, listener);
       return;
     }
-    Request request = new Request(key, message);
-    request.listeners.add(listener);
+    String text = openedVoiceTranscript(message);
+    if (text != null) {
+      listener.onResult(text);
+    } else if (canPersist(key, message)) {
+      MessageRevisionStore.loadTranscript(key.account(), key.userId(), key.chatId(), key.messageId(), stored -> {
+        if (!owner.isDestroyed() && owner.getChatId() == key.chatId() && transcriptKey(message).equals(key) &&
+            collapsed.get(Pair.create(key.chatId(), key.messageId())) == null && !requests.containsKey(key) && stored != null) {
+          listener.onResult(stored);
+        }
+      });
+    }
+  }
+
+  void start (TdApi.Message message, Listener listener) {
+    if (!canTranscribe(message) || owner.isDestroyed()) return;
+    TranscriptKey key = transcriptKey(message);
+    Request existing = requests.get(key);
+    if (existing != null) {
+      existing.subscribe(this, listener);
+      return;
+    }
+    Request request = new Request(key, owner.tdlib(), message);
     requests.put(key, request);
-    request.start(cached instanceof TdApi.SpeechRecognitionResultPending);
+    request.tdlib.incrementTranscriptionReferenceCount();
+    request.tdlib.listeners().addAuthorizationChangeListener(request);
+    request.subscribe(this, listener);
+    request.loadOrStart();
   }
 
   void showVideo (TdApi.Message message, RunnableBool onWorking) {
@@ -123,31 +137,75 @@ final class MessageTranscription {
     });
   }
 
-  void cancel () {
-    List<Request> pending = new ArrayList<>(requests.values());
-    for (Request request : pending) request.finish(null, 0);
+  void detach () {
+    for (Request request : requests.values()) request.listeners.remove(this);
   }
 
-  private final class Request {
-    final Pair<Long, Long> key;
+  private static final class Request implements AuthorizationListener {
+    final TranscriptKey key;
+    final Tdlib tdlib;
     final TdApi.Message message;
-    final List<Listener> listeners = new ArrayList<>();
+    final Map<MessageTranscription, Listener> listeners = new HashMap<>();
     boolean working;
     boolean server = true;
     OfflineSpeech.Job job;
     final Runnable timeout = () -> { if (active() && server) fallback(); };
 
-    Request (Pair<Long, Long> key, TdApi.Message message) {
+    Request (TranscriptKey key, Tdlib tdlib, TdApi.Message message) {
       this.key = key;
+      this.tdlib = tdlib;
       this.message = message;
     }
 
-    boolean active () { return requests.get(key) == this && !owner.isDestroyed(); }
+    boolean active () {
+      if (requests.get(key) != this) return false;
+      if (tdlib.isAuthorized() && tdlib.myUserId(true) == key.userId()) return true;
+      finish(null, 0);
+      return false;
+    }
+
+    @Override public void onAuthorizationStateChanged (TdApi.AuthorizationState state) {
+      if (!(state instanceof TdApi.AuthorizationStateReady)) UI.post(() -> finish(null, 0));
+    }
+
+    void subscribe (MessageTranscription owner, Listener listener) {
+      listeners.put(owner, listener);
+      listener.onWorking(working);
+    }
 
     void working (boolean value) {
       if (working == value) return;
       working = value;
-      for (Listener listener : listeners) listener.onWorking(value);
+      for (Listener listener : new ArrayList<>(listeners.values())) listener.onWorking(value);
+    }
+
+    void loadOrStart () {
+      TdApi.SpeechRecognitionResult cached = recognitionResult(message);
+      String text = cached instanceof TdApi.SpeechRecognitionResultText ?
+        ((TdApi.SpeechRecognitionResultText) cached).text : cachedText(key);
+      if (text != null && !text.trim().isEmpty()) {
+        finish(text, 0, false);
+        return;
+      }
+      working(true);
+      if (canPersist(key, message)) {
+        MessageRevisionStore.loadTranscript(key.account(), key.userId(), key.chatId(), key.messageId(), stored -> {
+          if (!active()) return;
+          if (stored != null) finish(stored, 0, false);
+          else start(cached instanceof TdApi.SpeechRecognitionResultPending);
+        });
+      } else {
+        start(cached instanceof TdApi.SpeechRecognitionResultPending);
+      }
+    }
+
+    private MessagesController focusedOwner () {
+      for (MessageTranscription observer : listeners.keySet()) {
+        if (!observer.owner.isDestroyed() && observer.owner.isFocused() && observer.owner.getChatId() == key.chatId()) {
+          return observer.owner;
+        }
+      }
+      return null;
     }
 
     void start (boolean alreadyPending) {
@@ -155,10 +213,10 @@ final class MessageTranscription {
       UI.post(timeout, 120000);
       if (alreadyPending) {
         poll();
-      } else if (!owner.tdlib().canTrySpeechRecognition(duration(message))) {
+      } else if (!tdlib.canTrySpeechRecognition(duration(message))) {
         fallback();
       } else {
-        owner.tdlib().client().send(new TdApi.RecognizeSpeech(message.chatId, message.id), response -> UI.post(() -> {
+        tdlib.client().send(new TdApi.RecognizeSpeech(message.chatId, message.id), response -> UI.post(() -> {
           if (!active() || !server) return;
           if (response instanceof TdApi.Error) fallback();
           else poll();
@@ -168,7 +226,7 @@ final class MessageTranscription {
 
     void poll () {
       if (!active() || !server) return;
-      owner.tdlib().client().send(new TdApi.GetMessage(message.chatId, message.id), response -> UI.post(() -> {
+      tdlib.client().send(new TdApi.GetMessage(message.chatId, message.id), response -> UI.post(() -> {
         if (!active() || !server) return;
         if (!(response instanceof TdApi.Message)) {
           fallback();
@@ -192,9 +250,12 @@ final class MessageTranscription {
         finish(null, R.string.FrogramOfflineUnsupported);
       } else if (OfflineSpeech.hasModel()) {
         startLocal(false);
-      } else if (!owner.isFocused()) {
-        finish(null, 0);
       } else {
+        MessagesController owner = focusedOwner();
+        if (owner == null) {
+          finish(null, 0);
+          return;
+        }
         working(false);
         MessageDialogStyle panel = new MessageDialogStyle(owner, Lang.getString(R.string.FrogramTranscribe), true);
         panel.add(panel.label(Lang.getString(R.string.FrogramOfflineDownload), 14, Theme.textDecentColor(), false), 8);
@@ -215,7 +276,7 @@ final class MessageTranscription {
       if (file.local.isDownloadingCompleted) {
         recognize(file.local.path, downloadModel);
       } else {
-        owner.tdlib().client().send(new TdApi.DownloadFile(file.id, 32, 0, 0, true), response -> UI.post(() -> {
+        tdlib.client().send(new TdApi.DownloadFile(file.id, 32, 0, 0, true), response -> UI.post(() -> {
           if (!active()) return;
           if (response instanceof TdApi.File && ((TdApi.File) response).local.isDownloadingCompleted) {
             recognize(((TdApi.File) response).local.path, downloadModel);
@@ -233,18 +294,29 @@ final class MessageTranscription {
     }
 
     void finish (String text, int error) {
+      finish(text, error, true);
+    }
+
+    void finish (String text, int error, boolean save) {
       if (requests.get(key) != this) return;
       requests.remove(key);
+      tdlib.listeners().removeAuthorizationChangeListener(this);
+      tdlib.decrementTranscriptionReferenceCount();
       UI.removePendingRunnable(timeout);
       if (job != null) job.cancel();
       working(false);
-      if (owner.isDestroyed()) return;
       if (text != null && !text.trim().isEmpty()) {
-        cacheText(message, text);
-        for (Listener listener : listeners) listener.onResult(text);
-      } else if (owner.isFocused() && (error != 0 || text != null)) {
+        if (key.userId() != 0 && save) {
+          recentTranscripts.put(key, new CachedTranscript(text, System.currentTimeMillis() + 7L * 86400000L));
+          if (canPersist(key, message)) {
+            MessageRevisionStore.saveTranscript(key.account(), key.userId(), key.chatId(), key.messageId(), text);
+          }
+        }
+        for (Listener listener : new ArrayList<>(listeners.values())) listener.onResult(text);
+      } else if (focusedOwner() != null && (error != 0 || text != null)) {
         UI.showToast(error != 0 ? error : R.string.FrogramTranscriptionEmpty, android.widget.Toast.LENGTH_SHORT);
       }
+      listeners.clear();
     }
   }
 

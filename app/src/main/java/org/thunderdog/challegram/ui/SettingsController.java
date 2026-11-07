@@ -263,9 +263,45 @@ public class SettingsController extends ViewController<Void> implements
     avatarPickerManager.showMenuForProfile(headerCell, false);
   }
 
+  private static final int GIF_EXPORT_REQUEST = 4101;
+  private static final int GIF_IMPORT_REQUEST = 4102;
+
   @Override
   public void onActivityResult (int requestCode, int resultCode, Intent data) {
+    if (requestCode == GIF_EXPORT_REQUEST || requestCode == GIF_IMPORT_REQUEST) {
+      if (resultCode == android.app.Activity.RESULT_OK && data != null && data.getData() != null) {
+        if (requestCode == GIF_EXPORT_REQUEST) tdlib.ui().savedGifs().exportTo(data.getData());
+        else tdlib.ui().savedGifs().importFrom(data.getData());
+      }
+      return;
+    }
     avatarPickerManager.handleActivityResult(requestCode, resultCode, data, AvatarPickerManager.MODE_PROFILE, null, null);
+  }
+
+  private void showSavedGifOptions () {
+    showOptions(new Options.Builder()
+      .info(Lang.getString(R.string.FrogramGifBackupHint))
+      .item(new OptionItem(R.id.btn_frogramGifArchive, Lang.getString(R.string.FrogramGifArchive), OptionColor.NORMAL, R.drawable.baseline_check_circle_24))
+      .item(new OptionItem(R.id.btn_frogramGifExport, Lang.getString(R.string.FrogramGifExport), OptionColor.NORMAL, R.drawable.baseline_arrow_upward_24))
+      .item(new OptionItem(R.id.btn_frogramGifImport, Lang.getString(R.string.FrogramGifImport), OptionColor.NORMAL, R.drawable.baseline_file_download_24))
+      .cancelItem()
+      .build(), (view, id) -> {
+        if (id == R.id.btn_frogramGifArchive) {
+          tdlib.ui().savedGifs().archiveCurrent();
+        } else if (id == R.id.btn_frogramGifExport || id == R.id.btn_frogramGifImport) {
+          boolean export = id == R.id.btn_frogramGifExport;
+          Intent intent = new Intent(export ? Intent.ACTION_CREATE_DOCUMENT : Intent.ACTION_OPEN_DOCUMENT);
+          intent.addCategory(Intent.CATEGORY_OPENABLE);
+          intent.setType(export ? "application/json" : "*/*");
+          if (export) intent.putExtra(Intent.EXTRA_TITLE, "Frogram-saved-gifs.json");
+          try {
+            context().startActivityForResult(intent, export ? GIF_EXPORT_REQUEST : GIF_IMPORT_REQUEST);
+          } catch (android.content.ActivityNotFoundException error) {
+            UI.showToast(R.string.FrogramGifBackupFailed, android.widget.Toast.LENGTH_SHORT);
+          }
+        }
+        return true;
+      });
   }
 
   private boolean hasNotificationError;
@@ -662,6 +698,8 @@ public class SettingsController extends ViewController<Void> implements
     items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
 
     items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
+    items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_frogramSavedGifs, R.drawable.deproko_baseline_gif_24, R.string.FrogramSavedGifs));
+    items.add(new ListItem(ListItem.TYPE_SEPARATOR));
     items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_checkUpdates, R.drawable.baseline_system_update_24, R.string.FrogramUpdates));
     items.add(new ListItem(ListItem.TYPE_SEPARATOR));
     items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_sourceCode, R.drawable.baseline_github_24, R.string.ViewSourceCode));
@@ -1138,6 +1176,8 @@ public class SettingsController extends ViewController<Void> implements
       navigateTo(new SettingsNotificationController(context, tdlib));
     } else if (viewId == R.id.btn_devices) {
       navigateTo(new SettingsSessionsController(context, tdlib));
+    } else if (viewId == R.id.btn_frogramSavedGifs) {
+      showSavedGifOptions();
     } else if (viewId == R.id.btn_checkUpdates) {
       navigateTo(new SettingsUpdatesController(context, tdlib));
     } else if (viewId == R.id.btn_subscribeToBeta) {

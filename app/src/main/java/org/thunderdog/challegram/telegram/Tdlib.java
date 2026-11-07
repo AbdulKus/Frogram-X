@@ -777,6 +777,14 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
     decrementReferenceCount(REFERENCE_TYPE_UI, JOB_ID_UI);
   }
 
+  public void incrementTranscriptionReferenceCount () {
+    incrementJobReferenceCount("message-transcription");
+  }
+
+  public void decrementTranscriptionReferenceCount () {
+    decrementJobReferenceCount("message-transcription");
+  }
+
   void incrementNotificationReferenceCount () {
     incrementReferenceCount(REFERENCE_TYPE_NOTIFICATION, JOB_ID_NOTIFICATION);
   }
@@ -1332,6 +1340,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
     }
     if (prevStatus != Status.READY && newStatus == Status.READY) {
       runStartupChecks();
+      UI.post(() -> ui().savedGifs().refreshCloudArchive());
     }
     if (prevStatus != Status.UNAUTHORIZED && newStatus == Status.UNAUTHORIZED) {
       Log.i("Performing account cleanup for accountId:%d", accountId);
@@ -9599,6 +9608,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
       // Auth
 
       case "my_id":
+        UI.post(() -> ui().savedGifs().refreshCloudArchive());
         onUpdateMyUserId(Td.longValue(update.value));
         break;
       case "authentication_token": {
@@ -9753,6 +9763,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
 
   private void updateSavedAnimations (TdApi.UpdateSavedAnimations update) {
     listeners.updateSavedAnimations(update);
+    UI.post(() -> ui().savedGifs().refreshCloudArchive());
   }
 
   private void updateDiceEmoji (String[] emoji) {
