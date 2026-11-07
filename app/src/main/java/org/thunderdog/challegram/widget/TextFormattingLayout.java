@@ -188,18 +188,11 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   public void setGlassBackground (java.util.function.BiFunction<View, Integer, ChatGlassDrawable> glassFactory) {
     if (hasGlassBackground()) return;
     setBackground(null);
-    setClickable(true);
-    setClipToPadding(false);
-    setClipChildren(false);
-    setPadding(Screen.dp(GLASS_PADDING), Screen.dp(GLASS_PADDING), Screen.dp(GLASS_PADDING), 0);
+    int inset = Screen.dp(GLASS_INSET);
+    setPadding(inset, inset, inset, 0);
     glassSurface = new View(getContext());
     glassSurface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-    LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, 0);
-    int inset = Screen.dp(GLASS_INSET);
-    // Layout padding is shared by all rows; extend just the backdrop around them.
-    int out = inset - Screen.dp(GLASS_PADDING);
-    params.setMargins(out, out, out, 0);
-    addView(glassSurface, 0, params);
+    addView(glassSurface, 0, new LayoutParams(LayoutParams.MATCH_PARENT, 0));
     ChatGlassDrawable glass = glassFactory.apply(glassSurface, ColorId.filling);
     glass.setRadius(Screen.dp(20f));
     glassSurface.setBackground(glass);
@@ -214,10 +207,6 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   }
 
   boolean hasGlassBackground () { return glassSurface != null; }
-
-  int getGlassKeyboardHeight (int width) {
-    return Params.buttonSizeForWidth(width, GLASS_PADDING) * 4 + Screen.dp(GLASS_ROW_GAP) * 3 + Screen.dp(GLASS_PADDING) * 2;
-  }
 
   public void init (ViewController<?> parent, InputView inputView, Delegate delegate) {
     this.parent = parent;
@@ -794,6 +783,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     private int buttonSizePx = 0;
     private float paddingHorizontal = 0f;
     private float paddingVertical = 0f;
+    private int glassContentInset;
 
     static int buttonSizeForWidth (int width, int padding) {
       return Math.max(1, Math.min(Screen.dp(MAX_BUTTON_SIZE),
@@ -801,6 +791,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     }
 
     public void init (int width, int height, boolean glass) {
+      glassContentInset = glass ? Screen.dp(GLASS_PADDING) - Screen.dp(GLASS_INSET) : 0;
       int side = glass ? GLASS_PADDING : PADDING_HORIZONTAL;
       int top = glass ? GLASS_PADDING : PADDING_VERTICAL;
       paddingVertical = Screen.dp(glass ? GLASS_ROW_GAP : 12);
@@ -817,8 +808,8 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
       final ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
       params.width = getWidth(width);
       params.height = buttonSizePx;
-      params.leftMargin = getLeft(left);
-      params.topMargin = getTop(top);
+      params.leftMargin = getLeft(left) + glassContentInset;
+      params.topMargin = getTop(top) + glassContentInset;
     }
 
     private int getWidth(int count) {

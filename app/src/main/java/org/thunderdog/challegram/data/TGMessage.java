@@ -1557,7 +1557,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     return !isOutgoing() && isDemoGroupChat();
   }
 
-  private boolean useBubbleTime () {
+  protected final boolean useBubbleTime () {
     return !headerDisabled() && (!useForward() || (isOutgoing() || (flags & FLAG_HEADER_ENABLED) != 0)) && !(this instanceof TGMessageCall);
   }
 

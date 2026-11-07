@@ -580,7 +580,7 @@ public class TGMessageVideo extends TGMessage implements FileProgressComponent.S
       c.drawCircle(circleX, textY + Screen.dp(11.5f), Screen.dp(1.5f), Paints.fillingPaint(ColorUtils.alphaColor(viewFactor, useBubbles ? 0xffffffff : Theme.getColor(ColorId.online))));
     }
 
-    drawTranscriptButton(view, c, receiver, x - contentWidth - (useBubbles ? Screen.dp(12) : 0), textY + Screen.dp(11.5f));
+    drawTranscriptButton(view, c, centerX * 2 - x, x - contentWidth - (useBubbles ? Screen.dp(12) : 0), textY + Screen.dp(11.5f));
     final boolean drawSpoiler = TD.isSelfDestructTypeImmediately(getMessage());
     float alpha = (1f - unmuteFactor) * (1f - fileProgress.getBackgroundAlpha());
     if (alpha > 0f && !drawSpoiler) {
@@ -608,7 +608,7 @@ public class TGMessageVideo extends TGMessage implements FileProgressComponent.S
     }
   }
 
-  private void drawTranscriptButton (MessageView view, Canvas canvas, Receiver receiver, int durationLeft, int centerY) {
+  private void drawTranscriptButton (MessageView view, Canvas canvas, int circleRight, int durationLeft, int centerY) {
     float opacity = 1f - isFullSizeAnimator.getFloatValue();
     if (opacity <= 0f || !allowInteraction() || !(controller() instanceof MessagesController) ||
         !MessagesController.supportsTranscription(getMessage())) {
@@ -618,23 +618,22 @@ public class TGMessageVideo extends TGMessage implements FileProgressComponent.S
     MessagesController controller = (MessagesController) controller();
     int radius = Screen.dp(11);
     int gap = Screen.dp(5);
+    boolean bubbles = useBubbles();
     int centerX;
     if (alignBubbleRight()) {
       centerX = durationLeft - gap - radius;
     } else {
-      int circleRight = receiver.centerX() + (int) ((float) ((double) (receiver.getWidth() / 2) * Math.sin(Math.toRadians(45f))));
-      if (useBubbles() && useBubbleTime() && !isChannel()) {
+      if (bubbles && useBubbleTime() && !isChannel()) {
         int timeWidth = computeBubbleTimePartWidth(false);
-        int timeRight = circleRight + Screen.dp(12f) + timeWidth;
+        int timeRight = getAbsolutelyRealRightContentEdge(view, timeWidth + Screen.dp(11)) + timeWidth + Screen.dp(6);
         centerX = timeRight + gap + radius;
       } else {
-        centerX = circleRight + (useBubbles() ? Screen.dp(6f) : Screen.dp(4f)) + radius;
+        centerX = circleRight + Screen.dp(bubbles ? 6 : 4) + radius;
       }
     }
     centerX = Math.max(radius, Math.min(view.getWidth() - radius, centerX));
     int touchRadius = radius + Screen.dp(3);
     transcriptHit.set(centerX - touchRadius, centerY - touchRadius, centerX + touchRadius, centerY + touchRadius);
-    boolean bubbles = useBubbles();
     int backgroundColor = bubbles ? getBubbleTimeColor() : Theme.getColor(ColorId.bubble_mediaTime_noWallpaper);
     int foregroundColor = bubbles ? getBubbleTimeTextColor() : Theme.getColor(ColorId.bubble_mediaTimeText_noWallpaper);
     canvas.drawCircle(centerX, centerY, radius, Paints.fillingPaint(ColorUtils.alphaColor(opacity, backgroundColor)));
