@@ -494,6 +494,19 @@ public class MessagesController extends ViewController<MessagesController.Argume
     });
   }
 
+  public boolean isTranscribingVideo (TdApi.Message message) {
+    return transcription.isWorking(message);
+  }
+
+  public void transcribeVideo (TdApi.Message message) {
+    transcription.showVideo(message, working -> {
+      if (message.chatId == getChatId()) {
+        TGMessage current = manager.getAdapter().findMessageById(message.id);
+        if (current != null) current.invalidateOverlay();
+      }
+    });
+  }
+
   private void openAiEditor () {
     if (inputView == null || isDestroyed() || isSecretChat()) return;
     org.thunderdog.challegram.util.TextSelection selection = inputView.getTextSelection();
@@ -6020,11 +6033,6 @@ public class MessagesController extends ViewController<MessagesController.Argume
             }
           }
           messageOptionsBuilder.item(historyItem);
-          TdApi.Message observedMessage = msg.getMessage();
-          if (MessageTranscription.canTranscribe(observedMessage)) {
-            messageOptionsBuilder.item(new OptionItem.Builder().id(R.id.btn_frogramTranscribe)
-              .name(R.string.FrogramTranscribe).icon(R.drawable.frogram_transcribe_24).build());
-          }
           if (readDate != null) {
             switch (readDate.getConstructor()) {
               case TdApi.MessageReadDateRead.CONSTRUCTOR: {
@@ -6912,14 +6920,6 @@ public class MessagesController extends ViewController<MessagesController.Argume
             MessageHistoryDialog.show(this, revisions);
           }
         });
-        return true;
-      } else if (id == R.id.btn_frogramTranscribe) {
-        cancelSheduledKeyboardOpeningAndHideAllKeyboards();
-        if (selectedMessage instanceof TGMessageFile) {
-          ((TGMessageFile) selectedMessage).toggleVoiceTranscript(selectedMessage.getId());
-        } else {
-          transcription.showVideo(selectedMessage.getMessage());
-        }
         return true;
       }
       if (id == R.id.btn_emojiPackInfoButton) {

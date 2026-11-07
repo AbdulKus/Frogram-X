@@ -479,11 +479,6 @@ public class TGMessageFile extends TGMessage {
     if (file != null && file.component.hasTranscription()) file.showTranscript(text);
   }
 
-  public void toggleVoiceTranscript (long messageId) {
-    CaptionedFile file = findCaptionedFile(messageId);
-    if (file != null && file.component.isVoice()) file.toggleTranscript();
-  }
-
   @Nullable
   public FileComponent findFileComponent (long messageId) {
     CaptionedFile file = findCaptionedFile(messageId);

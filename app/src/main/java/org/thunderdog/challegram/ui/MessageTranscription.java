@@ -18,6 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import me.vkryl.core.lambda.RunnableBool;
+
 import tgx.td.ChatId;
 
 final class MessageTranscription {
@@ -28,7 +30,8 @@ final class MessageTranscription {
 
   private final MessagesController owner;
   private final Map<Pair<Long, Long>, Request> requests = new HashMap<>();
-  private final LruCache<Pair<Long, Long>, String> results = new LruCache<>(64);
+  private record TranscriptKey(long userId, long chatId, long messageId) {}
+  private static final LruCache<TranscriptKey, String> recentTranscripts = new LruCache<>(128);
 
   private final LruCache<Pair<Long, Long>, Boolean> collapsed = new LruCache<>(64);
 
@@ -44,9 +47,29 @@ final class MessageTranscription {
     return supportsTranscription(message) && message.id > 0 && message.sendingState == null;
   }
 
+  private TranscriptKey transcriptKey (TdApi.Message message) {
+    return new TranscriptKey(owner.tdlib().myUserId(true), message.chatId, message.id);
+  }
+
+  private String cachedText (TdApi.Message message) {
+    TranscriptKey key = transcriptKey(message);
+    return key.userId() != 0 ? recentTranscripts.get(key) : null;
+  }
+
+  private void cacheText (TdApi.Message message, String text) {
+    TranscriptKey key = transcriptKey(message);
+    if (key.userId() != 0) recentTranscripts.put(key, text);
+  }
+
+  boolean isWorking (TdApi.Message message) {
+    if (requests.isEmpty()) return false;
+    Request request = requests.get(Pair.create(message.chatId, message.id));
+    return request != null && request.working;
+  }
+
   String openedVoiceTranscript (TdApi.Message message) {
     Pair<Long, Long> key = Pair.create(message.chatId, message.id);
-    return collapsed.get(key) == null ? results.get(key) : null;
+    return collapsed.get(key) == null ? cachedText(message) : null;
   }
 
   void setVoiceTranscriptExpanded (TdApi.Message message, boolean expanded) {
@@ -58,13 +81,13 @@ final class MessageTranscription {
   void start (TdApi.Message message, Listener listener) {
     if (!canTranscribe(message) || owner.isDestroyed()) return;
     Pair<Long, Long> key = Pair.create(message.chatId, message.id);
-    String text = results.get(key);
+    String text = cachedText(message);
     TdApi.SpeechRecognitionResult cached = recognitionResult(message);
     if (cached instanceof TdApi.SpeechRecognitionResultText) {
       text = ((TdApi.SpeechRecognitionResultText) cached).text;
     }
     if (text != null) {
-      results.put(key, text);
+      cacheText(message, text);
       listener.onWorking(false);
       if (!text.trim().isEmpty()) listener.onResult(text);
       else UI.showToast(R.string.FrogramTranscriptionEmpty, android.widget.Toast.LENGTH_SHORT);
@@ -82,14 +105,14 @@ final class MessageTranscription {
     request.start(cached instanceof TdApi.SpeechRecognitionResultPending);
   }
 
-  void showVideo (TdApi.Message message) {
+  void showVideo (TdApi.Message message, RunnableBool onWorking) {
     start(message, new Listener() {
       @Override public void onWorking (boolean working) {
-        if (working) UI.showToast(R.string.FrogramTranscribing, android.widget.Toast.LENGTH_SHORT);
+        onWorking.runWithBool(working);
       }
 
       @Override public void onResult (String text) {
-        if (!owner.isFocused()) return;
+        if (!owner.isFocused() || owner.getChatId() != message.chatId) return;
         MessageDialogStyle panel = new MessageDialogStyle(owner, Lang.getString(R.string.FrogramTranscribe), false);
         TextView label = panel.label(text, 16, Theme.textAccentColor(), false);
         label.setTextIsSelectable(true);
@@ -217,7 +240,7 @@ final class MessageTranscription {
       working(false);
       if (owner.isDestroyed()) return;
       if (text != null && !text.trim().isEmpty()) {
-        results.put(key, text);
+        cacheText(message, text);
         for (Listener listener : listeners) listener.onResult(text);
       } else if (owner.isFocused() && (error != 0 || text != null)) {
         UI.showToast(error != 0 ? error : R.string.FrogramTranscriptionEmpty, android.widget.Toast.LENGTH_SHORT);

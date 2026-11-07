@@ -2,7 +2,6 @@
 <resources>
   <item name="btn_frogramGroupCall" type="id" />
   <item name="btn_frogramHistory" type="id" />
-  <item name="btn_frogramTranscribe" type="id" />
   <item name="btn_frogramAi" type="id" />
   <string name="FrogramEditHistory">Edit history</string>
   <string name="FrogramHistoryLatest">Latest · %1$s</string>

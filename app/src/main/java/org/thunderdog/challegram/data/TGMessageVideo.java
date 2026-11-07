@@ -18,6 +18,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Interpolator;
@@ -86,6 +87,8 @@ public class TGMessageVideo extends TGMessage implements FileProgressComponent.S
   private int duration;
   private String durationStr;
   private float durationWidth;
+  private final RectF transcriptHit = new RectF();
+  private boolean transcriptTouch;
 
   public TGMessageVideo (MessagesManager context, TdApi.Message msg, TdApi.VideoNote videoNote, boolean isViewed) {
     super(context, msg);
@@ -577,6 +580,7 @@ public class TGMessageVideo extends TGMessage implements FileProgressComponent.S
       c.drawCircle(circleX, textY + Screen.dp(11.5f), Screen.dp(1.5f), Paints.fillingPaint(ColorUtils.alphaColor(viewFactor, useBubbles ? 0xffffffff : Theme.getColor(ColorId.online))));
     }
 
+    drawTranscriptButton(view, c, x - contentWidth - (useBubbles ? Screen.dp(12) : 0), textY + Screen.dp(11.5f));
     final boolean drawSpoiler = TD.isSelfDestructTypeImmediately(getMessage());
     float alpha = (1f - unmuteFactor) * (1f - fileProgress.getBackgroundAlpha());
     if (alpha > 0f && !drawSpoiler) {
@@ -604,14 +608,73 @@ public class TGMessageVideo extends TGMessage implements FileProgressComponent.S
     }
   }
 
+  private void drawTranscriptButton (MessageView view, Canvas canvas, int durationLeft, int centerY) {
+    float opacity = 1f - isFullSizeAnimator.getFloatValue();
+    if (opacity <= 0f || !allowInteraction() || !(controller() instanceof MessagesController) ||
+        !MessagesController.supportsTranscription(getMessage())) {
+      transcriptHit.setEmpty();
+      return;
+    }
+    MessagesController controller = (MessagesController) controller();
+    int radius = Screen.dp(11);
+    int gap = Screen.dp(5);
+    int timeWidth = computeBubbleTimePartWidth(false);
+    int timeRight = getAbsolutelyRealRightContentEdge(view, timeWidth + Screen.dp(11)) + timeWidth + Screen.dp(6);
+    int centerX = isOutgoing() ? durationLeft - gap - radius : timeRight + gap + radius;
+    centerX = Math.max(radius, Math.min(view.getWidth() - radius, centerX));
+    int touchRadius = radius + Screen.dp(3);
+    transcriptHit.set(centerX - touchRadius, centerY - touchRadius, centerX + touchRadius, centerY + touchRadius);
+    canvas.drawCircle(centerX, centerY, radius, Paints.fillingPaint(ColorUtils.alphaColor(opacity, getBubbleTimeColor())));
+    int iconColor = ColorUtils.alphaColor(opacity * (MessagesController.canTranscribe(getMessage()) ? 1f : .5f), getBubbleTimeTextColor());
+    if (controller.isTranscribingVideo(getMessage())) {
+      int ring = Screen.dp(5.5f);
+      canvas.drawArc(centerX - ring, centerY - ring, centerX + ring, centerY + ring,
+        SystemClock.uptimeMillis() % 900 * .4f, 265, false, Paints.strokeBigPaint(iconColor));
+      MessageViewGroup group = view.getParentMessageViewGroup();
+      if (group != null && canvas.isHardwareAccelerated()) group.getOverlayView().postInvalidateOnAnimation();
+    } else {
+      int save = canvas.save();
+      canvas.scale(.66f, .66f, centerX, centerY);
+      Drawables.drawCentered(canvas, view.getSparseDrawable(R.drawable.frogram_transcribe_24, 0),
+        centerX, centerY, Paints.getPorterDuffPaint(iconColor));
+      canvas.restoreToCount(save);
+    }
+  }
+
+  private boolean hitsTranscript (float x, float y) {
+    return !isFullSizeAnimator.getValue() && isFullSizeAnimator.getFloatValue() < .3f && transcriptHit.contains(x, y);
+  }
+
+  @Override
+  public boolean allowLongPress (float x, float y) {
+    return !hitsTranscript(x, y) && super.allowLongPress(x, y);
+  }
+
   @Override
   public boolean onTouchEvent (MessageView view, MotionEvent e) {
+    int action = e.getActionMasked();
+    if (action == MotionEvent.ACTION_DOWN) transcriptTouch = hitsTranscript(e.getX(), e.getY());
+    if (transcriptTouch) {
+      if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+        transcriptTouch = false;
+        if (action == MotionEvent.ACTION_UP && hitsTranscript(e.getX(), e.getY()) &&
+            MessagesController.canTranscribe(getMessage()) && controller() instanceof MessagesController) {
+          MessagesController controller = (MessagesController) controller();
+          if (!controller.isTranscribingVideo(getMessage())) {
+            performClickSoundFeedback();
+            controller.transcribeVideo(getMessage());
+          }
+        }
+      }
+      return true;
+    }
     return super.onTouchEvent(view, e) || fileProgress.onTouchEvent(view, e);
   }
 
   @Override
   protected void onMessageIdChanged (long oldMessageId, long newMessageId, boolean success) {
     fileProgress.updateMessageId(oldMessageId, newMessageId, success);
+    invalidateOverlay();
   }
 
   @Override
