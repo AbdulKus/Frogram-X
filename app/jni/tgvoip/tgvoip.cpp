@@ -35,6 +35,7 @@
 
 #include <tgcalls/VideoCaptureInterface.h>
 #include <tgcalls/StaticThreads.h>
+#include <tgcalls/group/GroupInstanceCustomImpl.h>
 #include <platform/android/AndroidInterface.h>
 #include <platform/android/AndroidContext.h>
 
@@ -973,3 +974,63 @@ jint JNI_OnLoad (JavaVM *vm, void *reserved) {
   return JNI_VERSION_1_6;
 }
 }
+
+#ifndef DISABLE_TGCALLS
+struct FrogramGroupHandle {
+  std::shared_ptr<JniWrapper> callbacks;
+  std::shared_ptr<tgcalls::GroupInstanceCustomImpl> instance;
+};
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_org_thunderdog_challegram_voip_GroupVoiceEngine_createNative(JNIEnv *env, jobject thiz) {
+  if (!tgcalls::initialize(env)) return 0;
+  auto callbacks = std::make_shared<JniWrapper>(env, thiz);
+  tgcalls::GroupInstanceDescriptor descriptor;
+  descriptor.threads = tgcalls::StaticThreads::getThreads();
+  descriptor.config.need_log = false;
+  descriptor.initialEnableNoiseSuppression = true;
+  descriptor.networkStateUpdated = [callbacks](tgcalls::GroupNetworkState state) {
+    callbacks->runSafely([&](JNIEnv *env) {
+      jmethodID method = env->GetMethodID(callbacks->clazz, "onState", "(Z)V");
+      env->CallVoidMethod(callbacks->thiz, method, static_cast<jboolean>(state.isConnected));
+    });
+  };
+  auto instance = std::make_shared<tgcalls::GroupInstanceCustomImpl>(std::move(descriptor));
+  instance->setIsMuted(true);
+  instance->setConnectionMode(tgcalls::GroupConnectionMode::GroupConnectionModeRtc, false, false);
+  return reinterpret_cast<jlong>(new FrogramGroupHandle{callbacks, instance});
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_thunderdog_challegram_voip_GroupVoiceEngine_emitNative(JNIEnv *, jobject, jlong ptr) {
+  auto handle = reinterpret_cast<FrogramGroupHandle *>(ptr);
+  auto callbacks = handle->callbacks;
+  handle->instance->emitJoinPayload([callbacks](tgcalls::GroupJoinPayload const &payload) {
+    callbacks->runSafely([&](JNIEnv *env) {
+      jmethodID method = env->GetMethodID(callbacks->clazz, "onPayload", "(ILjava/lang/String;)V");
+      jstring json = env->NewStringUTF(payload.json.c_str());
+      env->CallVoidMethod(callbacks->thiz, method, static_cast<jint>(payload.audioSsrc), json);
+      env->DeleteLocalRef(json);
+    });
+  });
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_thunderdog_challegram_voip_GroupVoiceEngine_responseNative(JNIEnv *env, jobject, jlong ptr, jstring payload) {
+  reinterpret_cast<FrogramGroupHandle *>(ptr)->instance->setJoinResponsePayload(jni::from_jstring(env, payload));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_thunderdog_challegram_voip_GroupVoiceEngine_muteNative(JNIEnv *, jobject, jlong ptr, jboolean muted) {
+  reinterpret_cast<FrogramGroupHandle *>(ptr)->instance->setIsMuted(muted == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_thunderdog_challegram_voip_GroupVoiceEngine_stopNative(JNIEnv *env, jobject, jlong ptr) {
+  auto handle = reinterpret_cast<FrogramGroupHandle *>(ptr);
+  handle->callbacks->releaseReference(env);
+  auto instance = handle->instance;
+  instance->stop([instance]() {});
+  delete handle;
+}
+#endif

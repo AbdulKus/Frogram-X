@@ -7768,7 +7768,7 @@ public class TdlibUi extends Handler {
   }
 
   public void openVoiceChat (ViewController<?> context, int groupCallId, @Nullable UrlOpenParameters openParameters) {
-    // TODO open voice chat layer
+    org.thunderdog.challegram.ui.GroupVoiceDialog.show(context, groupCallId);
   }
 
   // Suggestions by emoji

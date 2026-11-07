@@ -1,6 +1,7 @@
 # Third-party components and resources
 
 * [TDLib](https://github.com/tdlib/td): used for interacting with Telegram API and caching data
+* [whisper.cpp](https://github.com/ggml-org/whisper.cpp/tree/4979e04f5dcaccb36057e059bbaed8a2f5288315) (MIT): on-device speech recognition. Sources are fetched at a fixed commit with SHA-256 validation. The multilingual [Whisper base model](https://huggingface.co/ggerganov/whisper.cpp) is downloaded separately after user confirmation and checked against its SHA-256.
 * [LevelDB](https://github.com/google/leveldb): used for storing local data and settings
 
 * [libtgvoip](https://github.com/grishka/libtgvoip) & java layer by the same author: used for VoIP

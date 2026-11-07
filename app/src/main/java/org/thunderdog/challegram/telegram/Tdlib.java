@@ -498,6 +498,16 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
   private int unreadTrendingStickerSetsCount;
   private long[] trustedMiniAppBotUserIds;
   private TdApi.GroupCallMessageLevel[] groupCallMessageLevels;
+  private volatile TdApi.TextCompositionStyle[] textCompositionStyles = new TdApi.TextCompositionStyle[0];
+  private volatile int speechRecognitionTrialLeft = -1;
+
+  public boolean isSpeechRecognitionTrialExhausted () {
+    return speechRecognitionTrialLeft == 0;
+  }
+
+  public TdApi.TextCompositionStyle[] textCompositionStyles () {
+    return textCompositionStyles.clone();
+  }
 
   private @Mode int instanceMode;
   private boolean instancePaused;
@@ -1275,6 +1285,9 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
         break;
       }
       case Status.UNAUTHORIZED: {
+        MessageRevisionStore.clearAccount(id());
+        textCompositionStyles = new TdApi.TextCompositionStyle[0];
+        speechRecognitionTrialLeft = -1;
         if (newAuthState.getConstructor() == TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR) {
           setLoggingOut(true);
         } else {
@@ -7507,6 +7520,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
   }
 
   private void updateNewMessage (TdApi.UpdateNewMessage update, boolean isUpdate) {
+    MessageRevisionStore.observe(id(), update.message);
     if (update.message.sendingState instanceof TdApi.MessageSendingStatePending && update.message.content.getConstructor() != TdApi.MessageChatSetMessageAutoDeleteTime.CONSTRUCTOR) {
       addRemoveSendingMessage(update.message.chatId, update.message.id, true);
       if (isUpdate)
@@ -7529,6 +7543,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
   }
 
   private void updateMessageSendSucceeded (TdApi.UpdateMessageSendSucceeded update) {
+    MessageRevisionStore.observe(id(), update.message);
     synchronized (dataLock) {
       Settings.instance().updateScrollMessageId(accountId, update.message.chatId, update.oldMessageId, update.message.id);
     }
@@ -7570,6 +7585,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
 
   @TdlibThread
   private void updateMessageContent (TdApi.UpdateMessageContent update) {
+    MessageRevisionStore.observeChange(id(), update.chatId, update.messageId, update.newContent);
     final TdApi.Chat chat;
     synchronized (dataLock) {
       chat = chats.get(update.chatId);
@@ -7686,6 +7702,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
     if (update.fromCache) {
       return;
     }
+    MessageRevisionStore.deleteMessages(id(), update.chatId, update.messageIds);
 
     Arrays.sort(update.messageIds);
 
@@ -8270,6 +8287,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
 
   @TdlibThread
   private void updateChatHasProtectedContent (TdApi.UpdateChatHasProtectedContent update) {
+    if (update.hasProtectedContent) MessageRevisionStore.clearChat(id(), update.chatId);
     synchronized (dataLock) {
       final TdApi.Chat chat = chats.get(update.chatId);
       if (TdlibUtils.assertChat(update.chatId, chat, update)) {
@@ -8374,6 +8392,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
 
   @TdlibThread
   private void updateChatMessageAutoDeleteTime (TdApi.UpdateChatMessageAutoDeleteTime update) {
+    if (update.messageAutoDeleteTime > 0) MessageRevisionStore.clearChat(id(), update.chatId);
     synchronized (dataLock) {
       final TdApi.Chat chat = chats.get(update.chatId);
       if (TdlibUtils.assertChat(update.chatId, chat, update)) {
@@ -9542,7 +9561,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
 
   @TdlibThread
   private void updateSpeechRecognitionTrial (TdApi.UpdateSpeechRecognitionTrial update) {
-    // TODO
+    speechRecognitionTrialLeft = update.leftCount;
   }
 
   @TdlibThread
@@ -10501,7 +10520,10 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
       case TdApi.UpdateActiveGiftAuctions.CONSTRUCTOR:
       case TdApi.UpdateStakeDiceState.CONSTRUCTOR:
       case TdApi.UpdateNewOauthRequest.CONSTRUCTOR:
+        break;
+
       case TdApi.UpdateTextCompositionStyles.CONSTRUCTOR:
+        textCompositionStyles = ((TdApi.UpdateTextCompositionStyles) update).styles.clone();
         break;
 
       // for bots only.

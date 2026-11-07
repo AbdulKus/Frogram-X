@@ -1,0 +1,128 @@
+package org.thunderdog.challegram.telegram;
+
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+import org.drinkless.tdlib.TdApi;
+import org.thunderdog.challegram.tool.UI;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import tgx.td.ChatId;
+import tgx.td.Td;
+
+/** Local observations, never an assertion that Telegram supplied a complete edit history. */
+public final class MessageRevisionStore {
+  private static final ExecutorService IO = Executors.newSingleThreadExecutor();
+  private static SQLiteOpenHelper helper;
+  private static long lastPruned;
+
+  private static SQLiteDatabase database () {
+    if (helper == null) {
+      helper = new SQLiteOpenHelper(UI.getAppContext(), "message-revisions.db", null, 1) {
+        @Override public void onCreate (SQLiteDatabase db) {
+          db.execSQL("CREATE TABLE revisions (sequence INTEGER PRIMARY KEY AUTOINCREMENT, account INTEGER NOT NULL, chat INTEGER NOT NULL, message INTEGER NOT NULL, observed INTEGER NOT NULL, text TEXT NOT NULL)");
+          db.execSQL("CREATE INDEX revisions_message ON revisions(account, chat, message, sequence)");
+        }
+        @Override public void onUpgrade (SQLiteDatabase db, int oldVersion, int newVersion) { }
+      };
+    }
+    return helper.getWritableDatabase();
+  }
+
+  public static void observe (int account, TdApi.Message message) {
+    if (message == null || message.id <= 0 || message.sendingState != null || !message.canBeSaved || message.selfDestructType != null || message.autoDeleteIn > 0 || ChatId.isSecret(message.chatId)) return;
+    observe(account, message.chatId, message.id, message.content, false);
+  }
+
+  public static void observeChange (int account, long chat, long message, TdApi.MessageContent content) {
+    observe(account, chat, message, content, true);
+  }
+
+  private static void observe (int account, long chat, long message, TdApi.MessageContent content, boolean requireBaseline) {
+    if (message <= 0 || ChatId.isSecret(chat)) return;
+    TdApi.FormattedText formatted = Td.textOrCaption(content);
+    if (formatted == null) return;
+    final String text = formatted.text;
+    final long observed = System.currentTimeMillis();
+    IO.execute(() -> {
+      try {
+        SQLiteDatabase db = database();
+        try (Cursor cursor = db.rawQuery("SELECT text FROM revisions WHERE account=? AND chat=? AND message=? ORDER BY sequence DESC LIMIT 1", keys(account, chat, message))) {
+          boolean exists = cursor.moveToFirst();
+          // A rendered message can be a stale search/reply/cache snapshot. It may
+          // establish a baseline, but only TDLib updates may append revisions.
+          if ((!exists && requireBaseline) || (exists && !requireBaseline) || (exists && text.equals(cursor.getString(0)))) return;
+        }
+        ContentValues values = new ContentValues();
+        values.put("account", account);
+        values.put("chat", chat);
+        values.put("message", message);
+        values.put("observed", observed);
+        values.put("text", text);
+        db.insertOrThrow("revisions", null, values);
+        db.execSQL("DELETE FROM revisions WHERE sequence <= COALESCE((SELECT sequence FROM revisions ORDER BY sequence DESC LIMIT 1 OFFSET 10000), 0)");
+        // Bound disk use and retention, including messages no longer visited.
+        if (observed - lastPruned > 60000) {
+          db.delete("revisions", "observed < ?", new String[] {Long.toString(observed - 30L * 86400000L)});
+          lastPruned = observed;
+        }
+      } catch (RuntimeException ignored) {
+        // History must never interrupt delivery or rendering.
+      }
+    });
+  }
+
+  public interface Callback { void onLoaded (List<Revision> revisions); }
+
+  public static void clearAccount (int account) {
+    IO.execute(() -> {
+      try { database().delete("revisions", "account=?", new String[] {Integer.toString(account)}); }
+      catch (RuntimeException ignored) { }
+    });
+  }
+
+  public static void clearChat (int account, long chat) {
+    IO.execute(() -> {
+      try { database().delete("revisions", "account=? AND chat=?", new String[] {Integer.toString(account), Long.toString(chat)}); }
+      catch (RuntimeException ignored) { }
+    });
+  }
+
+  public static void deleteMessages (int account, long chat, long[] messageIds) {
+    final long[] ids = messageIds.clone();
+    IO.execute(() -> {
+      try {
+        for (long message : ids) database().delete("revisions", "account=? AND chat=? AND message=?", keys(account, chat, message));
+      } catch (RuntimeException ignored) { }
+    });
+  }
+
+  public static final class Revision {
+    public final long observed;
+    public final String text;
+    Revision (long observed, String text) { this.observed = observed; this.text = text; }
+  }
+
+  public static void load (int account, long chat, long message, Callback callback) {
+    IO.execute(() -> {
+      List<Revision> revisions = new ArrayList<>();
+      try {
+        database().delete("revisions", "observed < ?", new String[] {Long.toString(System.currentTimeMillis() - 30L * 86400000L)});
+      } catch (RuntimeException ignored) { }
+      try (Cursor cursor = database().rawQuery("SELECT observed, text FROM revisions WHERE account=? AND chat=? AND message=? ORDER BY sequence DESC LIMIT 100", keys(account, chat, message))) {
+        while (cursor.moveToNext()) revisions.add(new Revision(cursor.getLong(0), cursor.getString(1)));
+      } catch (RuntimeException ignored) { }
+      UI.post(() -> callback.onLoaded(revisions));
+    });
+  }
+
+  private static String[] keys (int account, long chat, long message) {
+    return new String[] {Integer.toString(account), Long.toString(chat), Long.toString(message)};
+  }
+}

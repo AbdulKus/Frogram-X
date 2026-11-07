@@ -65,6 +65,15 @@ jobs:
           java -cp "$RUNNER_TEMP/glass-tests" ChatViewportTest
           java -cp "$RUNNER_TEMP/glass-tests" GlassNavigationTest
 
+      - name: Test message history and speech resampling
+        run: |
+          python3 -B -m unittest discover -s tests/messages -p 'test_*.py'
+          mkdir -p "$RUNNER_TEMP/message-tests"
+          javac -d "$RUNNER_TEMP/message-tests" \
+            app/src/main/java/org/thunderdog/challegram/util/PcmResampler.java \
+            tests/messages/PcmResamplerTest.java
+          java -cp "$RUNNER_TEMP/message-tests" PcmResamplerTest
+
   build:
     name: Latest ARM64 APK
     needs: update-tests

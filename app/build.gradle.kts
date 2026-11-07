@@ -262,6 +262,7 @@ android {
         )
         externalNativeBuild.cmake {
           targets += arrayOf("tgxjni", "tgcallsjni")
+          if (selectedMinSdk >= 21) targets += "frogram_whisper"
           arguments(
             "-DANDROID_PLATFORM=android-${selectedMinSdk}",
             "-DTGX_FLAVOR=${variant.flavor}",

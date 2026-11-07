@@ -361,6 +361,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     this.currentViews = new MultipleViewProvider();
     this.currentViews.setContentProvider(this);
     this.msg = msg;
+    org.thunderdog.challegram.telegram.MessageRevisionStore.observe(tdlib.id(), msg);
     this.sponsoredMessage = sponsoredMessage;
     this.flags |= BitwiseUtils.optional(FLAG_BELOW_ALL_MESSAGES, isBelowAllMessages);
     this.messageReactions = new TGReactions(this, tdlib, msg.interactionInfo != null ? msg.interactionInfo.reactions : null, new TGReactions.MessageReactionsDelegate() {

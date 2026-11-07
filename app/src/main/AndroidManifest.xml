@@ -143,6 +143,11 @@
     tools:targetApi="37"
     tools:ignore="RtlEnabled">
 
+    <service
+      android:name=".service.GroupVoiceService"
+      android:exported="false"
+      android:foregroundServiceType="microphone" />
+
     <profileable android:shell="true" tools:targetApi="29" />
 
     <meta-data

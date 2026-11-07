@@ -23,7 +23,8 @@ values-nb
 values-pl
 values-pt-rBR
 values-ro
-values-ru
+values-ru/*
+!values-ru/frogram_messages.xml
 values-sk
 values-sr
 values-sv

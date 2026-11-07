@@ -274,13 +274,17 @@ public class Lang {
         resId != R.string.FrogramUpToDate && resId != R.string.FrogramNoReleaseNotes &&
         resId != R.string.FrogramUpdateCheckFailed && resId != R.string.FrogramUpdateDownloadFailed &&
         resId != R.string.FrogramUpdateInvalidFile && resId != R.string.FrogramUpdateSignatureMismatch &&
-        resId != R.string.FrogramUpdateInstallFailed) {
+        resId != R.string.FrogramUpdateInstallFailed && !getResourceEntryName(resId).startsWith("Frogram")) {
       return null;
     }
     Context context = UI.getAppContext();
     Configuration configuration = new Configuration(context.getResources().getConfiguration());
-    configuration.setLocale(locale());
-    return context.createConfigurationContext(configuration).getResources().getString(resId);
+    if (Build.VERSION.SDK_INT >= 17) {
+      configuration.setLocale(locale());
+      return context.createConfigurationContext(configuration).getResources().getString(resId);
+    }
+    configuration.locale = locale();
+    return new Resources(context.getAssets(), context.getResources().getDisplayMetrics(), configuration).getString(resId);
   }
 
   public static CharSequence getTutorial (ViewController<?> context, @NonNull TdApi.ChatSource source) {

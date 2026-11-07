@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.10.2 FATAL_ERROR)
 project(tgx VERSION 1.0.0 LANGUAGES C CXX)
+if (NOT TGX_FLAVOR STREQUAL "legacy")
+  add_subdirectory(speech)
+endif()
 message(STATUS "Building ${PROJECT_NAME} platform: ${ANDROID_PLATFORM} abi: ${ANDROID_ABI} type: ${CMAKE_BUILD_TYPE} flavor: ${TGX_FLAVOR} (${PROJECT_SOURCE_DIR})")
 
 if (NOT ${TGX_FLAVOR} MATCHES "legacy|lollipop|marshmallow|latest")

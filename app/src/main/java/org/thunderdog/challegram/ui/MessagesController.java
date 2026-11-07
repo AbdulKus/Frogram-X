@@ -458,6 +458,30 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   public boolean useFloatingInput () { return newChatInput; }
 
+  public void openAiEditor () {
+    if (inputView == null || isDestroyed()) return;
+    if (isSecretChat()) {
+      openAlert(R.string.FrogramAi, Lang.getString(R.string.FrogramAiSecret));
+      return;
+    }
+    TdApi.FormattedText source = inputView.getOutputText(false);
+    if (Td.isEmpty(source)) {
+      openAlert(R.string.FrogramAi, Lang.getString(R.string.FrogramAiEmpty));
+      return;
+    }
+    final long sourceChat = getChatId();
+    final Object sourceEdit = editContext;
+    new AiEditorDialog(this, source, result -> {
+      if (inputView == null || isDestroyed() || sourceChat != getChatId() || sourceEdit != editContext ||
+          !Td.equalsTo(source, inputView.getOutputText(false), true)) {
+        if (!isDestroyed()) openAlert(R.string.FrogramAi, Lang.getString(R.string.FrogramAiDraftChanged));
+        return;
+      }
+      inputView.setText(TD.toCharSequence(result));
+      inputView.setSelection(inputView.length());
+    }).show();
+  }
+
   private final BoolAnimator recordingUiHidden = new BoolAnimator(0, new FactorAnimator.Target() {
     @Override public void onFactorChanged (int id, float factor, float fraction, FactorAnimator animator) {
       if (contentView != null) contentView.invalidate();
@@ -2852,6 +2876,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       toggleDefaultForumTopic();
     } else if (id == R.id.btn_manageGroup) {
       manageGroup();
+    } else if (id == R.id.btn_frogramGroupCall) {
+      openGroupVoiceChat();
     } else if (id == R.id.btn_deleteThread) {
       deleteThread();
     } else if (id == R.id.btn_viewScheduled) {
@@ -5087,6 +5113,29 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   // Show more
 
+  private boolean canStartGroupVoiceChat (TdApi.ChatMemberStatus status) {
+    if (chat == null || !(chat.type instanceof TdApi.ChatTypeBasicGroup || chat.type instanceof TdApi.ChatTypeSupergroup)) return false;
+    return status instanceof TdApi.ChatMemberStatusCreator ||
+      status instanceof TdApi.ChatMemberStatusAdministrator && ((TdApi.ChatMemberStatusAdministrator) status).rights.canManageVideoChats;
+  }
+
+  private void openGroupVoiceChat () {
+    if (chat == null) return;
+    if (chat.videoChat != null && chat.videoChat.groupCallId != 0) {
+      GroupVoiceDialog.show(this, chat.videoChat.groupCallId);
+      return;
+    }
+    if (!canStartGroupVoiceChat(tdlib.chatStatus(chat.id))) return;
+    final long chatId = chat.id;
+    openAlert(R.string.FrogramGroupCall, Lang.getString(R.string.FrogramCallCreateConfirm), (dialog, which) -> {
+      tdlib.client().send(new TdApi.CreateVideoChat(chatId, "", 0, false), response -> UI.post(() -> {
+        if (isDestroyed() || getChatId() != chatId) return;
+        if (response instanceof TdApi.GroupCallId) GroupVoiceDialog.show(this, ((TdApi.GroupCallId) response).id);
+        else openAlert(R.string.FrogramGroupCall, Lang.getString(R.string.FrogramCallFailed));
+      }));
+    }, true);
+  }
+
   public void showMore () {
     if (chat == null) {
       return;
@@ -5096,6 +5145,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
     StringList strings = new StringList(4);
 
     TdApi.ChatMemberStatus status = tdlib.chatStatus(chat.id);
+    if ((chat.videoChat != null && chat.videoChat.groupCallId != 0) || canStartGroupVoiceChat(status)) {
+      ids.append(R.id.btn_frogramGroupCall);
+      strings.append(R.string.FrogramGroupCall);
+    }
 
     if (messageThread != null) {
       if (!manager.isTotallyEmpty() && !messagesHidden) {
@@ -5907,6 +5960,15 @@ public class MessagesController extends ViewController<MessagesController.Argume
           Options.Builder messageOptionsBuilder = new Options.Builder()
             .info(StringUtils.isEmpty(text) ? null : text)
             .items(ids, options, null, icons);
+          TdApi.Message observedMessage = msg.getMessage();
+          if (!ChatId.isSecret(observedMessage.chatId) && observedMessage.canBeSaved && observedMessage.selfDestructType == null && observedMessage.autoDeleteIn <= 0 && Td.textOrCaption(observedMessage.content) != null) {
+            messageOptionsBuilder.item(new OptionItem.Builder().id(R.id.btn_frogramHistory)
+              .name(R.string.FrogramEditHistory).icon(R.drawable.baseline_edit_24).build());
+          }
+          if (!ChatId.isSecret(observedMessage.chatId) && (observedMessage.content instanceof TdApi.MessageVoiceNote || observedMessage.content instanceof TdApi.MessageVideoNote)) {
+            messageOptionsBuilder.item(new OptionItem.Builder().id(R.id.btn_frogramTranscribe)
+              .name(R.string.FrogramTranscribe).icon(R.drawable.baseline_edit_24).build());
+          }
           if (readDate != null) {
             switch (readDate.getConstructor()) {
               case TdApi.MessageReadDateRead.CONSTRUCTOR: {
@@ -6785,6 +6847,27 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
       if (selectedMessage == null) {
         return false;
+      }
+      if (id == R.id.btn_frogramHistory) {
+        cancelSheduledKeyboardOpeningAndHideAllKeyboards();
+        TdApi.Message message = selectedMessage.getMessage();
+        org.thunderdog.challegram.telegram.MessageRevisionStore.observe(tdlib.id(), message);
+        org.thunderdog.challegram.telegram.MessageRevisionStore.load(tdlib.id(), message.chatId, message.id, revisions -> {
+          if (isDestroyed()) return;
+          StringBuilder history = new StringBuilder(Lang.getString(R.string.FrogramHistoryNotice));
+          java.text.DateFormat format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.MEDIUM);
+          for (org.thunderdog.challegram.telegram.MessageRevisionStore.Revision revision : revisions) {
+            history.append("\n\n").append(format.format(new java.util.Date(revision.observed))).append("\n").append(revision.text);
+          }
+          if (revisions.isEmpty()) history.append("\n\n").append(Lang.getString(R.string.FrogramHistoryEmpty));
+          AlertDialog dialog = openAlert(R.string.FrogramEditHistory, history);
+          MessageDialogStyle.apply(this, dialog);
+        });
+        return true;
+      } else if (id == R.id.btn_frogramTranscribe) {
+        cancelSheduledKeyboardOpeningAndHideAllKeyboards();
+        new MessageTranscriptionDialog(this).show(selectedMessage.getMessage());
+        return true;
       }
       if (id == R.id.btn_emojiPackInfoButton) {
         cancelSheduledKeyboardOpeningAndHideAllKeyboards();

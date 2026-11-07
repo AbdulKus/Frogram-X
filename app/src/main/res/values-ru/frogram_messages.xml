@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="FrogramEditHistory">История изменений</string>
+  <string name="FrogramHistoryNotice">Версии, замеченные на этом устройстве, от новых к старым. Даты — время наблюдения версии в Frogram X. Более ранние правки недоступны. Хранятся до 30 дней.</string>
+  <string name="FrogramHistoryEmpty">Сохранённых версий пока нет.</string>
+  <string name="FrogramTranscribe">Расшифровать</string>
+  <string name="FrogramTranscribing">Распознаём речь…</string>
+  <string name="FrogramTranscriptionFailed">Telegram не смог распознать сообщение. Возможно, исчерпана квота или сообщение не поддерживает распознавание.</string>
+  <string name="FrogramTranscriptionTimeout">Распознавание занимает больше времени, чем ожидалось. Попробуйте позже.</string>
+  <string name="FrogramAi">AI</string>
+  <string name="FrogramAiEmpty">Сначала напишите сообщение.</string>
+  <string name="FrogramAiDraftChanged">Черновик изменился. Откройте AI заново для текущего текста.</string>
+  <string name="FrogramAiProofread">Исправить ошибки</string>
+  <string name="FrogramAiOriginal">Исходный текст</string>
+  <string name="FrogramAiWorking">Готовим предпросмотр…</string>
+  <string name="FrogramAiPreview">Предпросмотр изменений</string>
+  <string name="FrogramAiApply">Применить</string>
+  <string name="FrogramAiQuota">Лимит Telegram AI исчерпан. У Premium лимит выше.</string>
+  <string name="FrogramAiFailed">Telegram AI недоступен. Попробуйте позже.</string>
+  <string name="FrogramOfflineUnsupported">Для локального распознавания нужен Android 5 или новее.</string>
+  <string name="FrogramOfflineDownload">Квота Telegram исчерпана. Скачайте многоязычную модель Whisper base (148 МБ) для распознавания на устройстве. Аудио останется на вашем устройстве.</string>
+  <string name="FrogramOfflineDownloadButton">Скачать модель</string>
+  <string name="FrogramOfflineWorking">Распознаём на устройстве…</string>
+  <string name="FrogramOfflineDownloadProgress">Загрузка модели: %1$d%%</string>
+  <string name="FrogramOfflineFailed">Локальное распознавание не удалось. Проверьте свободную память и повторите попытку. Поддерживается аудио до 10 минут.</string>
+  <string name="FrogramGroupCall">Аудиочат</string>
+  <string name="FrogramCallConnecting">Подключаемся…</string>
+  <string name="FrogramCallConnected">Подключено</string>
+  <string name="FrogramCallEnded">Вы вышли из аудиочата</string>
+  <string name="FrogramCallFailed">Не удалось подключиться к аудиочату. Попробуйте ещё раз.</string>
+  <string name="FrogramCallNotification">Аудиочат активен</string>
+  <string name="FrogramCallLeave">Выйти</string>
+  <string name="FrogramCallJoin">Войти в аудиочат</string>
+  <string name="FrogramCallJoinHint">Вход с выключенным микрофоном. Аудиочат продолжится после закрытия окна.</string>
+  <string name="FrogramCallUnmute">Включить микрофон</string>
+  <string name="FrogramCallMute">Выключить микрофон</string>
+  <string name="FrogramCallMuted">Микрофон выключен</string>
+  <string name="FrogramCallSpeaker">Переключить динамик / наушник</string>
+  <string name="FrogramCallCreateConfirm">Начать аудиочат в этой группе?</string>
+  <string name="FrogramAiSecret">Telegram AI недоступен в секретных чатах.</string>
+</resources>
