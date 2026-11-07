@@ -129,6 +129,8 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   public interface Delegate {
     void onWantsCloseTextFormattingKeyboard ();
     default void onWantsOpenTextFormattingKeyboard () {}
+    default boolean canUseAiEditor () { return false; }
+    default void onWantsAiEditor () {}
   }
 
   public TextFormattingLayout (@NonNull Context context) {
@@ -161,6 +163,9 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
 
       button.setId(buttonData.id);
       button.setDrawable(buttonData.icon);
+      if (buttonData.id == R.id.btn_frogramAi) {
+        button.setContentDescription(Lang.getString(R.string.FrogramAi));
+      }
       button.setOnClickListener(this::onButtonClick);
       buttons.append(buttonData.id, button);
       addView(button);
@@ -212,6 +217,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   }
 
   public void checkButtonsActive (boolean animated) {
+    buttons.get(R.id.btn_frogramAi).setVisibility(delegate.canUseAiEditor() ? VISIBLE : GONE);
     final boolean isEmpty = isSelectionEmpty();
 
     final TextSelection selection = inputView.getTextSelection();
@@ -314,6 +320,8 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
       inputView.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
     } else if (id == R.id.btn_translate) {
       startTranslate();
+    } else if (id == R.id.btn_frogramAi) {
+      delegate.onWantsAiEditor();
     } else if (id == android.R.id.copy || id == android.R.id.cut || id == android.R.id.paste) {
       inputView.onTextContextMenuItem(id);
     } else {
@@ -789,6 +797,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     addButton(new ButtonData(R.id.btn_translate, R.drawable.baseline_translate_24, false, 0, 6, 2));
 
     addButton(new ButtonData(R.id.btn_plain, R.drawable.dot_baseline_clear_formatting_24, false, FLAG_CLEAR, 0,3));
+    addButton(new ButtonData(R.id.btn_frogramAi, R.drawable.frogram_ai_24, true, 0, 1, 3));
     addButton(new ButtonData(android.R.id.cut, R.drawable.baseline_content_cut_24, false, 0, 2, 3));
     addButton(new ButtonData(android.R.id.copy, R.drawable.baseline_content_copy_24, false, 0, 3, 3));
     addButton(new ButtonData(android.R.id.paste, R.drawable.baseline_content_paste_24, false, 0, 4, 3));

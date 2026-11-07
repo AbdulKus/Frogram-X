@@ -17,9 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** One bounded on-device inference at a time, with a checksum-verified model. */
 @android.annotation.TargetApi(21)
 public final class OfflineSpeech {
-  private static final String MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
-  private static final String MODEL_SHA256 = "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe";
-  private static final long MODEL_SIZE = 147951465;
+  private static final String MODEL_NAME = "ggml-small-q5_1.bin";
+  private static final String MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/" + MODEL_NAME;
+  private static final String MODEL_SHA256 = "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb";
+  private static final long MODEL_SIZE = 190085487;
   private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();
   private static final AtomicBoolean BUSY = new AtomicBoolean();
   private static volatile Job running;
@@ -30,11 +31,10 @@ public final class OfflineSpeech {
   private static native void cancelNative ();
   private static native byte[] transcribeNative (String model, float[] audio);
 
-  private static File model () { return new File(UI.getAppContext().getNoBackupFilesDir(), "speech/ggml-base.bin"); }
+  private static File model () { return new File(UI.getAppContext().getNoBackupFilesDir(), "speech/" + MODEL_NAME); }
   public static boolean hasModel () { return model().length() == MODEL_SIZE; }
 
   public interface Listener {
-    void onProgress (int percent);
     void onResult (String text, boolean failed);
   }
 
@@ -48,7 +48,7 @@ public final class OfflineSpeech {
     }
   }
 
-  public static Job transcribe (String mediaPath, Listener listener) {
+  public static Job transcribe (String mediaPath, boolean allowDownload, Listener listener) {
     Job job = new Job();
     if (!BUSY.compareAndSet(false, true)) {
       UI.post(() -> { if (!job.cancelled.get()) listener.onResult("", true); });
@@ -61,8 +61,7 @@ public final class OfflineSpeech {
       try {
         if (!loaded) { System.loadLibrary("frogram_whisper"); loaded = true; }
         synchronized (NATIVE_LOCK) { resetNative(); }
-        File file = ensureModel(job, listener);
-        UI.post(() -> { if (!job.cancelled.get()) listener.onProgress(-1); });
+        File file = ensureModel(job, allowDownload);
         if (!job.cancelled.get()) {
           float[] samples = SpeechAudioDecoder.decode(mediaPath, job.cancelled);
           if (!job.cancelled.get()) {
@@ -83,9 +82,11 @@ public final class OfflineSpeech {
     return job;
   }
 
-  private static File ensureModel (Job job, Listener listener) throws Exception {
+  private static File ensureModel (Job job, boolean allowDownload) throws Exception {
     File target = model();
     if (hasModel() && MODEL_SHA256.equals(hash(target))) return target;
+    if (target.exists()) target.delete();
+    if (!allowDownload || job.cancelled.get()) throw new IOException("Speech model unavailable");
     File directory = target.getParentFile();
     if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("Cannot create model directory");
     File temporary = new File(directory, "model.part");
@@ -96,7 +97,6 @@ public final class OfflineSpeech {
     try {
       if (connection.getResponseCode() != 200) throw new IOException("Model download failed");
       long total = 0;
-      int previous = -1;
       try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(temporary)) {
         byte[] buffer = new byte[65536];
         int count;
@@ -105,11 +105,6 @@ public final class OfflineSpeech {
           total += count;
           if (total > MODEL_SIZE) throw new IOException("Model too large");
           output.write(buffer, 0, count);
-          int percent = (int) (100 * total / MODEL_SIZE);
-          if (percent != previous) {
-            previous = percent;
-            UI.post(() -> { if (!job.cancelled.get()) listener.onProgress(percent); });
-          }
         }
         output.getFD().sync();
       }

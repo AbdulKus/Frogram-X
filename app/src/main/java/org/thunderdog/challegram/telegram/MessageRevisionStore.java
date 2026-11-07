@@ -36,8 +36,32 @@ public final class MessageRevisionStore {
   }
 
   public static void observe (int account, TdApi.Message message) {
-    if (message == null || message.id <= 0 || message.sendingState != null || !message.canBeSaved || message.selfDestructType != null || message.autoDeleteIn > 0 || ChatId.isSecret(message.chatId)) return;
+    if (!canObserve(message)) return;
     observe(account, message.chatId, message.id, message.content, false);
+  }
+
+  private static boolean canObserve (TdApi.Message message) {
+    return message != null && message.id > 0 && message.sendingState == null && message.canBeSaved &&
+      message.selfDestructType == null && message.autoDeleteIn <= 0 && !ChatId.isSecret(message.chatId) &&
+      Td.textOrCaption(message.content) != null;
+  }
+
+  public static void hasHistory (int account, TdApi.Message message, me.vkryl.core.lambda.RunnableBool callback) {
+    if (!canObserve(message)) {
+      callback.runWithBool(false);
+      return;
+    }
+    String[] args = {Integer.toString(account), Long.toString(message.chatId), Long.toString(message.id),
+      Long.toString(System.currentTimeMillis() - 30L * 86400000L)};
+    IO.execute(() -> {
+      boolean found = false;
+      try (Cursor cursor = database().rawQuery(
+          "SELECT 1 FROM revisions WHERE account=? AND chat=? AND message=? AND observed>=? LIMIT 1 OFFSET 1", args)) {
+        found = cursor.moveToFirst();
+      } catch (RuntimeException ignored) { }
+      boolean result = found;
+      UI.post(() -> callback.runWithBool(result));
+    });
   }
 
   public static void observeChange (int account, long chat, long message, TdApi.MessageContent content) {

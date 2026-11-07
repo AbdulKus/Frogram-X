@@ -4,7 +4,7 @@ import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.nio.charset.StandardCharsets;
 
-/** Host JNI smoke test. Args: libfrogram_whisper.so, ggml-base.bin, samples/jfk.wav. */
+/** Host JNI smoke test. Args: libfrogram_whisper.so, GGML model, samples/jfk.wav. */
 public final class NativeSpeechSmokeTest {
   public static void main(String[] args) throws Exception {
     System.load(new File(args[0]).getAbsolutePath());

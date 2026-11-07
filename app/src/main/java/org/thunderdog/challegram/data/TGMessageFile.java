@@ -39,6 +39,7 @@ import org.thunderdog.challegram.tool.DrawAlgorithms;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Views;
+import org.thunderdog.challegram.ui.MessagesController;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.util.text.Highlight;
 import org.thunderdog.challegram.util.text.Text;
@@ -75,6 +76,9 @@ public class TGMessageFile extends TGMessage {
 
     private TdApi.FormattedText effectiveCaption;
     public final ReplaceAnimator<TextWrapper> caption;
+    public final ReplaceAnimator<TextWrapper> transcript;
+    private TextWrapper transcriptText;
+    private boolean waitingForTranscript;
     private TextWrapper captionWrapper;
     private long captionMediaKeyOffset;
     private final VariableFloat lastLineWidth = new VariableFloat(0);
@@ -94,7 +98,54 @@ public class TGMessageFile extends TGMessage {
         files.measure(needAnimateChanges());
         invalidate();
       }, AnimatorUtils.DECELERATE_INTERPOLATOR, TEXT_CROSS_FADE_DURATION_MS);
+      this.transcript = new ReplaceAnimator<>(animator -> {
+        files.measure(false);
+        invalidate();
+      }, AnimatorUtils.DECELERATE_INTERPOLATOR, 220L);
+      configureTranscription(message);
       updateCaption(false);
+    }
+
+    void configureTranscription (TdApi.Message message) {
+      component.setTranscriptionAction(MessagesController.canTranscribe(message) &&
+        component.isVoice() && controller() instanceof MessagesController ? this::toggleTranscript : null);
+    }
+
+    void toggleTranscript () {
+      if (waitingForTranscript) return;
+      if (transcriptText != null) {
+        setTranscriptExpanded(!transcriptExpanded);
+        return;
+      }
+      TdApi.Message message = getMessage(messageId);
+      if (!MessagesController.canTranscribe(message)) return;
+      waitingForTranscript = true;
+      ((MessagesController) controller()).transcribeVoice(message, working -> {
+        if (!isDestroyed()) {
+          waitingForTranscript = working;
+          component.setTranscribing(working);
+        }
+      }, value -> {
+        if (isDestroyed() || !filesList.contains(this)) return;
+        waitingForTranscript = false;
+        transcriptText = new TextWrapper(value, getTextStyleProvider(), getTextColorSet());
+        transcriptText.prepare(Math.max(1, component.getWidth()));
+        setTranscriptExpanded(true);
+      });
+    }
+
+    private boolean transcriptExpanded;
+
+    private void setTranscriptExpanded (boolean expanded) {
+      transcriptExpanded = expanded;
+      component.setTranscriptExpanded(expanded);
+      transcript.replace(expanded ? transcriptText : null, needAnimateChanges());
+      files.measure(false);
+      invalidate();
+    }
+
+    private int getTranscriptHeight () {
+      return Math.round(transcript.getMetadata().getTotalHeight() + Screen.dp(TEXT_MARGIN) * transcript.getMetadata().getTotalVisibility());
     }
 
     public boolean hasTextMedia () {
@@ -171,7 +222,7 @@ public class TGMessageFile extends TGMessage {
 
     @Override
     public int getHeight () {
-      return component.getHeight() + (hasCaption() ? Screen.dp(TEXT_MARGIN) + captionWrapper.getHeight() : 0);
+      return component.getHeight() + getTranscriptHeight() + (hasCaption() ? Screen.dp(TEXT_MARGIN) + captionWrapper.getHeight() : 0);
     }
 
     // Animation
@@ -183,7 +234,7 @@ public class TGMessageFile extends TGMessage {
         }
         return captionWrapper.getLastLineWidth();
       } else {
-        return component.getLastLineWidth();
+        return getTranscriptHeight() > 0 ? BOTTOM_LINE_EXPAND_HEIGHT : component.getLastLineWidth();
       }
     }
 
@@ -349,6 +400,7 @@ public class TGMessageFile extends TGMessage {
       if (file.messageId == oldMessageId) {
         file.messageId = newMessageId;
         file.component.getFileProgress().updateMessageId(oldMessageId, newMessageId, success);
+        file.configureTranscription(getMessage(newMessageId));
       }
     }
   }
@@ -373,6 +425,11 @@ public class TGMessageFile extends TGMessage {
     }
 
     return null;
+  }
+
+  public void toggleVoiceTranscript (long messageId) {
+    CaptionedFile file = findCaptionedFile(messageId);
+    if (file != null && file.component.isVoice()) file.toggleTranscript();
   }
 
   @Nullable
@@ -533,6 +590,10 @@ public class TGMessageFile extends TGMessage {
   protected void buildContent (int maxWidth) {
     for (ListAnimator.Entry<CaptionedFile> entry : files) {
       entry.item.component.buildLayout(maxWidth);
+      if (entry.item.transcriptText != null) {
+        entry.item.transcriptText.prepare(Math.max(1, entry.item.component.getWidth()));
+        entry.item.transcript.measure(false);
+      }
       for (ListAnimator.Entry<TextWrapper> caption : entry.item.caption) {
         caption.item.prepare(maxWidth);
       }
@@ -546,6 +607,7 @@ public class TGMessageFile extends TGMessage {
     for (CaptionedFile file : filesList) {
       file.component.performDestroy();
       file.caption.clear(false);
+      file.transcript.clear(false);
     }
   }
 
@@ -604,9 +666,21 @@ public class TGMessageFile extends TGMessage {
       }
       int contentStartY = Math.round(rectF.top + entry.getSpacingStart());
       entry.item.component.draw(view, c, startX, contentStartY, previewReceiver, imageReceiver, backgroundColor, useBubbles() ? ColorUtils.compositeColor(contentReplaceColor, pressColor) : contentReplaceColor, entry.getVisibility(), entry.item.getCheckFactor());
+      int rowBottom = contentStartY + entry.item.component.getHeight();
+      int transcriptHeight = entry.item.getTranscriptHeight();
+      if (transcriptHeight > 0) {
+        int save = c.save();
+        int right = startX + entry.item.component.getWidth();
+        c.clipRect(startX, rowBottom, right, rowBottom + transcriptHeight);
+        for (ListAnimator.Entry<TextWrapper> transcript : entry.item.transcript) {
+          transcript.item.draw(c, startX, right, 0, rowBottom + Screen.dp(TEXT_MARGIN), null,
+            entry.getVisibility() * transcript.getVisibility() * alpha, null);
+        }
+        c.restoreToCount(save);
+      }
       for (ListAnimator.Entry<TextWrapper> caption : entry.item.caption) {
         int right = useBubbles() ? startX + getContentWidth() : startX + Math.max(entry.item.component.getWidth(), caption.item.getWidth());
-        caption.item.draw(c, startX, right, 0, contentStartY + entry.item.component.getHeight() + Screen.dp(TEXT_MARGIN), null, entry.getVisibility() * caption.getVisibility() * alpha, view.getTextMediaReceiver());
+        caption.item.draw(c, startX, right, 0, rowBottom + transcriptHeight + Screen.dp(TEXT_MARGIN), null, entry.getVisibility() * caption.getVisibility() * alpha, view.getTextMediaReceiver());
       }
     }
     if (clip) {

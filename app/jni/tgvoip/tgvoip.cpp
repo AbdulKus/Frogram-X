@@ -20,7 +20,9 @@
 #include <client/android/tg_voip_jni.h>
 
 #ifndef DISABLE_TGCALLS
+#include <api/make_ref_counted.h>
 #include <modules/utility/include/jvm_android.h>
+#include <sdk/android/native_api/audio_device_module/audio_device_android.h>
 #include <sdk/android/native_api/video/wrapper.h>
 #include <sdk/android/native_api/base/init.h>
 #include <rtc_base/ssl_adapter.h>
@@ -976,19 +978,45 @@ jint JNI_OnLoad (JavaVM *vm, void *reserved) {
 }
 
 #ifndef DISABLE_TGCALLS
+namespace {
+class GroupAndroidAudioDevice : public tgcalls::DefaultWrappedAudioDeviceModule {
+public:
+  using DefaultWrappedAudioDeviceModule::DefaultWrappedAudioDeviceModule;
+
+  // tgcalls probes desktop hardware controls during startup and on every mute.
+  // Android routes via AudioManager and tgcalls mutes its outgoing audio channel.
+  int32_t MicrophoneMuteIsAvailable(bool *available) override {
+    *available = false;
+    return 0;
+  }
+
+  int32_t SetPlayoutDevice(WindowsDeviceType) override {
+    return DefaultWrappedAudioDeviceModule::SetPlayoutDevice(uint16_t{0});
+  }
+
+  int32_t SetRecordingDevice(WindowsDeviceType) override {
+    return DefaultWrappedAudioDeviceModule::SetRecordingDevice(uint16_t{0});
+  }
+};
+
 struct FrogramGroupHandle {
   std::shared_ptr<JniWrapper> callbacks;
   std::shared_ptr<tgcalls::GroupInstanceCustomImpl> instance;
 };
+}
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_org_thunderdog_challegram_voip_GroupVoiceEngine_createNative(JNIEnv *env, jobject thiz) {
   if (!tgcalls::initialize(env)) return 0;
   auto callbacks = std::make_shared<JniWrapper>(env, thiz);
-  tgcalls::GroupInstanceDescriptor descriptor;
+  tgcalls::GroupInstanceDescriptor descriptor{};
   descriptor.threads = tgcalls::StaticThreads::getThreads();
   descriptor.config.need_log = false;
   descriptor.initialEnableNoiseSuppression = true;
+  descriptor.createWrappedAudioDeviceModule = [](webrtc::TaskQueueFactory *) {
+    auto device = webrtc::CreateAndroidAudioDeviceModule(webrtc::AudioDeviceModule::kPlatformDefaultAudio);
+    return rtc::make_ref_counted<GroupAndroidAudioDevice>(std::move(device));
+  };
   descriptor.networkStateUpdated = [callbacks](tgcalls::GroupNetworkState state) {
     callbacks->runSafely([&](JNIEnv *env) {
       jmethodID method = env->GetMethodID(callbacks->clazz, "onState", "(Z)V");
@@ -997,13 +1025,13 @@ Java_org_thunderdog_challegram_voip_GroupVoiceEngine_createNative(JNIEnv *env, j
   };
   auto instance = std::make_shared<tgcalls::GroupInstanceCustomImpl>(std::move(descriptor));
   instance->setIsMuted(true);
-  instance->setConnectionMode(tgcalls::GroupConnectionMode::GroupConnectionModeRtc, false, false);
   return reinterpret_cast<jlong>(new FrogramGroupHandle{callbacks, instance});
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_org_thunderdog_challegram_voip_GroupVoiceEngine_emitNative(JNIEnv *, jobject, jlong ptr) {
   auto handle = reinterpret_cast<FrogramGroupHandle *>(ptr);
+  handle->instance->setConnectionMode(tgcalls::GroupConnectionMode::GroupConnectionModeNone, false, false);
   auto callbacks = handle->callbacks;
   handle->instance->emitJoinPayload([callbacks](tgcalls::GroupJoinPayload const &payload) {
     callbacks->runSafely([&](JNIEnv *env) {
@@ -1017,7 +1045,9 @@ Java_org_thunderdog_challegram_voip_GroupVoiceEngine_emitNative(JNIEnv *, jobjec
 
 extern "C" JNIEXPORT void JNICALL
 Java_org_thunderdog_challegram_voip_GroupVoiceEngine_responseNative(JNIEnv *env, jobject, jlong ptr, jstring payload) {
-  reinterpret_cast<FrogramGroupHandle *>(ptr)->instance->setJoinResponsePayload(jni::from_jstring(env, payload));
+  const auto &instance = reinterpret_cast<FrogramGroupHandle *>(ptr)->instance;
+  instance->setJoinResponsePayload(jni::from_jstring(env, payload));
+  instance->setConnectionMode(tgcalls::GroupConnectionMode::GroupConnectionModeRtc, false, false);
 }
 
 extern "C" JNIEXPORT void JNICALL

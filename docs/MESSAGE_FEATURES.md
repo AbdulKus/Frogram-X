@@ -2,45 +2,41 @@
 
 ## Transcription
 
-Message menu → **Transcribe** supports voice notes and video notes. Both Premium and non-Premium accounts first use TDLib `RecognizeSpeech`. Cached results are reused; pending results show partial text and progress. Closing the dialog or destroying its controller stops polling; server polling times out after two minutes.
+Voice notes have a transcription button before the play control. It shows progress and expands the note to display the text. Tap it again to collapse the text. Video notes use the **Transcribe** item in the message menu. Both Premium and non-Premium accounts first use TDLib `RecognizeSpeech` or reuse a cached result. Server recognition has a two-minute deadline.
 
-For non-Premium accounts, quota/Premium/flood-limit errors offer on-device recognition. The first use asks to download multilingual Whisper base (147,951,465 bytes). Later uses run without downloading it again. Model bytes are checked against SHA-256 `60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe`, including before reuse. Interrupted downloads use a temporary file and are removed. Audio is not uploaded to the model host.
+When Telegram recognition is unavailable, the app uses multilingual Whisper Small Q5.1 (190,085,487 bytes) with beam search. A compact prompt offers the download when the model is missing. Model bytes are checked against SHA-256 `ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb`, including before reuse. Interrupted downloads use a temporary file. Local inference uses the downloaded audio on the device.
 
 `MediaExtractor`/`MediaCodec` select and decode the audio track (including the audio in a video note), downmix to mono and resample to 16 kHz. A pinned `whisper.cpp` v1.8.2 source archive builds a separate JNI library, explicitly included in the APK native targets for Android 5+. Only one inference runs at a time; cancellation reaches the native decoder. Audio is limited to ten minutes to bound memory. Device codec support and sufficient free RAM are required. Android 4.x retains server transcription only.
 
-This does not transcribe ordinary video attachments or music/audio file attachments. Local results are displayed in the dialog, rather than injected into Telegram's server-owned recognition result.
+Transcription is available for voice and video notes. Local results are kept in memory for the active chat controller.
 
 ## Edit history
 
-Message menu → **Edit history** shows locally observed text/caption versions, newest first, with observation timestamps. The first incoming, successfully sent, or rendered eligible message establishes a baseline. Only subsequent TDLib content updates append revisions, so rendering an old search/reply snapshot cannot create a false edit. Updates outside the currently visible chat are captured when a baseline exists.
+Message menu → **Edit history** appears before **Delete** when at least two local versions are available. Each version has its own card. The first incoming, successfully sent, or rendered eligible message establishes a baseline. Only subsequent TDLib content updates append revisions, so rendering an old search/reply snapshot cannot create a false edit. Updates outside the currently visible chat are captured when a baseline exists.
 
 The private SQLite database is isolated by account/chat/message. Duplicate text is ignored; deletions remove message history, logout clears account history, and enabling content protection or automatic deletion clears chat history. Secret chats, protected messages, self-destructing messages and messages with automatic deletion are excluded when establishing baselines. Retention is 30 days, with a global cap of 10,000 observations; the viewer shows the newest 100.
 
-Observation dates are explicitly labelled: Telegram does not supply past versions or the original timestamp of an edit that was never observed. Formatting-only edits and edits missed while the app was offline are not reconstructed. Loading an existing message establishes a baseline only when none is stored.
+The dates on the cards are local observation times. Formatting-only edits and edits missed while the app was offline are not reconstructed. Loading an existing message establishes a baseline only when none is stored.
 
 ## AI editor
 
-Attachment menu → **AI** offers proofreading via `FixTextWithAi` and styles from TDLib `UpdateTextCompositionStyles` via `ComposeTextWithAi`. Both functions exist in the pinned TDLib submodule. The preview displays the original and the returned text; **Apply** is disabled until a successful result. Dismissing the preview ignores late responses. Application preserves returned text entities and checks the chat, edit context and original formatted draft before replacing text. Stale results cannot overwrite a changed draft. Secret chats are excluded from AI processing; quota errors are shown without changing the draft.
+Select part of the draft and open the formatting keyboard to use **AI**. It offers proofreading via `FixTextWithAi` and styles from TDLib `UpdateTextCompositionStyles` via `ComposeTextWithAi`. The preview compares the selection and the returned text. **Apply** replaces the original selection and preserves the returned entities. The app checks the chat, edit context and original draft before applying the result. Secret chats are excluded from AI processing.
 
-Panels use the existing chat glass background with rounded corners and fade/scale entry; result text fades in. English and Russian resources follow the selected Telegram language. The attachment bar accounts for the extra item in both LTR and RTL layouts.
+Panels use the chat glass drawable on a single rounded surface. English and Russian resources follow the selected Telegram language.
 
 ## Group audio
 
 Group menu → **Voice chat** opens an existing group voice chat, or allows an administrator with `canManageVideoChats` to create one after confirmation. Voice-chat service messages open the same panel.
 
-The implementation connects TDLib `JoinVideoChat` signaling to the existing `tgcalls::GroupInstanceCustomImpl`. A process-level session owns the native instance, requests microphone permission and audio focus, joins muted, tracks participant updates and server mute restrictions, and handles `needRejoin`. Audio continues when the panel is dismissed. A foreground microphone service exposes a leave action in its notification. Leaving, authorization loss, service destruction, or a competing ordinary call stops the engine and restores audio mode/routing. Connection attempts have a 45-second timeout.
+The implementation connects TDLib `JoinVideoChat` signaling to `tgcalls::GroupInstanceCustomImpl`. The group audio adapter reports that Android hardware mute is unavailable and delegates routing to the Android audio layer. A process-level session requests microphone permission and audio focus, joins muted, tracks participants and server mute restrictions, and handles `needRejoin`. Audio continues when the panel is dismissed. A foreground microphone service exposes a leave action. Leaving, authorization loss, service destruction, or a competing ordinary call stops the engine and restores audio routing. Connection attempts have a 45-second timeout.
 
-**This group audio path has not been validated by a full Android native build or an actual multi-client call.** Standalone encrypted conferences (`InputGroupCallLink`), video, RTMP streams, participant moderation and Bluetooth-specific routing controls are outside this implementation. Speaker/earpiece switching uses Android's audio routing APIs.
+The group engine passed startup, RTC offer generation, mute/unmute and shutdown on a physical Android device. End-to-end Telegram signaling and audio between two clients still require a live account test. Speaker and earpiece switching uses Android's audio routing APIs.
 
 ## Verification performed
 
-- Existing update tests: 8 passed; existing performance tests: 3 passed.
-- New SQLite/resource tests: 8 passed. These execute production SQL against SQLite to check isolation, ordering under clock rollback, history/disk limits, Unicode, deletion and retention boundaries. English/Russian resource keys and format placeholders match.
-- Java PCM test passed for seven source rates, duration, waveform accuracy, 16 kHz identity and invalid/oversized inputs.
-- New Java components compiled against the pinned generated TDLib classes and an Android API jar, with application boundaries stubbed. This checks component syntax and TDLib/Android API usage, **not full application integration**.
-- The actual Whisper JNI bridge was built on ARM64 and recognized the included JFK sample with the verified base model. Native cancellation passed. This checks native inference, **not Android `MediaCodec`, APK packaging, or the UI**.
-- XML parsing and `git diff --check` passed.
-- Full Gradle compilation was attempted. Java 21 and Gradle now run, but application configuration stops because `local.properties` is absent; SDK/NDK, remaining native dependencies and valid Telegram API credentials are also needed. No APK or device UI verification is claimed.
+- The update, performance, SQLite and localization suites passed 20 tests. The PCM test covered seven input rates, waveform accuracy, 16 kHz identity and invalid inputs.
+- The full ARM64 debug APK built and was installed under a separate test package. The Android test decoded a Russian Opus file with `MediaCodec` and recognized it with Whisper Small Q5.1.
+- The host JNI smoke test recognized the included JFK sample and verified cancellation. On 12 held-out Russian clips from FLEURS, the previous configuration made 51 word errors across 219 reference words. The new configuration made 22.
 
 Re-run portable tests:
 
@@ -50,10 +46,10 @@ javac -d /tmp/frogram-message-tests app/src/main/java/org/thunderdog/challegram/
 java -cp /tmp/frogram-message-tests PcmResamplerTest
 ```
 
-Optional native smoke test (JDK 21, CMake, a C++ compiler, curl; downloads approximately 156 MB):
+Optional native smoke test (JDK, CMake, a C++ compiler, curl, approximately 200 MB of downloads).
 
 ```sh
 JAVA_HOME=/path/to/jdk tests/messages/run-native-smoke.sh /path/to/test-cache
 ```
 
-Before release: compile the full APK; check Russian/English and RTL layout on device; exercise Premium/non-Premium quotas and offline voice/video-note decoding; test history after restart/deletion/logout; test AI draft edits during requests; and make a call between two clients covering mute, backgrounding, interruption, reconnection and leave.
+Remaining device checks include the chat layouts, Telegram recognition with a real account, AI preview and apply, and an audio call between two clients.

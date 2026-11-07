@@ -50,6 +50,7 @@ import org.thunderdog.challegram.telegram.TdlibManager;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.DrawAlgorithms;
+import org.thunderdog.challegram.tool.Drawables;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Strings;
@@ -357,7 +358,8 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
       buildTitles(maxWidth - (getPreviewSize() + getPreviewOffset()));
     }
     if (waveform != null) {
-      waveform.layout(Math.min(Screen.dp(420f), Math.min(TGMessage.getEstimatedContentMaxWidth(), maxWidth) - Screen.dp(FileProgressComponent.DEFAULT_FILE_RADIUS) * 2 - getPreviewOffset() - (int) sizeWidth - Screen.dp(12f)));
+      waveform.layout(Math.max(0, Math.min(Screen.dp(420f), Math.min(TGMessage.getEstimatedContentMaxWidth(), maxWidth) -
+        getPreviewSize() - getTranscriptionWidth() - getPreviewOffset() - (int) sizeWidth - Screen.dp(12f))));
     }
   }
 
@@ -482,6 +484,29 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   private int lastPreviewLeft, lastPreviewTop, lastPreviewRight, lastPreviewBottom;
 
   private int lastMaxWidth;
+  private Runnable transcriptionAction;
+  private boolean transcriptionCaught;
+  private boolean transcribing;
+  private boolean transcriptExpanded;
+
+  void setTranscriptionAction (Runnable action) {
+    transcriptionAction = action;
+    rebuildLayout();
+  }
+
+  void setTranscribing (boolean working) {
+    transcribing = working;
+    context.invalidate();
+  }
+
+  void setTranscriptExpanded (boolean expanded) {
+    transcriptExpanded = expanded;
+    context.invalidate();
+  }
+
+  private int getTranscriptionWidth () {
+    return transcriptionAction != null ? getPreviewSize() + Screen.dp(6) : 0;
+  }
 
   private void layoutSize () {
     int maxWidth = lastMaxWidth - getPreviewOffset() - getPreviewSize();
@@ -520,7 +545,7 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   public int getWidth () {
     int contentWidth = getPreviewSize() + getPreviewOffset();
     if (waveform != null) {
-      contentWidth += waveform.getWidth() + sizeWidth + Screen.dp(12f);
+      contentWidth += getTranscriptionWidth() + waveform.getWidth() + sizeWidth + Screen.dp(12f);
     } else {
       contentWidth += Math.max(getTitleWidth(), sizeWidth) + Screen.dp(6f);
     }
@@ -552,8 +577,28 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   }
 
   public boolean onTouchEvent (View view, MotionEvent event) {
-    int startX = lastStartX;
+    int startX = lastStartX + getTranscriptionWidth();
     int startY = lastStartY;
+
+    if (transcriptionAction != null) {
+      int action = event.getActionMasked();
+      float x = event.getX();
+      float y = event.getY();
+      boolean inside = x >= lastStartX && x <= lastStartX + getPreviewSize() && y >= startY && y <= startY + getPreviewSize();
+      if (action == MotionEvent.ACTION_DOWN) {
+        transcriptionCaught = inside;
+      }
+      if (transcriptionCaught) {
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+          transcriptionCaught = false;
+          if (action == MotionEvent.ACTION_UP && inside && !transcribing) {
+            context.performClickSoundFeedback();
+            transcriptionAction.run();
+          }
+        }
+        return true;
+      }
+    }
 
     if (progress.onTouchEvent(view, event)) {
       return true;
@@ -644,6 +689,7 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   }
 
   public void clearTouch () {
+    transcriptionCaught = false;
     loadCaught = false;
   }
 
@@ -687,6 +733,24 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     this.lastStartY = startY;
 
     final int previewSize = getPreviewSize();
+    if (transcriptionAction != null) {
+      float radius = previewSize / 2f;
+      float cx = startX + radius;
+      float cy = startY + radius;
+      int accent = Theme.getColor(context.isOutgoingBubble() ? ColorId.bubbleOut_file : ColorId.file);
+      int iconColor = ColorUtils.alphaColor(alpha, accent);
+      c.drawCircle(cx, cy, radius, Paints.fillingPaint(ColorUtils.alphaColor((transcriptExpanded ? .24f : .14f) * alpha, accent)));
+      if (transcribing) {
+        float ring = Screen.dp(9);
+        android.graphics.RectF bounds = Paints.getRectF();
+        bounds.set(cx - ring, cy - ring, cx + ring, cy + ring);
+        c.drawArc(bounds, SystemClock.uptimeMillis() % 900 * .4f, 265, false, Paints.strokeBigPaint(iconColor));
+        view.postInvalidateDelayed(16);
+      } else {
+        Drawables.drawCentered(c, view.getSparseDrawable(R.drawable.frogram_transcribe_24, 0), cx, cy, Paints.getPorterDuffPaint(iconColor));
+      }
+      startX += getTranscriptionWidth();
+    }
     preview.setBounds(startX, startY, startX + previewSize, startY + previewSize);
     if (checkFactor != 0f) {
       c.save();

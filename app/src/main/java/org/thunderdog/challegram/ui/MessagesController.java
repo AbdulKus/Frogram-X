@@ -142,6 +142,7 @@ import org.thunderdog.challegram.data.TGAudio;
 import org.thunderdog.challegram.data.TGBotStart;
 import org.thunderdog.challegram.data.TGMessage;
 import org.thunderdog.challegram.data.TGMessageBotInfo;
+import org.thunderdog.challegram.data.TGMessageFile;
 import org.thunderdog.challegram.data.TGMessageLocation;
 import org.thunderdog.challegram.data.TGMessageMedia;
 import org.thunderdog.challegram.data.TGMessageSticker;
@@ -195,6 +196,7 @@ import org.thunderdog.challegram.telegram.EmojiMediaType;
 import org.thunderdog.challegram.telegram.GlobalAccountListener;
 import org.thunderdog.challegram.telegram.ListManager;
 import org.thunderdog.challegram.telegram.MessageListManager;
+import org.thunderdog.challegram.telegram.MessageRevisionStore;
 import org.thunderdog.challegram.telegram.MessageThreadListener;
 import org.thunderdog.challegram.telegram.NotificationSettingsListener;
 import org.thunderdog.challegram.telegram.RightId;
@@ -458,27 +460,37 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   public boolean useFloatingInput () { return newChatInput; }
 
-  public void openAiEditor () {
-    if (inputView == null || isDestroyed()) return;
-    if (isSecretChat()) {
-      openAlert(R.string.FrogramAi, Lang.getString(R.string.FrogramAiSecret));
-      return;
-    }
-    TdApi.FormattedText source = inputView.getOutputText(false);
-    if (Td.isEmpty(source)) {
-      openAlert(R.string.FrogramAi, Lang.getString(R.string.FrogramAiEmpty));
-      return;
-    }
+  private final MessageTranscription transcription = new MessageTranscription(this);
+
+  public static boolean canTranscribe (TdApi.Message message) {
+    return MessageTranscription.canTranscribe(message);
+  }
+
+  public void transcribeVoice (TdApi.Message message, RunnableBool working, RunnableData<String> result) {
+    transcription.start(message, new MessageTranscription.Listener() {
+      @Override public void onWorking (boolean value) { working.runWithBool(value); }
+      @Override public void onResult (String text) { result.runWithData(text); }
+    });
+  }
+
+  private void openAiEditor () {
+    if (inputView == null || isDestroyed() || isSecretChat()) return;
+    org.thunderdog.challegram.util.TextSelection selection = inputView.getTextSelection();
+    if (selection == null || selection.isEmpty()) return;
+    TdApi.FormattedText draft = inputView.getOutputText(false);
+    TdApi.FormattedText source = Td.substring(draft, selection.start, selection.end);
+    if (Td.isEmpty(source)) return;
     final long sourceChat = getChatId();
     final Object sourceEdit = editContext;
     new AiEditorDialog(this, source, result -> {
       if (inputView == null || isDestroyed() || sourceChat != getChatId() || sourceEdit != editContext ||
-          !Td.equalsTo(source, inputView.getOutputText(false), true)) {
+          !Td.equalsTo(draft, inputView.getOutputText(false), true)) {
         if (!isDestroyed()) openAlert(R.string.FrogramAi, Lang.getString(R.string.FrogramAiDraftChanged));
         return;
       }
-      inputView.setText(TD.toCharSequence(result));
-      inputView.setSelection(inputView.length());
+      CharSequence replacement = TD.toCharSequence(result);
+      inputView.getText().replace(selection.start, selection.end, replacement);
+      inputView.setSelection(selection.start + replacement.length());
     }).show();
   }
 
@@ -4944,6 +4956,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   public void destroy () {
+    transcription.cancel();
     context().getRoundVideoController().detachVideoLayer(this);
     // MainActivity caches this controller per account. Ordinary chat close also
     // calls destroy(), but keeps its Views for the next chat. release() is terminal.
@@ -5127,13 +5140,17 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
     if (!canStartGroupVoiceChat(tdlib.chatStatus(chat.id))) return;
     final long chatId = chat.id;
-    openAlert(R.string.FrogramGroupCall, Lang.getString(R.string.FrogramCallCreateConfirm), (dialog, which) -> {
+    MessageDialogStyle panel = new MessageDialogStyle(this, Lang.getString(R.string.FrogramGroupCall), true);
+    panel.add(panel.label(Lang.getString(R.string.FrogramCallCreateConfirm), 14, Theme.textDecentColor(), false), 8);
+    panel.add(panel.button(Lang.getString(R.string.FrogramCallCreate), Theme.textLinkColor(), true, () -> {
+      panel.dismiss();
       tdlib.client().send(new TdApi.CreateVideoChat(chatId, "", 0, false), response -> UI.post(() -> {
         if (isDestroyed() || getChatId() != chatId) return;
         if (response instanceof TdApi.GroupCallId) GroupVoiceDialog.show(this, ((TdApi.GroupCallId) response).id);
-        else openAlert(R.string.FrogramGroupCall, Lang.getString(R.string.FrogramCallFailed));
+        else UI.showToast(R.string.FrogramCallFailed, Toast.LENGTH_SHORT);
       }));
-    }, true);
+    }), 12);
+    panel.show();
   }
 
   public void showMore () {
@@ -5939,6 +5956,13 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
     CharSequence text = StringUtils.trim(b);
 
+    MessageRevisionStore.hasHistory(tdlib.id(), msg.getMessage(), hasHistory ->
+      showMessageOptions(messageContext, ids, options, icons, text, hasHistory));
+  }
+
+  private void showMessageOptions (MessageContext messageContext, int[] ids, String[] options, int[] icons, CharSequence text, boolean hasHistory) {
+    TGMessage msg = messageContext.message;
+    if (isDestroyed() || msg.isDestroyed()) return;
     msg.loadAllMessageProperties(() -> {
       msg.loadAvailableReactions(() -> {
         AtomicBoolean shown = new AtomicBoolean(false);
@@ -5958,16 +5982,21 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
           OptionDelegate messageHandler = newMessageOptionDelegate(messageContext);
           Options.Builder messageOptionsBuilder = new Options.Builder()
-            .info(StringUtils.isEmpty(text) ? null : text)
-            .items(ids, options, null, icons);
-          TdApi.Message observedMessage = msg.getMessage();
-          if (!ChatId.isSecret(observedMessage.chatId) && observedMessage.canBeSaved && observedMessage.selfDestructType == null && observedMessage.autoDeleteIn <= 0 && Td.textOrCaption(observedMessage.content) != null) {
-            messageOptionsBuilder.item(new OptionItem.Builder().id(R.id.btn_frogramHistory)
-              .name(R.string.FrogramEditHistory).icon(R.drawable.baseline_edit_24).build());
+            .info(StringUtils.isEmpty(text) ? null : text);
+          OptionItem historyItem = hasHistory ? new OptionItem.Builder().id(R.id.btn_frogramHistory)
+            .name(R.string.FrogramEditHistory).icon(R.drawable.frogram_edit_history_24).build() : null;
+          for (OptionItem item : getOptions(null, ids, options, null, icons, Text.LINE_COUNT_UNLIMITED).items) {
+            if (item.id == R.id.btn_messageDelete && historyItem != null) {
+              messageOptionsBuilder.item(historyItem);
+              historyItem = null;
+            }
+            messageOptionsBuilder.item(item);
           }
-          if (!ChatId.isSecret(observedMessage.chatId) && (observedMessage.content instanceof TdApi.MessageVoiceNote || observedMessage.content instanceof TdApi.MessageVideoNote)) {
+          messageOptionsBuilder.item(historyItem);
+          TdApi.Message observedMessage = msg.getMessage();
+          if (MessageTranscription.canTranscribe(observedMessage)) {
             messageOptionsBuilder.item(new OptionItem.Builder().id(R.id.btn_frogramTranscribe)
-              .name(R.string.FrogramTranscribe).icon(R.drawable.baseline_edit_24).build());
+              .name(R.string.FrogramTranscribe).icon(R.drawable.frogram_transcribe_24).build());
           }
           if (readDate != null) {
             switch (readDate.getConstructor()) {
@@ -6851,22 +6880,19 @@ public class MessagesController extends ViewController<MessagesController.Argume
       if (id == R.id.btn_frogramHistory) {
         cancelSheduledKeyboardOpeningAndHideAllKeyboards();
         TdApi.Message message = selectedMessage.getMessage();
-        org.thunderdog.challegram.telegram.MessageRevisionStore.observe(tdlib.id(), message);
-        org.thunderdog.challegram.telegram.MessageRevisionStore.load(tdlib.id(), message.chatId, message.id, revisions -> {
-          if (isDestroyed()) return;
-          StringBuilder history = new StringBuilder(Lang.getString(R.string.FrogramHistoryNotice));
-          java.text.DateFormat format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.MEDIUM);
-          for (org.thunderdog.challegram.telegram.MessageRevisionStore.Revision revision : revisions) {
-            history.append("\n\n").append(format.format(new java.util.Date(revision.observed))).append("\n").append(revision.text);
+        MessageRevisionStore.load(tdlib.id(), message.chatId, message.id, revisions -> {
+          if (!isDestroyed() && getChatId() == message.chatId && revisions.size() >= 2) {
+            MessageHistoryDialog.show(this, revisions);
           }
-          if (revisions.isEmpty()) history.append("\n\n").append(Lang.getString(R.string.FrogramHistoryEmpty));
-          AlertDialog dialog = openAlert(R.string.FrogramEditHistory, history);
-          MessageDialogStyle.apply(this, dialog);
         });
         return true;
       } else if (id == R.id.btn_frogramTranscribe) {
         cancelSheduledKeyboardOpeningAndHideAllKeyboards();
-        new MessageTranscriptionDialog(this).show(selectedMessage.getMessage());
+        if (selectedMessage instanceof TGMessageFile) {
+          ((TGMessageFile) selectedMessage).toggleVoiceTranscript(selectedMessage.getId());
+        } else {
+          transcription.showVideo(selectedMessage.getMessage());
+        }
         return true;
       }
       if (id == R.id.btn_emojiPackInfoButton) {
@@ -10272,6 +10298,16 @@ public class MessagesController extends ViewController<MessagesController.Argume
           @Override
           public void onWantsOpenTextFormattingKeyboard () {
             openEmojiKeyboard();
+          }
+
+          @Override
+          public boolean canUseAiEditor () {
+            return !isSecretChat();
+          }
+
+          @Override
+          public void onWantsAiEditor () {
+            openAiEditor();
           }
         });
 

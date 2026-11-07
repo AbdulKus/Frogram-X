@@ -3,28 +3,25 @@
   <item name="btn_frogramGroupCall" type="id" />
   <item name="btn_frogramHistory" type="id" />
   <item name="btn_frogramTranscribe" type="id" />
+  <item name="btn_frogramAi" type="id" />
   <string name="FrogramEditHistory">Edit history</string>
-  <string name="FrogramHistoryNotice">Versions observed on this device, newest first. Dates show when Frogram X observed each version. Earlier edits are unavailable. Stored for up to 30 days.</string>
-  <string name="FrogramHistoryEmpty">No saved versions.</string>
+  <string name="FrogramHistoryLatest">Latest · %1$s</string>
   <string name="FrogramTranscribe">Transcribe</string>
   <string name="FrogramTranscribing">Recognizing speech…</string>
-  <string name="FrogramTranscriptionFailed">Telegram could not recognize this message. The quota may be exhausted, or this message may not support recognition.</string>
-  <string name="FrogramTranscriptionTimeout">Recognition is taking longer than expected. You can try again later.</string>
+  <string name="FrogramTranscriptionEmpty">No speech recognized.</string>
   <string name="FrogramAi">AI</string>
-  <string name="FrogramAiEmpty">Write a message first.</string>
   <string name="FrogramAiDraftChanged">The draft changed. Open AI again to edit the current text.</string>
   <string name="FrogramAiProofread">Fix spelling and grammar</string>
   <string name="FrogramAiOriginal">Original</string>
+  <string name="FrogramAiResult">Edited text</string>
   <string name="FrogramAiWorking">Preparing a preview…</string>
   <string name="FrogramAiPreview">Preview changes</string>
   <string name="FrogramAiApply">Apply</string>
   <string name="FrogramAiQuota">The Telegram AI quota is exhausted. Premium provides a higher limit.</string>
   <string name="FrogramAiFailed">Telegram AI is unavailable. Please try again later.</string>
   <string name="FrogramOfflineUnsupported">Offline recognition requires Android 5 or later.</string>
-  <string name="FrogramOfflineDownload">Telegram quota is exhausted. Download the multilingual Whisper base model (148 MB) to recognize speech on this device. Audio stays on your device.</string>
+  <string name="FrogramOfflineDownload">Telegram transcription is unavailable. Download the 190 MB model to transcribe on this device.</string>
   <string name="FrogramOfflineDownloadButton">Download model</string>
-  <string name="FrogramOfflineWorking">Recognizing on this device…</string>
-  <string name="FrogramOfflineDownloadProgress">Downloading model: %1$d%%</string>
   <string name="FrogramOfflineFailed">Offline recognition failed. Check available storage and try again. Supported audio duration is up to 10 minutes.</string>
   <string name="FrogramGroupCall">Voice chat</string>
   <string name="FrogramCallConnecting">Connecting…</string>
@@ -34,11 +31,13 @@
   <string name="FrogramCallNotification">Voice chat is active</string>
   <string name="FrogramCallLeave">Leave</string>
   <string name="FrogramCallJoin">Join voice chat</string>
-  <string name="FrogramCallJoinHint">Join with your microphone muted. Audio continues when this window is closed.</string>
-  <string name="FrogramCallUnmute">Turn on microphone</string>
-  <string name="FrogramCallMute">Turn off microphone</string>
+  <string name="FrogramCallJoinHint">Your microphone is muted when you join.</string>
+  <string name="FrogramCallUnmute">Unmute</string>
+  <string name="FrogramCallMute">Mute</string>
   <string name="FrogramCallMuted">Muted</string>
-  <string name="FrogramCallSpeaker">Switch speaker / earpiece</string>
+  <string name="FrogramCallSpeaker">Earpiece</string>
+  <string name="FrogramCallSpeakerOn">Speaker</string>
+  <string name="FrogramCallCreate">Start voice chat</string>
   <string name="FrogramCallCreateConfirm">Start a voice chat in this group?</string>
   <string name="FrogramAiSecret">Telegram AI is unavailable in secret chats.</string>
 </resources>

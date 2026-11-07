@@ -36,10 +36,13 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   private boolean audioConfigured;
   private PowerManager.WakeLock wakeLock;
   private boolean joining;
+  private boolean waitingForPayload;
+  private boolean connecting;
   private boolean joined;
   private long connectionGeneration;
   private int muteGeneration;
   private TdApi.MessageSender self;
+  private boolean canUnmute = true;
   private final AudioManager.OnAudioFocusChangeListener focus = change -> UI.post(() -> {
     if (change == AudioManager.AUDIOFOCUS_LOSS) stop(null);
     else if (change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) setMuted(true);
@@ -69,12 +72,17 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     try {
       if (Build.VERSION.SDK_INT >= 26) owner.context().startForegroundService(intent);
       else owner.context().startService(intent);
-    } catch (RuntimeException e) { session.stop(Lang.getString(R.string.FrogramCallFailed)); }
+    } catch (RuntimeException e) {
+      session.fail(e);
+    }
   }
 
   public void connect () {
-    if (ended || engine != null) return;
+    if (ended || connecting || engine != null) return;
+    connecting = true;
+    connectionTimeout();
     tdlib.client().send(new TdApi.GetGroupCall(callId), response -> UI.post(() -> {
+      connecting = false;
       if (ended) return;
       if (!(response instanceof TdApi.GroupCall) || !((TdApi.GroupCall) response).isActive || !((TdApi.GroupCall) response).isVideoChat || ((TdApi.GroupCall) response).isRtmpStream) {
         stop(Lang.getString(R.string.FrogramCallFailed));
@@ -93,14 +101,14 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
         wakeLock.setReferenceCounted(false);
         wakeLock.acquire();
         engine = new GroupVoiceEngine(this);
-        engine.joinPayload();
-        connectionTimeout();
-      } catch (RuntimeException | LinkageError error) { stop(Lang.getString(R.string.FrogramCallFailed)); }
+        requestJoinPayload();
+      } catch (RuntimeException | LinkageError error) { fail(error); }
     }));
   }
 
   @Override public void onPayload (int source, String payload) {
-    if (ended || joining) return;
+    if (ended || !waitingForPayload) return;
+    waitingForPayload = false;
     joining = true;
     TdApi.GroupCallJoinParameters parameters = new TdApi.GroupCallJoinParameters(source, payload, true, false);
     tdlib.client().send(new TdApi.JoinVideoChat(callId, null, parameters, ""), response -> UI.post(() -> {
@@ -112,11 +120,21 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
       if (!(response instanceof TdApi.Text)) { stop(Lang.getString(R.string.FrogramCallFailed)); return; }
       joined = true;
       muted = true;
-      engine.mute(true);
-      engine.response(((TdApi.Text) response).text);
+      try {
+        engine.mute(true);
+        engine.response(((TdApi.Text) response).text);
+      } catch (RuntimeException | LinkageError error) {
+        fail(error);
+        return;
+      }
       tdlib.client().send(new TdApi.LoadGroupCallParticipants(callId, 100), ignored -> { });
       notifyChanged();
     }));
+  }
+
+  private void requestJoinPayload () {
+    waitingForPayload = true;
+    engine.joinPayload();
   }
 
   @Override public void onState (boolean value) {
@@ -136,7 +154,7 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   }
 
   public void setMuted (boolean value) {
-    if (ended || engine == null || !joined || self == null) return;
+    if (ended || engine == null || !joined || self == null || (!value && !canUnmute)) return;
     if (value) { muted = true; engine.mute(true); notifyChanged(); }
     int generation = ++muteGeneration;
     tdlib.client().send(new TdApi.ToggleGroupCallParticipantIsMuted(callId, self, value), response -> UI.post(() -> {
@@ -147,7 +165,18 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   }
 
   public void toggleSpeaker () {
-    if (audioConfigured && !ended) audio.setSpeakerphoneOn(!audio.isSpeakerphoneOn());
+    if (audioConfigured && !ended) {
+      audio.setSpeakerphoneOn(!isSpeakerOn());
+      notifyChanged();
+    }
+  }
+
+  public boolean isSpeakerOn () {
+    return audioConfigured && audio.isSpeakerphoneOn();
+  }
+
+  public boolean canToggleMute () {
+    return connected && self != null && (!muted || canUnmute);
   }
 
   @Override public void onGroupCallUpdated (TdApi.GroupCall call) {
@@ -155,11 +184,12 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     UI.post(() -> {
       if (ended) return;
       if (!call.isActive || (joined && !call.isJoined && !call.needRejoin)) { stop(null); return; }
-      if (call.needRejoin && engine != null && !joining) {
+      if (call.needRejoin && engine != null && !joining && !waitingForPayload) {
         connected = false;
         muted = true;
+        status = Lang.getString(R.string.FrogramCallConnecting);
         engine.mute(true);
-        engine.joinPayload();
+        requestJoinPayload();
         connectionTimeout();
       }
       notifyChanged();
@@ -175,7 +205,8 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
       else participants.put(key, participant);
       if (participant.isCurrentUser) {
         self = participant.participantId;
-        if (participant.isMutedForAllUsers && !participant.canUnmuteSelf && engine != null) { muteGeneration++; muted = true; engine.mute(true); }
+        canUnmute = !participant.isMutedForAllUsers || participant.canUnmuteSelf;
+        if (!canUnmute && engine != null) { muteGeneration++; muted = true; engine.mute(true); }
       }
       notifyChanged();
     });
@@ -205,6 +236,11 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     if (current == this) current = null;
     UI.getAppContext().stopService(new Intent(UI.getAppContext(), GroupVoiceService.class));
     notifyChanged();
+  }
+
+  public void fail (Throwable error) {
+    android.util.Log.e("FrogramGroupVoice", "Unable to start group audio", error);
+    stop(Lang.getString(R.string.FrogramCallFailed));
   }
 
   private void notifyChanged () { if (changed != null) changed.run(); }

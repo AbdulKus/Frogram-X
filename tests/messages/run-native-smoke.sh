@@ -5,7 +5,7 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 speech_test_dir=${1:?Usage: run-native-smoke.sh /absolute/path/to/test-cache}
 mkdir -p "$speech_test_dir"
 speech_test_dir=$(CDPATH= cd -- "$speech_test_dir" && pwd)
-: "${JAVA_HOME:?Set JAVA_HOME to a JDK 21 installation}"
+: "${JAVA_HOME:?Set JAVA_HOME to a JDK installation}"
 revision=4979e04f5dcaccb36057e059bbaed8a2f5288315
 archive="$speech_test_dir/whisper.tar.gz"
 if [ ! -f "$archive" ]; then
@@ -31,11 +31,11 @@ c++ -shared -fPIC -fexceptions -std=c++17 \
   "$speech_test_dir/whisper-build/ggml/src/libggml-cpu.a" \
   "$speech_test_dir/whisper-build/ggml/src/libggml-base.a" \
   -pthread -o "$speech_test_dir/libfrogram_whisper.so"
-model="$speech_test_dir/ggml-base.bin"
+model="$speech_test_dir/ggml-small-q5_1.bin"
 if [ ! -f "$model" ]; then
-  curl --fail --location --retry 2 https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin -o "$model"
+  curl --fail --location --retry 2 https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin -o "$model"
 fi
-printf '%s  %s\n' 60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe "$model" | sha256sum --check
+printf '%s  %s\n' ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb "$model" | sha256sum --check
 mkdir -p "$speech_test_dir/native-tests"
 javac -d "$speech_test_dir/native-tests" \
   "$repo/tests/messages/native/OfflineSpeech.java" "$repo/tests/messages/NativeSpeechSmokeTest.java"

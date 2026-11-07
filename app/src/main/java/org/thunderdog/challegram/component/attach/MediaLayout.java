@@ -248,7 +248,6 @@ public class MediaLayout extends FrameLayoutFix implements
         this.needVote = tdlib().canSendPolls(getTargetChatId());
         if (rtl) {
           items = new MediaBottomBar.BarItem[]{
-            new MediaBottomBar.BarItem(R.drawable.baseline_edit_24, R.string.FrogramAi, ColorId.attachInlineBot),
             needVote ?
               new MediaBottomBar.BarItem(R.drawable.baseline_poll_24, R.string.CreatePoll, ColorId.attachInlineBot) :
               new MediaBottomBar.BarItem(R.drawable.deproko_baseline_bots_24, R.string.InlineBot, ColorId.attachInlineBot),
@@ -265,11 +264,10 @@ public class MediaLayout extends FrameLayoutFix implements
             new MediaBottomBar.BarItem(R.drawable.baseline_location_on_24, R.string.Location, ColorId.attachLocation, Screen.dp(1f)),
             needVote ?
               new MediaBottomBar.BarItem(R.drawable.baseline_poll_24, R.string.CreatePoll, ColorId.attachInlineBot) :
-              new MediaBottomBar.BarItem(R.drawable.deproko_baseline_bots_24, R.string.InlineBot, ColorId.attachInlineBot),
-            new MediaBottomBar.BarItem(R.drawable.baseline_edit_24, R.string.FrogramAi, ColorId.attachInlineBot)
+              new MediaBottomBar.BarItem(R.drawable.deproko_baseline_bots_24, R.string.InlineBot, ColorId.attachInlineBot)
           };
         }
-        index = rtl ? 3 : 2;
+        index = 2;
         mode = MODE_DEFAULT;
         break;
       }
@@ -692,19 +690,11 @@ public class MediaLayout extends FrameLayoutFix implements
 
   @Override
   public boolean onBottomPrepareSectionChange (int fromIndex, int toIndex, boolean ignorePermissionsRequest) {
-    int logicalIndex = rtl && mode == MODE_DEFAULT && itemsAdapter == null ? controllers.length - toIndex - 1 : toIndex;
-    if (mode == MODE_DEFAULT && itemsAdapter == null && logicalIndex == 5) {
-      if (target != null) {
-        hide(false);
-        target.openAiEditor();
-      }
-      return false;
-    }
     if (counterFactor != 0f || (counterAnimator != null && counterAnimator.isAnimating()) || getCurrentController().isAnimating()) {
       return false;
     }
 
-    switch (logicalIndex) {
+    switch (toIndex) {
       case 3: {
         boolean googleMapsInstalled;
         try {

@@ -39,7 +39,7 @@ public final class GroupVoiceService extends Service {
       startForeground(7801, notification.build());
       session.connect();
     } catch (RuntimeException error) {
-      session.stop(Lang.getString(R.string.FrogramCallFailed));
+      session.fail(error);
       stopSelf();
     }
     return START_NOT_STICKY;

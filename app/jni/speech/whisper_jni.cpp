@@ -39,7 +39,8 @@ Java_org_thunderdog_challegram_util_OfflineSpeech_transcribeNative(
     std::vector<float> samples(count);
     env->GetFloatArrayRegion(audio, 0, count, samples.data());
     if (env->ExceptionCheck()) return nullptr;
-    auto params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    auto params = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH);
+    params.beam_search.beam_size = 3;
     params.n_threads = std::max(1u, std::min(4u, std::thread::hardware_concurrency()));
     params.language = "auto";
     params.translate = false;
@@ -47,7 +48,6 @@ Java_org_thunderdog_challegram_util_OfflineSpeech_transcribeNative(
     params.print_realtime = false;
     params.print_timestamps = false;
     params.print_special = false;
-    params.no_context = true;
     params.abort_callback = [](void *) { return cancelled.load(); };
     if (whisper_full(context.get(), params, samples.data(), count) != 0 || cancelled.load()) return nullptr;
     std::string text;

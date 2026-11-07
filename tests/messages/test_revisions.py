@@ -13,7 +13,7 @@ class RevisionQueriesTest(unittest.TestCase):
         self.db = sqlite3.connect(':memory:')
         for sql in re.findall(r'db.execSQL\("(CREATE [^"]+)"\)', SOURCE):
             self.db.execute(sql)
-        self.latest, self.history = re.findall(r'rawQuery\("([^"]+)"', SOURCE)
+        self.has_history, self.latest, self.history = re.findall(r'rawQuery\(\s*"([^"]+)"', SOURCE)
 
     def tearDown(self):
         self.db.close()
@@ -41,6 +41,16 @@ class RevisionQueriesTest(unittest.TestCase):
         rows = self.db.execute(self.history, ('1','2','3')).fetchall()
         self.assertEqual(len(rows),100)
         self.assertEqual((rows[0][1], rows[-1][1]), ('149','50'))
+
+    def test_menu_requires_two_retained_versions_of_the_same_message(self):
+        self.insert(1,2,3,99,'expired baseline')
+        self.insert(1,2,3,100,'retained text')
+        self.insert(2,2,3,100,'another account')
+        self.insert(1,2,4,100,'another message')
+        args = (1,2,3,100)
+        self.assertIsNone(self.db.execute(self.has_history, args).fetchone())
+        self.insert(1,2,3,101,'retained edit')
+        self.assertEqual(self.db.execute(self.has_history, args).fetchone(), (1,))
 
     def test_disk_cap_preserves_newest(self):
         for i in range(10100):
