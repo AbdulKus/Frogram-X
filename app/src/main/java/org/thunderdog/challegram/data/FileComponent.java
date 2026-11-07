@@ -664,7 +664,7 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
             seekStartX = x;
           }
           if (isSeeking) {
-            int waveformLeft = startX + previewSize + getPreviewOffset();
+            int waveformLeft = startX + getPreviewSize() + getPreviewOffset();
             int waveformWidth = waveform.getWidth();
             float seek = MathUtils.clamp((x - waveformLeft) / (float) waveformWidth);
             boolean needInvalidate = desiredSeek == -1 || (int) ((float) waveformWidth * seek) != (int) ((float) waveformWidth * desiredSeek);
