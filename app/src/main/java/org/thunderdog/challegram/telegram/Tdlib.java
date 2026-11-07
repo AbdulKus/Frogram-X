@@ -499,10 +499,14 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
   private long[] trustedMiniAppBotUserIds;
   private TdApi.GroupCallMessageLevel[] groupCallMessageLevels;
   private volatile TdApi.TextCompositionStyle[] textCompositionStyles = new TdApi.TextCompositionStyle[0];
-  private volatile int speechRecognitionTrialLeft = -1;
+  private volatile TdApi.UpdateSpeechRecognitionTrial speechRecognitionTrial;
 
-  public boolean isSpeechRecognitionTrialExhausted () {
-    return speechRecognitionTrialLeft == 0;
+  public boolean canTrySpeechRecognition (int duration) {
+    TdApi.UpdateSpeechRecognitionTrial trial = speechRecognitionTrial;
+    if (hasPremium() || trial == null) return true;
+    return trial.weeklyCount > 0 &&
+      (trial.maxMediaDuration <= 0 || duration <= trial.maxMediaDuration) &&
+      (trial.leftCount > 0 || trial.nextResetDate <= currentTimeMillis() / 1000L);
   }
 
   public TdApi.TextCompositionStyle[] textCompositionStyles () {
@@ -1287,7 +1291,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
       case Status.UNAUTHORIZED: {
         MessageRevisionStore.clearAccount(id());
         textCompositionStyles = new TdApi.TextCompositionStyle[0];
-        speechRecognitionTrialLeft = -1;
+      speechRecognitionTrial = null;
         if (newAuthState.getConstructor() == TdApi.AuthorizationStateLoggingOut.CONSTRUCTOR) {
           setLoggingOut(true);
         } else {
@@ -9561,7 +9565,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
 
   @TdlibThread
   private void updateSpeechRecognitionTrial (TdApi.UpdateSpeechRecognitionTrial update) {
-    speechRecognitionTrialLeft = update.leftCount;
+    speechRecognitionTrial = update;
   }
 
   @TdlibThread

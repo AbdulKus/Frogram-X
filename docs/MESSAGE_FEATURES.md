@@ -12,7 +12,7 @@ Transcription is available for voice and video notes. Local results are kept in 
 
 ## Edit history
 
-Message menu → **Edit history** appears before **Delete** when at least two local versions are available. Each version has its own card. The first incoming, successfully sent, or rendered eligible message establishes a baseline. Only subsequent TDLib content updates append revisions, so rendering an old search/reply snapshot cannot create a false edit. Updates outside the currently visible chat are captured when a baseline exists.
+Message menu → **Edit history** appears after **Edit** when at least two local versions are available. Each version has its own card. The first incoming, successfully sent, or rendered eligible message establishes a baseline. Only subsequent TDLib content updates append revisions, so rendering an old search/reply snapshot cannot create a false edit. Updates outside the currently visible chat are captured when a baseline exists.
 
 The private SQLite database is isolated by account/chat/message. Duplicate text is ignored; deletions remove message history, logout clears account history, and enabling content protection or automatic deletion clears chat history. Secret chats, protected messages, self-destructing messages and messages with automatic deletion are excluded when establishing baselines. Retention is 30 days, with a global cap of 10,000 observations; the viewer shows the newest 100.
 
@@ -28,7 +28,7 @@ Panels use the chat glass drawable on a single rounded surface. English and Russ
 
 Group menu → **Voice chat** opens an existing group voice chat, or allows an administrator with `canManageVideoChats` to create one after confirmation. Voice-chat service messages open the same panel.
 
-The implementation connects TDLib `JoinVideoChat` signaling to `tgcalls::GroupInstanceCustomImpl`. The group audio adapter reports that Android hardware mute is unavailable and delegates routing to the Android audio layer. A process-level session requests microphone permission and audio focus, joins muted, tracks participants and server mute restrictions, and handles `needRejoin`. Audio continues when the panel is dismissed. A foreground microphone service exposes a leave action. Leaving, authorization loss, service destruction, or a competing ordinary call stops the engine and restores audio routing. Connection attempts have a 45-second timeout.
+The implementation connects TDLib `JoinVideoChat` signaling to `tgcalls::GroupInstanceCustomImpl`. The group audio adapter reports that Android hardware mute is unavailable and delegates routing to the Android audio layer. A process-level session requests microphone permission and audio focus, joins muted, tracks participants and server mute restrictions, and handles `needRejoin`. The ongoing call bar and notification reopen the panel. Participants have avatars and speaking rings. Selecting a participant's name replaces it with a local playback volume slider. Leaving, authorization loss, service destruction, or a competing ordinary call stops the engine and restores audio routing. The initial server request has a 45-second deadline. RTC has an 18-second deadline after signaling and can retry once.
 
 The group engine passed startup, RTC offer generation, mute/unmute and shutdown on a physical Android device. End-to-end Telegram signaling and audio between two clients still require a live account test. Speaker and earpiece switching uses Android's audio routing APIs.
 

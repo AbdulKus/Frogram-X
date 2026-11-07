@@ -6,6 +6,7 @@
   <string name="FrogramTranscribing">Распознаём речь…</string>
   <string name="FrogramTranscriptionEmpty">Речь не распознана.</string>
   <string name="FrogramAi">AI</string>
+  <string name="FrogramAiStyling">Стилизация с ИИ</string>
   <string name="FrogramAiDraftChanged">Черновик изменился. Откройте AI заново для текущего текста.</string>
   <string name="FrogramAiProofread">Исправить ошибки</string>
   <string name="FrogramAiOriginal">Исходный текст</string>
@@ -18,7 +19,7 @@
   <string name="FrogramOfflineUnsupported">Для локального распознавания нужен Android 5 или новее.</string>
   <string name="FrogramOfflineDownload">Расшифровка в Telegram недоступна. Скачайте модель на 190 МБ для распознавания на телефоне.</string>
   <string name="FrogramOfflineDownloadButton">Скачать модель</string>
-  <string name="FrogramOfflineFailed">Локальное распознавание не удалось. Проверьте свободную память и повторите попытку. Поддерживается аудио до 10 минут.</string>
+  <string name="FrogramOfflineFailed">Не удалось расшифровать аудио на устройстве. Попробуйте ещё раз.</string>
   <string name="FrogramGroupCall">Аудиочат</string>
   <string name="FrogramCallConnecting">Подключаемся…</string>
   <string name="FrogramCallConnected">Подключено</string>
@@ -26,6 +27,9 @@
   <string name="FrogramCallFailed">Не удалось подключиться к аудиочату. Попробуйте ещё раз.</string>
   <string name="FrogramCallNotification">Аудиочат активен</string>
   <string name="FrogramCallLeave">Выйти</string>
+  <string name="FrogramCallMinimize">Свернуть</string>
+  <string name="FrogramCallParticipantVolume">Громкость участника</string>
+  <string name="FrogramCallVolumePercent">%1$d%%</string>
   <string name="FrogramCallJoin">Войти в аудиочат</string>
   <string name="FrogramCallJoinHint">При входе микрофон будет выключен.</string>
   <string name="FrogramCallUnmute">Включить</string>

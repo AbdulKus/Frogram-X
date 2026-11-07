@@ -10,6 +10,7 @@
   <string name="FrogramTranscribing">Recognizing speech…</string>
   <string name="FrogramTranscriptionEmpty">No speech recognized.</string>
   <string name="FrogramAi">AI</string>
+  <string name="FrogramAiStyling">AI Styling</string>
   <string name="FrogramAiDraftChanged">The draft changed. Open AI again to edit the current text.</string>
   <string name="FrogramAiProofread">Fix spelling and grammar</string>
   <string name="FrogramAiOriginal">Original</string>
@@ -22,7 +23,7 @@
   <string name="FrogramOfflineUnsupported">Offline recognition requires Android 5 or later.</string>
   <string name="FrogramOfflineDownload">Telegram transcription is unavailable. Download the 190 MB model to transcribe on this device.</string>
   <string name="FrogramOfflineDownloadButton">Download model</string>
-  <string name="FrogramOfflineFailed">Offline recognition failed. Check available storage and try again. Supported audio duration is up to 10 minutes.</string>
+  <string name="FrogramOfflineFailed">Could not transcribe this audio on the device. Try again.</string>
   <string name="FrogramGroupCall">Voice chat</string>
   <string name="FrogramCallConnecting">Connecting…</string>
   <string name="FrogramCallConnected">Connected</string>
@@ -30,6 +31,9 @@
   <string name="FrogramCallFailed">Could not connect to the voice chat. Please try again.</string>
   <string name="FrogramCallNotification">Voice chat is active</string>
   <string name="FrogramCallLeave">Leave</string>
+  <string name="FrogramCallMinimize">Minimize</string>
+  <string name="FrogramCallParticipantVolume">Participant volume</string>
+  <string name="FrogramCallVolumePercent">%1$d%%</string>
   <string name="FrogramCallJoin">Join voice chat</string>
   <string name="FrogramCallJoinHint">Your microphone is muted when you join.</string>
   <string name="FrogramCallUnmute">Unmute</string>

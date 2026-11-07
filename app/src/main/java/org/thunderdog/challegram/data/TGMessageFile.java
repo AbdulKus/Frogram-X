@@ -76,7 +76,8 @@ public class TGMessageFile extends TGMessage {
 
     private TdApi.FormattedText effectiveCaption;
     public final ReplaceAnimator<TextWrapper> caption;
-    public final ReplaceAnimator<TextWrapper> transcript;
+    private FactorAnimator transcriptAnimator;
+    private int transcriptHeight;
     private TextWrapper transcriptText;
     private boolean waitingForTranscript;
     private TextWrapper captionWrapper;
@@ -98,10 +99,6 @@ public class TGMessageFile extends TGMessage {
         files.measure(needAnimateChanges());
         invalidate();
       }, AnimatorUtils.DECELERATE_INTERPOLATOR, TEXT_CROSS_FADE_DURATION_MS);
-      this.transcript = new ReplaceAnimator<>(animator -> {
-        files.measure(false);
-        invalidate();
-      }, AnimatorUtils.DECELERATE_INTERPOLATOR, 220L);
       configureTranscription(message);
       updateCaption(false);
     }
@@ -139,13 +136,34 @@ public class TGMessageFile extends TGMessage {
     private void setTranscriptExpanded (boolean expanded) {
       transcriptExpanded = expanded;
       component.setTranscriptExpanded(expanded);
-      transcript.replace(expanded ? transcriptText : null, needAnimateChanges());
-      files.measure(false);
-      invalidate();
+      if (transcriptAnimator == null) {
+        transcriptAnimator = new FactorAnimator(0, (id, factor, fraction, animator) -> updateTranscriptHeight(),
+          AnimatorUtils.DECELERATE_INTERPOLATOR, 200L);
+      }
+      float target = expanded ? 1f : 0f;
+      if (needAnimateChanges()) {
+        transcriptAnimator.animateTo(target);
+      } else {
+        transcriptAnimator.forceFactor(target);
+        updateTranscriptHeight();
+      }
     }
 
     private int getTranscriptHeight () {
-      return Math.round(transcript.getMetadata().getTotalHeight() + Screen.dp(TEXT_MARGIN) * transcript.getMetadata().getTotalVisibility());
+      return transcriptHeight;
+    }
+
+    private int measureTranscriptHeight () {
+      return transcriptText != null && transcriptAnimator != null ?
+        Math.round((transcriptText.getHeight() + Screen.dp(TEXT_MARGIN)) * transcriptAnimator.getFactor()) : 0;
+    }
+
+    private void updateTranscriptHeight () {
+      int height = measureTranscriptHeight();
+      if (transcriptHeight != height) {
+        transcriptHeight = height;
+        files.measure(false);
+      }
     }
 
     public boolean hasTextMedia () {
@@ -592,7 +610,7 @@ public class TGMessageFile extends TGMessage {
       entry.item.component.buildLayout(maxWidth);
       if (entry.item.transcriptText != null) {
         entry.item.transcriptText.prepare(Math.max(1, entry.item.component.getWidth()));
-        entry.item.transcript.measure(false);
+        entry.item.transcriptHeight = entry.item.measureTranscriptHeight();
       }
       for (ListAnimator.Entry<TextWrapper> caption : entry.item.caption) {
         caption.item.prepare(maxWidth);
@@ -607,7 +625,7 @@ public class TGMessageFile extends TGMessage {
     for (CaptionedFile file : filesList) {
       file.component.performDestroy();
       file.caption.clear(false);
-      file.transcript.clear(false);
+      if (file.transcriptAnimator != null) file.transcriptAnimator.cancel();
     }
   }
 
@@ -668,13 +686,12 @@ public class TGMessageFile extends TGMessage {
       entry.item.component.draw(view, c, startX, contentStartY, previewReceiver, imageReceiver, backgroundColor, useBubbles() ? ColorUtils.compositeColor(contentReplaceColor, pressColor) : contentReplaceColor, entry.getVisibility(), entry.item.getCheckFactor());
       int rowBottom = contentStartY + entry.item.component.getHeight();
       int transcriptHeight = entry.item.getTranscriptHeight();
-      if (transcriptHeight > 0) {
+      if (transcriptHeight > Screen.dp(TEXT_MARGIN) && entry.item.transcriptText != null) {
         int save = c.save();
         int right = startX + entry.item.component.getWidth();
-        c.clipRect(startX, rowBottom, right, rowBottom + transcriptHeight);
-        for (ListAnimator.Entry<TextWrapper> transcript : entry.item.transcript) {
-          transcript.item.draw(c, startX, right, 0, rowBottom + Screen.dp(TEXT_MARGIN), null,
-            entry.getVisibility() * transcript.getVisibility() * alpha, null);
+        if (c.clipRect(startX, rowBottom, right, rowBottom + transcriptHeight)) {
+          entry.item.transcriptText.draw(c, startX, right, 0, rowBottom + Screen.dp(TEXT_MARGIN), null,
+            entry.getVisibility() * entry.item.transcriptAnimator.getFactor() * alpha, null);
         }
         c.restoreToCount(save);
       }
@@ -716,7 +733,11 @@ public class TGMessageFile extends TGMessage {
 
   @Override
   protected float getIntermediateBubbleExpandFactor () {
-    return filesList.get(filesList.size() - 1).needBottomLineExpand.get();
+    CaptionedFile last = filesList.get(filesList.size() - 1);
+    if (last.captionWrapper == null && last.transcriptAnimator != null) {
+      return last.transcriptAnimator.getFactor();
+    }
+    return last.needBottomLineExpand.get();
   }
 
   @Override

@@ -745,7 +745,7 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
         android.graphics.RectF bounds = Paints.getRectF();
         bounds.set(cx - ring, cy - ring, cx + ring, cy + ring);
         c.drawArc(bounds, SystemClock.uptimeMillis() % 900 * .4f, 265, false, Paints.strokeBigPaint(iconColor));
-        view.postInvalidateDelayed(16);
+        if (c.isHardwareAccelerated() || !view.isHardwareAccelerated()) view.postInvalidateOnAnimation();
       } else {
         Drawables.drawCentered(c, view.getSparseDrawable(R.drawable.frogram_transcribe_24, 0), cx, cy, Paints.getPorterDuffPaint(iconColor));
       }

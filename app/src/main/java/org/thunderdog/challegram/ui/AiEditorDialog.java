@@ -33,8 +33,8 @@ final class AiEditorDialog {
 
   void show () {
     TdApi.TextCompositionStyle[] styles = controller.tdlib().textCompositionStyles();
-    MessageDialogStyle panel = new MessageDialogStyle(controller, Lang.getString(R.string.FrogramAi), true);
-    panel.add(panel.button(Lang.getString(R.string.FrogramAiProofread), Theme.textLinkColor(), false, () -> {
+    MessageDialogStyle panel = new MessageDialogStyle(controller, Lang.getString(R.string.FrogramAiStyling), true);
+    panel.add(panel.button(Lang.getString(R.string.FrogramAiProofread), Theme.textLinkColor(), true, () -> {
       panel.dismiss();
       preview(null);
     }), 12);

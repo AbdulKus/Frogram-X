@@ -65,6 +65,7 @@ import org.thunderdog.challegram.tool.Strings;
 import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.ui.CallController;
+import org.thunderdog.challegram.ui.GroupVoiceDialog;
 import org.thunderdog.challegram.ui.CreateChannelController;
 import org.thunderdog.challegram.ui.CreateGroupController;
 import org.thunderdog.challegram.ui.EditChatFolderController;
@@ -837,6 +838,17 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
     if (Intents.ACTION_OPEN_CALL.equals(action)) {
       openCallController();
       return true;
+    }
+
+    if (Intents.ACTION_OPEN_GROUP_VOICE.equals(action)) {
+      org.thunderdog.challegram.voip.GroupVoiceSession group = org.thunderdog.challegram.voip.GroupVoiceSession.current();
+      ViewController<?> owner = navigation.getCurrentStackItem();
+      if (owner != null && group != null && group.callId == intent.getIntExtra("group_call_id", 0) &&
+          group.tdlib.id() == targetAccountId) {
+        GroupVoiceDialog.openCurrent(owner);
+        return true;
+      }
+      return false;
     }
 
     if (action.startsWith(Intents.ACTION_OPEN_PLAYER)) {

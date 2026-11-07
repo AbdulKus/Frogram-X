@@ -125,6 +125,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   private boolean ignoreSelectionChangesForTranslatedText;
   private String languageToTranslate;
   private Delegate delegate;
+  private boolean glassBackground;
 
   public interface Delegate {
     void onWantsCloseTextFormattingKeyboard ();
@@ -180,6 +181,20 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   void setKeyboardView (KeyboardFrameLayout keyboardView) {
     this.keyboardView = keyboardView;
   }
+
+  public void setGlassBackground (java.util.function.BiFunction<View, Integer, ChatGlassDrawable> glassFactory) {
+    if (glassBackground) return;
+    glassBackground = true;
+    setBackground(null);
+    View surface = new View(getContext());
+    surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+    params.setMargins(Screen.dp(7), Screen.dp(7), Screen.dp(7), Screen.dp(5));
+    addView(surface, 0, params);
+    surface.setBackground(glassFactory.apply(surface, ColorId.filling));
+  }
+
+  boolean hasGlassBackground () { return glassBackground; }
 
   public void init (ViewController<?> parent, InputView inputView, Delegate delegate) {
     this.parent = parent;

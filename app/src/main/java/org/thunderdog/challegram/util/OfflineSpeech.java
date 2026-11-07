@@ -10,8 +10,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** One bounded on-device inference at a time, with a checksum-verified model. */
@@ -21,14 +22,16 @@ public final class OfflineSpeech {
   private static final String MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/" + MODEL_NAME;
   private static final String MODEL_SHA256 = "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb";
   private static final long MODEL_SIZE = 190085487;
-  private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();
-  private static final AtomicBoolean BUSY = new AtomicBoolean();
+  private static final ScheduledThreadPoolExecutor WORKER = new ScheduledThreadPoolExecutor(1);
+  private static ScheduledFuture<?> releaseModel;
+  private static long verifiedModelModified = Long.MIN_VALUE;
   private static volatile Job running;
   private static final Object NATIVE_LOCK = new Object();
   private static volatile boolean loaded;
 
   private static native void resetNative ();
   private static native void cancelNative ();
+  private static native void releaseModelNative ();
   private static native byte[] transcribeNative (String model, float[] audio);
 
   private static File model () { return new File(UI.getAppContext().getNoBackupFilesDir(), "speech/" + MODEL_NAME); }
@@ -50,15 +53,17 @@ public final class OfflineSpeech {
 
   public static Job transcribe (String mediaPath, boolean allowDownload, Listener listener) {
     Job job = new Job();
-    if (!BUSY.compareAndSet(false, true)) {
-      UI.post(() -> { if (!job.cancelled.get()) listener.onResult("", true); });
-      return job;
-    }
     WORKER.execute(() -> {
+      if (job.cancelled.get()) return;
+      if (releaseModel != null) {
+        releaseModel.cancel(false);
+        releaseModel = null;
+      }
       synchronized (NATIVE_LOCK) { running = job; }
       String result = "";
       boolean failed = true;
       try {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DEFAULT + 2);
         if (!loaded) { System.loadLibrary("frogram_whisper"); loaded = true; }
         synchronized (NATIVE_LOCK) { resetNative(); }
         File file = ensureModel(job, allowDownload);
@@ -69,11 +74,13 @@ public final class OfflineSpeech {
             if (bytes != null) { result = new String(bytes, StandardCharsets.UTF_8).trim(); failed = false; }
           }
         }
-      } catch (Exception | LinkageError | OutOfMemoryError ignored) {
-        // Report to the originating dialog without crashing the chat.
+      } catch (Exception | LinkageError | OutOfMemoryError error) {
+        if (!job.cancelled.get()) android.util.Log.w("FrogramSpeech", "Offline inference failed", error);
       } finally {
         synchronized (NATIVE_LOCK) { running = null; }
-        BUSY.set(false);
+        if (loaded) {
+          releaseModel = WORKER.schedule(OfflineSpeech::releaseModelNative, 20, TimeUnit.SECONDS);
+        }
       }
       final String text = result;
       final boolean error = failed;
@@ -84,7 +91,12 @@ public final class OfflineSpeech {
 
   private static File ensureModel (Job job, boolean allowDownload) throws Exception {
     File target = model();
-    if (hasModel() && MODEL_SHA256.equals(hash(target))) return target;
+    long modified = target.lastModified();
+    if (hasModel() && (modified == verifiedModelModified || MODEL_SHA256.equals(hash(target)))) {
+      verifiedModelModified = modified;
+      return target;
+    }
+    verifiedModelModified = Long.MIN_VALUE;
     if (target.exists()) target.delete();
     if (!allowDownload || job.cancelled.get()) throw new IOException("Speech model unavailable");
     File directory = target.getParentFile();
@@ -110,6 +122,7 @@ public final class OfflineSpeech {
       }
       if (job.cancelled.get() || total != MODEL_SIZE || !MODEL_SHA256.equals(hash(temporary))) throw new IOException("Model verification failed");
       if (!temporary.renameTo(target)) throw new IOException("Model installation failed");
+      verifiedModelModified = target.lastModified();
       return target;
     } finally {
       connection.disconnect();

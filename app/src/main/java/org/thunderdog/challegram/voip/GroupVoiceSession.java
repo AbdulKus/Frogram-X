@@ -16,14 +16,22 @@ import org.thunderdog.challegram.telegram.AuthorizationListener;
 import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.tool.UI;
 import java.util.LinkedHashMap;
+import java.util.HashMap;
+import android.util.SparseBooleanArray;
+import me.vkryl.core.reference.ReferenceList;
 
 /** Process-level owner; the dialog may close while audio continues in the foreground service. */
 public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEngine.Listener, CallManager.CurrentCallListener, AuthorizationListener {
   private static GroupVoiceSession current;
+  private static final ReferenceList<Runnable> listeners = new ReferenceList<>();
   public static GroupVoiceSession current () { return current; }
+  public static void addListener (Runnable listener) { listeners.add(listener); }
+  public static void removeListener (Runnable listener) { listeners.remove(listener); }
   public final Tdlib tdlib;
   public final int callId;
   public final LinkedHashMap<String, TdApi.GroupCallParticipant> participants = new LinkedHashMap<>();
+  private final HashMap<String, Integer> volumes = new HashMap<>();
+  private final SparseBooleanArray speaking = new SparseBooleanArray();
   public boolean muted = true;
   public boolean connected;
   public boolean ended;
@@ -39,10 +47,13 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   private boolean waitingForPayload;
   private boolean connecting;
   private boolean joined;
+  private boolean retriedRtc;
   private long connectionGeneration;
   private int muteGeneration;
   private TdApi.MessageSender self;
   private boolean canUnmute = true;
+  private String bannerStatus;
+  private boolean bannerMuted;
   private final AudioManager.OnAudioFocusChangeListener focus = change -> UI.post(() -> {
     if (change == AudioManager.AUDIOFOCUS_LOSS) stop(null);
     else if (change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) setMuted(true);
@@ -50,24 +61,26 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
 
   private GroupVoiceSession (Tdlib tdlib, int callId) { this.tdlib = tdlib; this.callId = callId; }
 
-  public static void start (ViewController<?> owner, int callId, java.util.function.Consumer<GroupVoiceSession> ready) {
+  public static void start (ViewController<?> owner, Tdlib tdlib, int callId, java.util.function.Consumer<GroupVoiceSession> ready) {
     if (owner.isDestroyed()) return;
     if (current != null) {
-      if (current.tdlib == owner.tdlib() && current.callId == callId) ready.accept(current);
+      if (current.tdlib == tdlib && current.callId == callId) ready.accept(current);
       else owner.openAlert(R.string.FrogramGroupCall, Lang.getString(R.string.SomeCallInProgressDesc));
       return;
     }
-    if (owner.tdlib().context().calls().promptActiveCall()) return;
+    if (tdlib.context().calls().promptActiveCall()) return;
     if (owner.context().permissions().requestRecordAudioPermissions(granted -> {
-      if (granted) start(owner, callId, ready);
+      if (granted) start(owner, tdlib, callId, ready);
     })) return;
-    GroupVoiceSession session = new GroupVoiceSession(owner.tdlib(), callId);
+    GroupVoiceSession session = new GroupVoiceSession(tdlib, callId);
     current = session;
     session.tdlib.incrementCallReferenceCount();
     session.tdlib.listeners().subscribeForGlobalUpdates(session);
     session.tdlib.context().calls().addCurrentCallListener(session);
     session.tdlib.listeners().addAuthorizationChangeListener(session);
     ready.accept(session);
+    if (session.ended) return;
+    session.notifyChanged();
     Intent intent = new Intent(owner.context(), GroupVoiceService.class);
     try {
       if (Build.VERSION.SDK_INT >= 26) owner.context().startForegroundService(intent);
@@ -85,6 +98,7 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
       connecting = false;
       if (ended) return;
       if (!(response instanceof TdApi.GroupCall) || !((TdApi.GroupCall) response).isActive || !((TdApi.GroupCall) response).isVideoChat || ((TdApi.GroupCall) response).isRtmpStream) {
+        android.util.Log.w("FrogramGroupVoice", "GetGroupCall rejected or not an active RTC video chat");
         stop(Lang.getString(R.string.FrogramCallFailed));
         return;
       }
@@ -114,15 +128,25 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     tdlib.client().send(new TdApi.JoinVideoChat(callId, null, parameters, ""), response -> UI.post(() -> {
       joining = false;
       if (ended) {
-        if (response instanceof TdApi.Text) tdlib.client().send(new TdApi.LeaveGroupCall(callId), ignored -> { });
+        if (response instanceof TdApi.Text && (current == null || current.callId != callId || current.tdlib != tdlib)) {
+          tdlib.client().send(new TdApi.LeaveGroupCall(callId), ignored -> { });
+        }
         return;
       }
-      if (!(response instanceof TdApi.Text)) { stop(Lang.getString(R.string.FrogramCallFailed)); return; }
+      if (!(response instanceof TdApi.Text)) {
+        if (response instanceof TdApi.Error) {
+          TdApi.Error error = (TdApi.Error) response;
+          android.util.Log.w("FrogramGroupVoice", "JoinVideoChat rejected: " + error.code + " " + error.message);
+        }
+        stop(Lang.getString(R.string.FrogramCallFailed));
+        return;
+      }
       joined = true;
       muted = true;
       try {
         engine.mute(true);
         engine.response(((TdApi.Text) response).text);
+        connectionTimeout();
       } catch (RuntimeException | LinkageError error) {
         fail(error);
         return;
@@ -140,17 +164,41 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
   @Override public void onState (boolean value) {
     if (ended) return;
     connected = value;
+    android.util.Log.i("FrogramGroupVoice", "RTC connected: " + value);
     status = Lang.getString(value ? R.string.FrogramCallConnected : R.string.FrogramCallConnecting);
-    if (!value) connectionTimeout();
-    else connectionGeneration++;
+    if (!value) {
+      speaking.clear();
+      connectionTimeout();
+    } else {
+      retriedRtc = false;
+      connectionGeneration++;
+    }
     notifyChanged();
   }
 
   private void connectionTimeout () {
     long generation = ++connectionGeneration;
     UI.post(() -> {
-      if (!ended && !connected && generation == connectionGeneration) stop(Lang.getString(R.string.FrogramCallFailed));
-    }, 45000);
+      if (ended || connected || generation != connectionGeneration) return;
+      if (joined && engine != null && !waitingForPayload && !joining && !retriedRtc) {
+        retriedRtc = true;
+        android.util.Log.i("FrogramGroupVoice", "Retrying RTC join after connection timeout");
+        rejoin();
+      } else {
+        android.util.Log.w("FrogramGroupVoice", "Group audio connection timed out");
+        stop(Lang.getString(R.string.FrogramCallFailed));
+      }
+    }, joined ? 18000 : 45000);
+  }
+
+  private void rejoin () {
+    connected = false;
+    speaking.clear();
+    muted = true;
+    status = Lang.getString(R.string.FrogramCallConnecting);
+    engine.mute(true);
+    requestJoinPayload();
+    connectionTimeout();
   }
 
   public void setMuted (boolean value) {
@@ -179,18 +227,36 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     return connected && self != null && (!muted || canUnmute);
   }
 
+  @Override public void onSpeakers (int[] sources) {
+    if (ended || !connected) return;
+    speaking.clear();
+    for (int source : sources) speaking.put(source, true);
+    if (changed != null) changed.run();
+  }
+
+  public boolean isSpeaking (TdApi.GroupCallParticipant participant) {
+    return connected && speaking.get(participant.isCurrentUser ? 0 : participant.audioSourceId);
+  }
+
+  public int volume (String key, TdApi.GroupCallParticipant participant) {
+    Integer volume = volumes.get(key);
+    return volume != null ? volume : Math.max(0, Math.min(200, Math.round(participant.volumeLevel / 100f)));
+  }
+
+  public void setVolume (String key, int volume) {
+    TdApi.GroupCallParticipant participant = participants.get(key);
+    if (ended || engine == null || participant == null || participant.isCurrentUser || participant.audioSourceId == 0) return;
+    volumes.put(key, volume);
+    engine.setVolume(participant.audioSourceId, volume / 100.0);
+  }
+
   @Override public void onGroupCallUpdated (TdApi.GroupCall call) {
     if (call.id != callId) return;
     UI.post(() -> {
       if (ended) return;
-      if (!call.isActive || (joined && !call.isJoined && !call.needRejoin)) { stop(null); return; }
+      if (!call.isActive || (connected && joined && !call.isJoined && !call.needRejoin)) { stop(null); return; }
       if (call.needRejoin && engine != null && !joining && !waitingForPayload) {
-        connected = false;
-        muted = true;
-        status = Lang.getString(R.string.FrogramCallConnecting);
-        engine.mute(true);
-        requestJoinPayload();
-        connectionTimeout();
+        rejoin();
       }
       notifyChanged();
     });
@@ -202,7 +268,12 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
       if (ended) return;
       String key = participant.participantId instanceof TdApi.MessageSenderUser ? "u" + ((TdApi.MessageSenderUser) participant.participantId).userId : "c" + ((TdApi.MessageSenderChat) participant.participantId).chatId;
       if (participant.order.isEmpty()) participants.remove(key);
-      else participants.put(key, participant);
+      else {
+        participants.put(key, participant);
+        if (engine != null && !participant.isCurrentUser && participant.audioSourceId != 0) {
+          engine.setVolume(participant.audioSourceId, volume(key, participant) / 100.0);
+        }
+      }
       if (participant.isCurrentUser) {
         self = participant.participantId;
         canUnmute = !participant.isMutedForAllUsers || participant.canUnmuteSelf;
@@ -218,7 +289,7 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     connected = false;
     status = error != null ? error : Lang.getString(R.string.FrogramCallEnded);
     if (engine != null) { engine.stop(); engine = null; }
-    tdlib.client().send(new TdApi.LeaveGroupCall(callId), ignored -> { });
+    if (joined) tdlib.client().send(new TdApi.LeaveGroupCall(callId), ignored -> { });
     tdlib.listeners().unsubscribeFromGlobalUpdates(this);
     tdlib.context().calls().removeCurrentCallListener(this);
     tdlib.listeners().removeAuthorizationChangeListener(this);
@@ -243,7 +314,14 @@ public final class GroupVoiceSession implements GroupCallListener, GroupVoiceEng
     stop(Lang.getString(R.string.FrogramCallFailed));
   }
 
-  private void notifyChanged () { if (changed != null) changed.run(); }
+  private void notifyChanged () {
+    if (changed != null) changed.run();
+    if (ended || !status.equals(bannerStatus) || muted != bannerMuted) {
+      bannerStatus = status;
+      bannerMuted = muted;
+      for (Runnable listener : listeners) listener.run();
+    }
+  }
 
   @Override public void onCurrentCallChanged (Tdlib account, TdApi.Call call) {
     if (call != null) UI.post(() -> stop(null));

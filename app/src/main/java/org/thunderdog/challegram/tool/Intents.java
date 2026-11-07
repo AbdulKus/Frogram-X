@@ -84,6 +84,7 @@ public class Intents {
   public static final String ACTION_OPEN_CHAT = PACKAGE_NAME + ".OPEN_CHAT";
 
   public static final String ACTION_OPEN_CALL = PACKAGE_NAME + ".OPEN_CALL";
+  public static final String ACTION_OPEN_GROUP_VOICE = PACKAGE_NAME + ".OPEN_GROUP_VOICE";
 
   public static final String ACTION_END_CALL = PACKAGE_NAME + ".END_CALL";
   public static final String ACTION_DECLINE_CALL = PACKAGE_NAME + ".DECLINE_CALL";

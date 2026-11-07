@@ -114,6 +114,8 @@ final class MessageTranscription {
       UI.post(timeout, 120000);
       if (alreadyPending) {
         poll();
+      } else if (!owner.tdlib().canTrySpeechRecognition(duration(message))) {
+        fallback();
       } else {
         owner.tdlib().client().send(new TdApi.RecognizeSpeech(message.chatId, message.id), response -> UI.post(() -> {
           if (!active() || !server) return;
@@ -209,5 +211,10 @@ final class MessageTranscription {
     if (message.content instanceof TdApi.MessageVoiceNote) return ((TdApi.MessageVoiceNote) message.content).voiceNote.speechRecognitionResult;
     if (message.content instanceof TdApi.MessageVideoNote) return ((TdApi.MessageVideoNote) message.content).videoNote.speechRecognitionResult;
     return null;
+  }
+
+  private static int duration (TdApi.Message message) {
+    return message.content instanceof TdApi.MessageVoiceNote ? ((TdApi.MessageVoiceNote) message.content).voiceNote.duration :
+      ((TdApi.MessageVideoNote) message.content).videoNote.duration;
   }
 }

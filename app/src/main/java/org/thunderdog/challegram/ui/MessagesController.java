@@ -5985,12 +5985,18 @@ public class MessagesController extends ViewController<MessagesController.Argume
             .info(StringUtils.isEmpty(text) ? null : text);
           OptionItem historyItem = hasHistory ? new OptionItem.Builder().id(R.id.btn_frogramHistory)
             .name(R.string.FrogramEditHistory).icon(R.drawable.frogram_edit_history_24).build() : null;
+          boolean hasEdit = false;
+          for (int id : ids) hasEdit |= id == R.id.btn_messageEdit;
           for (OptionItem item : getOptions(null, ids, options, null, icons, Text.LINE_COUNT_UNLIMITED).items) {
-            if (item.id == R.id.btn_messageDelete && historyItem != null) {
+            if (!hasEdit && item.id == R.id.btn_messageDelete && historyItem != null) {
               messageOptionsBuilder.item(historyItem);
               historyItem = null;
             }
             messageOptionsBuilder.item(item);
+            if (item.id == R.id.btn_messageEdit && historyItem != null) {
+              messageOptionsBuilder.item(historyItem);
+              historyItem = null;
+            }
           }
           messageOptionsBuilder.item(historyItem);
           TdApi.Message observedMessage = msg.getMessage();
@@ -10310,6 +10316,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
             openAiEditor();
           }
         });
+        textFormattingLayout.setGlassBackground(this::createGlassSurface);
 
         emojiLayout = emojiKeyboardFrameLayout.contentView.emojiLayout;
         emojiLayout.initWithMediasEnabled(this, true, this, this, false);

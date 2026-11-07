@@ -91,12 +91,18 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   private int[] pixels = new int[0];
   private int[] capturePixels = new int[0];
   private Bitmap sample, capture;
+  private int backdropDimColor;
   private boolean customShape;
 
   public void setShape (Path path) {
     clip.set(path);
     customShape = true;
     host.invalidate();
+  }
+
+  public void setBackdropDimAmount (float amount) {
+    backdropDimColor = ColorUtils.alphaColor(amount, Color.BLACK);
+    invalidateBackdrop();
   }
 
   public static int surfaceColor (int colorId) {
@@ -326,8 +332,13 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       invalidateBackdrop();
       return;
     }
-    host.getLocationInWindow(hostPosition);
-    changed.getLocationInWindow(changedPosition);
+    if (host.getWindowToken() == changed.getWindowToken()) {
+      host.getLocationInWindow(hostPosition);
+      changed.getLocationInWindow(changedPosition);
+    } else {
+      host.getLocationOnScreen(hostPosition);
+      changed.getLocationOnScreen(changedPosition);
+    }
     int left = changedPosition[0] - hostPosition[0], top = changedPosition[1] - hostPosition[1];
     if (left < sampleBounds.right && left + changed.getWidth() > sampleBounds.left &&
         top < sampleBounds.bottom && top + changed.getHeight() > sampleBounds.top) invalidateBackdrop();
@@ -341,6 +352,13 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       return;
     }
     host.getLocationInWindow(hostPosition);
+    if (host.getWindowToken() != sourceView.getWindowToken()) {
+      host.getLocationOnScreen(hostPosition);
+      sourceView.getLocationOnScreen(wallpaperPosition);
+      sourceView.getLocationInWindow(changedPosition);
+      hostPosition[0] -= wallpaperPosition[0] - changedPosition[0];
+      hostPosition[1] -= wallpaperPosition[1] - changedPosition[1];
+    }
     if (region.left < hostPosition[0] + sampleBounds.right && region.right > hostPosition[0] + sampleBounds.left &&
         region.top < hostPosition[1] + sampleBounds.bottom && region.bottom > hostPosition[1] + sampleBounds.top) invalidateBackdrop();
   }
@@ -356,14 +374,21 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
 
   private boolean prepareBackdropContents () {
     if (released || !enabled || panel.isEmpty() || (sourceView.getWidth() == 0 && (messages == null || messages.getWidth() == 0))) return false;
-    host.getLocationInWindow(hostPosition);
-    sourceView.getLocationInWindow(wallpaperPosition);
+    boolean sameWindow = host.getWindowToken() == sourceView.getWindowToken();
+    if (sameWindow) {
+      host.getLocationInWindow(hostPosition);
+      sourceView.getLocationInWindow(wallpaperPosition);
+    } else {
+      host.getLocationOnScreen(hostPosition);
+      sourceView.getLocationOnScreen(wallpaperPosition);
+    }
     int relativeX = hostPosition[0] - wallpaperPosition[0];
     int relativeY = hostPosition[1] - wallpaperPosition[1];
     int color = Theme.getColor(colorId);
     int messagesX = 0, messagesY = 0;
     if (messages != null) {
-      messages.getLocationInWindow(messagesPosition);
+      if (sameWindow) messages.getLocationInWindow(messagesPosition);
+      else messages.getLocationOnScreen(messagesPosition);
       messagesX = messagesPosition[0] - wallpaperPosition[0];
       messagesY = messagesPosition[1] - wallpaperPosition[1];
     }
@@ -407,6 +432,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
       if (videoLayer != null) videoLayer.draw(sampleCanvas);
     }
     sampleCanvas.restoreToCount(sampleSave);
+    if (backdropDimColor != 0) sampleCanvas.drawColor(backdropDimColor);
     if (pixels.length < width * height) pixels = new int[width * height];
     if (capturePixels.length < width * height * 4) capturePixels = new int[width * height * 4];
     capture.getPixels(capturePixels, 0, width * 2, 0, 0, width * 2, height * 2);

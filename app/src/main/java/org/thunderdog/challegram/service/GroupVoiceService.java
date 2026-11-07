@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.IBinder;
 import org.thunderdog.challegram.R;
 import org.thunderdog.challegram.core.Lang;
+import org.thunderdog.challegram.tool.Intents;
 import org.thunderdog.challegram.voip.GroupVoiceSession;
 
 public final class GroupVoiceService extends Service {
@@ -34,7 +35,13 @@ public final class GroupVoiceService extends Service {
       .setContentText(Lang.getString(R.string.FrogramCallNotification)).setOngoing(true)
       .addAction(R.drawable.baseline_call_end_24, Lang.getString(R.string.FrogramCallLeave), leave);
     Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
-    if (launch != null) notification.setContentIntent(PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT | immutable));
+    if (launch != null) {
+      launch.setAction(Intents.ACTION_OPEN_GROUP_VOICE)
+        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        .putExtra("account_id", session.tdlib.id())
+        .putExtra("group_call_id", session.callId);
+      notification.setContentIntent(PendingIntent.getActivity(this, 7801, launch, PendingIntent.FLAG_UPDATE_CURRENT | immutable));
+    }
     try {
       startForeground(7801, notification.build());
       session.connect();

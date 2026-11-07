@@ -26,6 +26,7 @@
 #include <sdk/android/native_api/video/wrapper.h>
 #include <sdk/android/native_api/base/init.h>
 #include <rtc_base/ssl_adapter.h>
+#include <rtc_base/time_utils.h>
 #include <webrtc/media/base/media_constants.h>
 
 #include <os/android/JNIUtilities.h>
@@ -41,6 +42,7 @@
 #include <platform/android/AndroidInterface.h>
 #include <platform/android/AndroidContext.h>
 
+#include <map>
 #include <utility>
 
 #else
@@ -1023,6 +1025,30 @@ Java_org_thunderdog_challegram_voip_GroupVoiceEngine_createNative(JNIEnv *env, j
       env->CallVoidMethod(callbacks->thiz, method, static_cast<jboolean>(state.isConnected));
     });
   };
+  descriptor.audioLevelsUpdated = [callbacks, active = std::map<uint32_t, int64_t>{},
+                                    previous = std::vector<jint>{}](const tgcalls::GroupLevelsUpdate &levels) mutable {
+    const auto now = rtc::TimeMillis();
+    for (const auto &entry : levels.updates) {
+      if (entry.value.isMuted) active.erase(entry.ssrc);
+      else if (entry.value.voice && entry.value.level > 0.03f) active[entry.ssrc] = now + 350;
+    }
+    std::vector<jint> sources;
+    for (auto it = active.begin(); it != active.end();) {
+      if (it->second <= now) it = active.erase(it);
+      else sources.push_back(static_cast<jint>((it++)->first));
+    }
+    if (sources == previous) return;
+    previous = sources;
+    callbacks->runSafely([&](JNIEnv *env) {
+      const auto count = static_cast<jsize>(sources.size());
+      jintArray array = env->NewIntArray(count);
+      if (!array) return;
+      if (count != 0) env->SetIntArrayRegion(array, 0, count, sources.data());
+      jmethodID method = env->GetMethodID(callbacks->clazz, "onSpeakers", "([I)V");
+      env->CallVoidMethod(callbacks->thiz, method, array);
+      env->DeleteLocalRef(array);
+    });
+  };
   auto instance = std::make_shared<tgcalls::GroupInstanceCustomImpl>(std::move(descriptor));
   instance->setIsMuted(true);
   return reinterpret_cast<jlong>(new FrogramGroupHandle{callbacks, instance});
@@ -1053,6 +1079,11 @@ Java_org_thunderdog_challegram_voip_GroupVoiceEngine_responseNative(JNIEnv *env,
 extern "C" JNIEXPORT void JNICALL
 Java_org_thunderdog_challegram_voip_GroupVoiceEngine_muteNative(JNIEnv *, jobject, jlong ptr, jboolean muted) {
   reinterpret_cast<FrogramGroupHandle *>(ptr)->instance->setIsMuted(muted == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_thunderdog_challegram_voip_GroupVoiceEngine_volumeNative(JNIEnv *, jobject, jlong ptr, jint source, jdouble gain) {
+  reinterpret_cast<FrogramGroupHandle *>(ptr)->instance->setVolume(static_cast<uint32_t>(source), gain);
 }
 
 extern "C" JNIEXPORT void JNICALL

@@ -89,6 +89,9 @@ public class KeyboardFrameLayoutContent extends FrameLayout {
 
   public boolean setTextFormattingLayoutVisible (boolean visible) {
     emojiLayout.optimizeForDisplayTextFormattingLayout(visible);    // todo - just hide view ?
+    if (textFormattingLayout.hasGlassBackground()) {
+      emojiLayout.setVisibility(visible ? View.INVISIBLE : View.VISIBLE);
+    }
     textFormattingLayout.setVisibility(visible ? View.VISIBLE : View.GONE);
     if (visible) {
       textFormattingLayout.checkButtonsActive(false);

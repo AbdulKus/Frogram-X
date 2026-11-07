@@ -51,6 +51,7 @@ import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.ui.CallController;
+import org.thunderdog.challegram.ui.GroupVoiceDialog;
 import org.thunderdog.challegram.ui.PlaybackController;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Size;
@@ -60,6 +61,7 @@ import org.thunderdog.challegram.util.text.Counter;
 import org.thunderdog.challegram.util.text.Text;
 import org.thunderdog.challegram.util.text.TextColorSet;
 import org.thunderdog.challegram.util.text.TextColorSets;
+import org.thunderdog.challegram.voip.GroupVoiceSession;
 import org.thunderdog.challegram.voip.annotation.CallState;
 import org.thunderdog.challegram.voip.gui.CallSettings;
 import org.thunderdog.challegram.widget.PopupLayout;
@@ -189,6 +191,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   @Override
   public void performDestroy () {
     TGLegacyManager.instance().removeEmojiListener(this);
+    GroupVoiceSession.removeListener(groupCallChanged);
   }
 
   // Component stuff
@@ -806,6 +809,11 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   private Tdlib callTdlib;
   private TdApi.Call call;
+  private final Runnable groupCallChanged = () -> {
+    if (call == null) {
+      setShowOngoingSection(SECTION_CALL, GroupVoiceSession.current() != null, true, false);
+    }
+  };
 
   private int getCallId () {
     return call != null ? call.id : 0;
@@ -813,6 +821,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   private void initCallListeners () {
     TdlibManager.instance().calls().addCurrentCallListener(this);
+    GroupVoiceSession.addListener(groupCallChanged);
     setCall(TdlibManager.instance().calls().getCurrentCallTdlib(), TdlibManager.instance().calls().getCurrentCall(), true);
   }
 
@@ -857,6 +866,14 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   private void buildCall () {
     if (call == null) {
+      GroupVoiceSession group = GroupVoiceSession.current();
+      if (group != null) {
+        setText(Lang.getString(R.string.FrogramGroupCall), "  " + group.status, textLeft * 2);
+        setCallActive(true, true, null);
+        setCallIncoming(false, isOngoingBarVisible());
+        setCallMuted(group.muted, isOngoingBarVisible());
+        setCallFlashing(false);
+      }
       return;
     }
     TdApi.User user = callTdlib.cache().user(call.userId);
@@ -890,14 +907,14 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     }
     if (call != null || oldCall == null || force) {
       this.call = call;
-      setShowOngoingSection(SECTION_CALL, call != null, false, force);
+      setShowOngoingSection(SECTION_CALL, call != null || GroupVoiceSession.current() != null, false, force);
     } else {
       UI.post(() -> {
         if (HeaderFilling.this.callTdlib != null && HeaderFilling.this.callTdlib.id() == oldTdlib.id() &&
           HeaderFilling.this.call != null && oldCall.id == HeaderFilling.this.call.id) {
           HeaderFilling.this.call = null;
           HeaderFilling.this.callTdlib = null;
-          setShowOngoingSection(SECTION_CALL, false, false, false);
+          groupCallChanged.run();
         }
       }, isOngoingBarVisible() ? 2000 : 0);
     }
@@ -1067,11 +1084,15 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
       }
       setCallMuted(!settings.isMicMuted(), true);
       settings.setMicMuted(isCallMuted);
+    } else {
+      GroupVoiceSession group = GroupVoiceSession.current();
+      if (group != null && group.canToggleMute()) group.setMuted(!group.muted);
     }
   }
 
   private void openCall () {
-    TdlibManager.instance().calls().openCurrentCall();
+    if (call != null) TdlibManager.instance().calls().openCurrentCall();
+    else if (navigationController != null) GroupVoiceDialog.openCurrent(navigationController.getCurrentStackItem());
   }
 
   private void drawOngoingCall (Canvas c, int playerTop, float rectWidth, int playerBottom) {
@@ -1406,6 +1427,9 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
           } else {
             TdlibManager.instance().calls().hangUp(callTdlib, call.id);
           }
+        } else if (call == null) {
+          GroupVoiceSession group = GroupVoiceSession.current();
+          if (group != null) group.stop(null);
         }
       }
     } else if (BitwiseUtils.hasFlag(ongoingSections, SECTION_AUDIO)) {

@@ -20,6 +20,7 @@ import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Fonts;
 import org.thunderdog.challegram.tool.Screen;
+import org.thunderdog.challegram.widget.ChatGlassDrawable;
 
 import me.vkryl.core.ColorUtils;
 import me.vkryl.core.lambda.Destroyable;
@@ -27,13 +28,16 @@ import me.vkryl.core.lambda.Destroyable;
 final class MessageDialogStyle {
   private final ViewController<?> owner;
   private final Dialog dialog;
+  private final ChatGlassDrawable glass;
   final LinearLayout content;
   private final boolean compact;
+  private final float dimAmount;
   private Runnable onDismiss;
 
   MessageDialogStyle (ViewController<?> owner, String title, boolean compact) {
     this.owner = owner;
     this.compact = compact;
+    this.dimAmount = compact ? .20f : .30f;
     dialog = new Dialog(owner.context(), Theme.dialogTheme());
     dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
     content = new LinearLayout(owner.context());
@@ -41,8 +45,11 @@ final class MessageDialogStyle {
     int padding = Screen.dp(compact ? 16 : 20);
     content.setPadding(padding, padding, padding, padding);
     if (owner instanceof MessagesController) {
-      content.setBackground(((MessagesController) owner).createGlassSurface(content, ColorId.filling));
+      glass = ((MessagesController) owner).createGlassSurface(content, ColorId.filling);
+      glass.setBackdropDimAmount(dimAmount);
+      content.setBackground(glass);
     } else {
+      glass = null;
       content.setBackground(rounded(Theme.getColor(ColorId.filling), 26));
     }
     if (Build.VERSION.SDK_INT >= 21) {
@@ -112,12 +119,13 @@ final class MessageDialogStyle {
     Destroyable destroy = dialog::dismiss;
     owner.addDestroyListener(destroy);
     dialog.setOnDismissListener(ignored -> {
+      if (glass != null) glass.release();
       owner.removeDestroyListener(destroy);
       if (onDismiss != null) onDismiss.run();
     });
     Window window = dialog.getWindow();
     window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-    window.setDimAmount(compact ? .20f : .30f);
+    window.setDimAmount(dimAmount);
     dialog.show();
     int width = owner.context().getResources().getDisplayMetrics().widthPixels - Screen.dp(48);
     window.setLayout(Math.min(width, Screen.dp(compact ? 320 : 400)), ViewGroup.LayoutParams.WRAP_CONTENT);
