@@ -47,6 +47,7 @@ final class MessageDialogStyle {
     if (owner instanceof MessagesController) {
       glass = ((MessagesController) owner).createGlassSurface(content, ColorId.filling);
       glass.setBackdropDimAmount(dimAmount);
+      glass.setWindowBackdrop(owner.context().getWindow());
       content.setBackground(glass);
     } else {
       glass = null;

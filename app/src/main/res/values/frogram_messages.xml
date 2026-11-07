@@ -44,4 +44,13 @@
   <string name="FrogramCallCreate">Start voice chat</string>
   <string name="FrogramCallCreateConfirm">Start a voice chat in this group?</string>
   <string name="FrogramAiSecret">Telegram AI is unavailable in secret chats.</string>
+  <string name="FrogramAiStyleTribal">Tribal</string>
+  <string name="FrogramAiStyleBiblical">Biblical</string>
+  <string name="FrogramAiStyleFormal">Formal</string>
+  <string name="FrogramAiStyleShort">Short</string>
+  <string name="FrogramAiStyleCorp">Corporate</string>
+  <string name="FrogramAiStyleViking">Viking</string>
+  <string name="FrogramCallCloseVolume">Close volume control</string>
+  <string name="FrogramFormattingPasteLink">Paste a link…</string>
+  <string name="FrogramFormattingMultipleLinks">Multiple links</string>
 </resources>

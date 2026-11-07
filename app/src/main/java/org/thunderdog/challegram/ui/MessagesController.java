@@ -466,10 +466,31 @@ public class MessagesController extends ViewController<MessagesController.Argume
     return MessageTranscription.canTranscribe(message);
   }
 
+  public static boolean supportsTranscription (TdApi.Message message) {
+    return MessageTranscription.supportsTranscription(message);
+  }
+
+  public String openedVoiceTranscript (TdApi.Message message) {
+    return transcription.openedVoiceTranscript(message);
+  }
+
+  public void setVoiceTranscriptExpanded (TdApi.Message message, boolean expanded) {
+    transcription.setVoiceTranscriptExpanded(message, expanded);
+  }
+
   public void transcribeVoice (TdApi.Message message, RunnableBool working, RunnableData<String> result) {
     transcription.start(message, new MessageTranscription.Listener() {
       @Override public void onWorking (boolean value) { working.runWithBool(value); }
-      @Override public void onResult (String text) { result.runWithData(text); }
+      @Override public void onResult (String text) {
+        setVoiceTranscriptExpanded(message, true);
+        result.runWithData(text);
+        if (message.chatId == getChatId()) {
+          TGMessage current = manager.getAdapter().findMessageById(message.id);
+          if (current instanceof TGMessageFile) {
+            ((TGMessageFile) current).showVoiceTranscript(message.id, text);
+          }
+        }
+      }
     });
   }
 

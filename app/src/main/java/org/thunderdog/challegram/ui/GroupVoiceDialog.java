@@ -190,6 +190,7 @@ public final class GroupVoiceDialog {
     final SpeakerAvatar avatar;
     final TextView title;
     final ImageView muted;
+    final ImageView closeVolume;
     final LinearLayout volumeControl;
     final SeekBar slider;
     final TextView percent;
@@ -225,7 +226,6 @@ public final class GroupVoiceDialog {
       volumeControl.addView(slider, new LinearLayout.LayoutParams(0, -1, 1f));
       percent = panel.label("", 13, Theme.textLinkColor(), true);
       percent.setGravity(Gravity.CENTER);
-      percent.setOnClickListener(v -> toggleVolume());
       volumeControl.addView(percent, new LinearLayout.LayoutParams(Screen.dp(46), -1));
       slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
         @Override public void onProgressChanged (SeekBar bar, int value, boolean fromUser) {
@@ -239,7 +239,19 @@ public final class GroupVoiceDialog {
       muted.setImageResource(R.drawable.frogram_mic_off_24);
       muted.setColorFilter(Paints.getColorFilter(Theme.textDecentColor()));
       muted.setContentDescription(Lang.getString(R.string.FrogramCallMuted));
-      addView(muted, new LinearLayout.LayoutParams(Screen.dp(18), Screen.dp(18)));
+      addView(muted, new LinearLayout.LayoutParams(Screen.dp(36), Screen.dp(36)));
+      muted.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+      int inset = Screen.dp(8);
+      muted.setPadding(inset, inset, inset, inset);
+
+      closeVolume = new ImageView(owner.context());
+      closeVolume.setImageResource(R.drawable.baseline_close_20);
+      closeVolume.setColorFilter(Paints.getColorFilter(Theme.textAccentColor()));
+      closeVolume.setScaleType(ImageView.ScaleType.CENTER);
+      closeVolume.setBackground(MessageDialogStyle.rounded(ColorUtils.alphaColor(.10f, Theme.textAccentColor()), 10));
+      closeVolume.setContentDescription(Lang.getString(R.string.FrogramCallCloseVolume));
+      closeVolume.setOnClickListener(v -> toggleVolume());
+      addView(closeVolume, new LinearLayout.LayoutParams(Screen.dp(36), Screen.dp(36)));
     }
 
     void toggleVolume () {
@@ -253,6 +265,7 @@ public final class GroupVoiceDialog {
       title.setVisibility(adjusting ? GONE : VISIBLE);
       volumeControl.setVisibility(adjusting ? VISIBLE : GONE);
       muted.setVisibility(!adjusting && participant.isMutedForAllUsers ? VISIBLE : GONE);
+      closeVolume.setVisibility(adjusting ? VISIBLE : GONE);
       if (adjusting) {
         int volume = session.volume(key, participant);
         slider.setProgress(volume);
@@ -289,8 +302,9 @@ public final class GroupVoiceDialog {
     @Override protected void onDraw (Canvas canvas) {
       receiver.draw(canvas);
       if (speaking) {
+        int color = Theme.isDark() ? 0xff62e5a2 : Theme.getColor(ColorId.online);
         canvas.drawCircle(getWidth() / 2f, getHeight() / 2f, getWidth() / 2f - Screen.dp(1),
-          Paints.strokeBigPaint(Theme.getColor(ColorId.headerBarCallActive)));
+          Paints.strokeBigPaint(color));
       }
     }
 

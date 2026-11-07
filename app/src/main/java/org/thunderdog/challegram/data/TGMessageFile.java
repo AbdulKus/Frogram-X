@@ -100,22 +100,32 @@ public class TGMessageFile extends TGMessage {
         invalidate();
       }, AnimatorUtils.DECELERATE_INTERPOLATOR, TEXT_CROSS_FADE_DURATION_MS);
       configureTranscription(message);
+      if (component.hasTranscription() && MessagesController.canTranscribe(message)) {
+        String restored = ((MessagesController) controller()).openedVoiceTranscript(message);
+        if (restored != null) {
+          prepareTranscript(restored);
+          transcriptExpanded = true;
+          component.setTranscriptExpanded(true);
+        }
+      }
       updateCaption(false);
     }
 
     void configureTranscription (TdApi.Message message) {
-      component.setTranscriptionAction(MessagesController.canTranscribe(message) &&
-        component.isVoice() && controller() instanceof MessagesController ? this::toggleTranscript : null);
+      boolean available = component.isVoice() && controller() instanceof MessagesController &&
+        MessagesController.supportsTranscription(message);
+      component.setTranscriptionAction(available ? this::toggleTranscript : null, MessagesController.canTranscribe(message));
     }
 
     void toggleTranscript () {
       if (waitingForTranscript) return;
+      TdApi.Message message = getMessage(messageId);
+      if (!MessagesController.canTranscribe(message)) return;
       if (transcriptText != null) {
+        ((MessagesController) controller()).setVoiceTranscriptExpanded(message, !transcriptExpanded);
         setTranscriptExpanded(!transcriptExpanded);
         return;
       }
-      TdApi.Message message = getMessage(messageId);
-      if (!MessagesController.canTranscribe(message)) return;
       waitingForTranscript = true;
       ((MessagesController) controller()).transcribeVoice(message, working -> {
         if (!isDestroyed()) {
@@ -124,22 +134,31 @@ public class TGMessageFile extends TGMessage {
         }
       }, value -> {
         if (isDestroyed() || !filesList.contains(this)) return;
-        waitingForTranscript = false;
-        transcriptText = new TextWrapper(value, getTextStyleProvider(), getTextColorSet());
-        transcriptText.prepare(Math.max(1, component.getWidth()));
-        setTranscriptExpanded(true);
+        showTranscript(value);
       });
+    }
+
+    private void prepareTranscript (String value) {
+      transcriptText = new TextWrapper(value, getTextStyleProvider(), getTextColorSet());
+    }
+
+    private void showTranscript (String value) {
+      if (transcriptText != null) return;
+      waitingForTranscript = false;
+      prepareTranscript(value);
+      transcriptText.prepare(Math.max(1, component.getWidth()));
+      setTranscriptExpanded(true);
     }
 
     private boolean transcriptExpanded;
 
     private void setTranscriptExpanded (boolean expanded) {
-      transcriptExpanded = expanded;
-      component.setTranscriptExpanded(expanded);
       if (transcriptAnimator == null) {
         transcriptAnimator = new FactorAnimator(0, (id, factor, fraction, animator) -> updateTranscriptHeight(),
-          AnimatorUtils.DECELERATE_INTERPOLATOR, 200L);
+          AnimatorUtils.DECELERATE_INTERPOLATOR, 200L, transcriptFactor());
       }
+      transcriptExpanded = expanded;
+      component.setTranscriptExpanded(expanded);
       float target = expanded ? 1f : 0f;
       if (needAnimateChanges()) {
         transcriptAnimator.animateTo(target);
@@ -154,8 +173,12 @@ public class TGMessageFile extends TGMessage {
     }
 
     private int measureTranscriptHeight () {
-      return transcriptText != null && transcriptAnimator != null ?
-        Math.round((transcriptText.getHeight() + Screen.dp(TEXT_MARGIN)) * transcriptAnimator.getFactor()) : 0;
+      return transcriptText != null ?
+        Math.round((transcriptText.getHeight() + Screen.dp(TEXT_MARGIN)) * transcriptFactor()) : 0;
+    }
+
+    private float transcriptFactor () {
+      return transcriptAnimator != null ? transcriptAnimator.getFactor() : transcriptExpanded ? 1f : 0f;
     }
 
     private void updateTranscriptHeight () {
@@ -163,6 +186,7 @@ public class TGMessageFile extends TGMessage {
       if (transcriptHeight != height) {
         transcriptHeight = height;
         files.measure(false);
+        updateFileDimensions();
       }
     }
 
@@ -252,7 +276,9 @@ public class TGMessageFile extends TGMessage {
         }
         return captionWrapper.getLastLineWidth();
       } else {
-        return getTranscriptHeight() > 0 ? BOTTOM_LINE_EXPAND_HEIGHT : component.getLastLineWidth();
+        if (getTranscriptHeight() == 0) return component.getLastLineWidth();
+        if (transcriptText.getLastLineIsRtl() != Lang.rtl()) return BOTTOM_LINE_EXPAND_HEIGHT;
+        return transcriptText.getLastLineWidth();
       }
     }
 
@@ -310,13 +336,16 @@ public class TGMessageFile extends TGMessage {
     }
   }
   private final List<CaptionedFile> filesList = new ArrayList<>();
-  private final ListAnimator<CaptionedFile> files = new ListAnimator<>(animator -> {
+  private final ListAnimator<CaptionedFile> files = new ListAnimator<>(animator -> updateFileDimensions(),
+    AnimatorUtils.DECELERATE_INTERPOLATOR, 200L);
+
+  private void updateFileDimensions () {
     if (rebuildContentDimensions()) {
       requestLayout();
     } else {
       invalidate();
     }
-  }, AnimatorUtils.DECELERATE_INTERPOLATOR, 200l);
+  }
 
   @NonNull
   private CaptionedFile newFile (TGMessage context, TdApi.Message message) {
@@ -445,6 +474,11 @@ public class TGMessageFile extends TGMessage {
     return null;
   }
 
+  public void showVoiceTranscript (long messageId, String text) {
+    CaptionedFile file = findCaptionedFile(messageId);
+    if (file != null && file.component.hasTranscription()) file.showTranscript(text);
+  }
+
   public void toggleVoiceTranscript (long messageId) {
     CaptionedFile file = findCaptionedFile(messageId);
     if (file != null && file.component.isVoice()) file.toggleTranscript();
@@ -552,6 +586,9 @@ public class TGMessageFile extends TGMessage {
       file.component.performDestroy();
       file.component = newComponent;
       component = newComponent;
+      file.configureTranscription(message);
+      component.setTranscribing(file.waitingForTranscript);
+      component.setTranscriptExpanded(file.transcriptExpanded);
       component.buildLayout(getContentMaxWidth());
     }
 
@@ -691,7 +728,7 @@ public class TGMessageFile extends TGMessage {
         int right = startX + entry.item.component.getWidth();
         if (c.clipRect(startX, rowBottom, right, rowBottom + transcriptHeight)) {
           entry.item.transcriptText.draw(c, startX, right, 0, rowBottom + Screen.dp(TEXT_MARGIN), null,
-            entry.getVisibility() * entry.item.transcriptAnimator.getFactor() * alpha, null);
+            entry.getVisibility() * entry.item.transcriptFactor() * alpha, null);
         }
         c.restoreToCount(save);
       }
@@ -734,8 +771,8 @@ public class TGMessageFile extends TGMessage {
   @Override
   protected float getIntermediateBubbleExpandFactor () {
     CaptionedFile last = filesList.get(filesList.size() - 1);
-    if (last.captionWrapper == null && last.transcriptAnimator != null) {
-      return last.transcriptAnimator.getFactor();
+    if (last.captionWrapper == null && last.component.hasTranscription() && last.transcriptHeight > 0) {
+      return last.needBottomLineExpand.get() == 0f ? 1f - last.transcriptFactor() : 1f;
     }
     return last.needBottomLineExpand.get();
   }

@@ -13,8 +13,13 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.PixelCopy;
 import android.view.View;
 import android.view.ViewTreeObserver;
+import android.view.Window;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -105,11 +110,22 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     invalidateBackdrop();
   }
 
+  public void setWindowBackdrop (Window window) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      backdropWindow = window;
+      invalidateBackdrop();
+    }
+  }
+
   public static int surfaceColor (int colorId) {
     int color = Theme.getColor(colorId);
     return Theme.isDark() ? color : ColorUtils.fromToArgb(color, Theme.headerColor(), .18f);
   }
 
+  private Window backdropWindow;
+  private final Rect requestedWindowBounds = new Rect();
+  private boolean windowCapturePending;
+  private boolean windowCaptureFailed;
   private Canvas sampleCanvas;
   private Shader sheen;
   private int alpha = 255;
@@ -373,6 +389,10 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   }
 
   private boolean prepareBackdropContents () {
+    if (backdropWindow != null && !windowCaptureFailed && !released && enabled && !panel.isEmpty()) {
+      prepareWindowBackdrop();
+      return false;
+    }
     if (released || !enabled || panel.isEmpty() || (sourceView.getWidth() == 0 && (messages == null || messages.getWidth() == 0))) return false;
     boolean sameWindow = host.getWindowToken() == sourceView.getWindowToken();
     if (sameWindow) {
@@ -433,9 +453,67 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     }
     sampleCanvas.restoreToCount(sampleSave);
     if (backdropDimColor != 0) sampleCanvas.drawColor(backdropDimColor);
+    return blurCapture(capture, width, height);
+  }
+
+  // The dialog is its own window. Sample the exact rectangle behind it in the
+  // activity's surface, including overlays and any transformed message views.
+  private void prepareWindowBackdrop () {
+    if (windowCapturePending || host.getWindowToken() == null) return;
+    View decor = backdropWindow.getDecorView();
+    if (decor.getWindowToken() == null || decor.getWidth() == 0 || decor.getHeight() == 0) return;
+    decor.getLocationOnScreen(wallpaperPosition);
+    host.getLocationOnScreen(hostPosition);
+    int x = hostPosition[0] - wallpaperPosition[0], y = hostPosition[1] - wallpaperPosition[1];
+    Rect region = new Rect(getBounds());
+    region.inset(-Screen.dp(32), -Screen.dp(32));
+    region.offset(x, y);
+    if (!region.intersect(0, 0, decor.getWidth(), decor.getHeight())) return;
+    Rect local = new Rect(region);
+    local.offset(-x, -y);
+    // Position can change as the keyboard or a dialog's content changes size.
+    if (sample != null && region.equals(requestedWindowBounds) &&
+        sampleBounds.left == local.left && sampleBounds.top == local.top &&
+        sampleBounds.right == local.right && sampleBounds.bottom == local.bottom) return;
+    requestedWindowBounds.set(region);
+    windowCapturePending = true;
+    int step = Math.max(Screen.dp(6), Math.max(region.width(), region.height()) / 92);
+    int width = Math.max(1, (region.width() + step - 1) / step);
+    int height = Math.max(1, (region.height() + step - 1) / step);
+    Bitmap bitmap = Bitmap.createBitmap(width * 2, height * 2, Bitmap.Config.ARGB_8888);
+    try {
+      PixelCopy.request(backdropWindow, region, bitmap, result -> {
+        windowCapturePending = false;
+        if (released) {
+          bitmap.recycle();
+          return;
+        }
+        if (result == PixelCopy.SUCCESS) {
+          new Canvas(bitmap).drawColor(backdropDimColor);
+          sampleBounds.set(local);
+          if (sample == null || sample.getWidth() != width || sample.getHeight() != height) {
+            sample = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            frames.clear();
+          }
+          blurCapture(bitmap, width, height);
+          geometryDirty = false;
+        } else {
+          windowCaptureFailed = true;
+        }
+        bitmap.recycle();
+        invalidateBackdrop();
+      }, new Handler(Looper.getMainLooper()));
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      windowCapturePending = false;
+      windowCaptureFailed = true;
+      bitmap.recycle();
+    }
+  }
+
+  private boolean blurCapture (Bitmap bitmap, int width, int height) {
     if (pixels.length < width * height) pixels = new int[width * height];
     if (capturePixels.length < width * height * 4) capturePixels = new int[width * height * 4];
-    capture.getPixels(capturePixels, 0, width * 2, 0, 0, width * 2, height * 2);
+    bitmap.getPixels(capturePixels, 0, width * 2, 0, 0, width * 2, height * 2);
     GlassSampling.downsample2x(capturePixels, pixels, width, height);
     if (!frames.update(pixels, width, height, false)) return false;
     sample.setPixels(frames.pixels(), 0, width, 0, 0, width, height);

@@ -70,6 +70,14 @@ public class KeyboardFrameLayoutContent extends FrameLayout {
     this.additionalHeight = additionalHeight;
   }
 
+  int getKeyboardHeight (int width) {
+    int normalHeight = Keyboard.getSize();
+    if (width > 0 && textFormattingLayout.getVisibility() == View.VISIBLE && textFormattingLayout.hasGlassBackground()) {
+      return Math.min(normalHeight, textFormattingLayout.getGlassKeyboardHeight(width));
+    }
+    return normalHeight;
+  }
+
   @Override
   protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
     if (!BitwiseUtils.hasFlag(flags, FLAG_CUSTOM_HEIGHT)) {
@@ -79,7 +87,7 @@ public class KeyboardFrameLayoutContent extends FrameLayout {
 
     int height = additionalHeight;
     if (!BitwiseUtils.hasFlag(flags, FLAG_KEYBOARD_VISIBLE)) {
-      height += Keyboard.getSize();
+      height += getKeyboardHeight(MeasureSpec.getSize(widthMeasureSpec));
     }
 
     super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));

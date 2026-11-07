@@ -5,17 +5,17 @@
   <string name="FrogramTranscribe">Расшифровать</string>
   <string name="FrogramTranscribing">Распознаём речь…</string>
   <string name="FrogramTranscriptionEmpty">Речь не распознана.</string>
-  <string name="FrogramAi">AI</string>
+  <string name="FrogramAi">ИИ</string>
   <string name="FrogramAiStyling">Стилизация с ИИ</string>
-  <string name="FrogramAiDraftChanged">Черновик изменился. Откройте AI заново для текущего текста.</string>
+  <string name="FrogramAiDraftChanged">Черновик изменился. Откройте ИИ заново для текущего текста.</string>
   <string name="FrogramAiProofread">Исправить ошибки</string>
   <string name="FrogramAiOriginal">Исходный текст</string>
   <string name="FrogramAiResult">После правки</string>
   <string name="FrogramAiWorking">Готовим предпросмотр…</string>
   <string name="FrogramAiPreview">Предпросмотр изменений</string>
   <string name="FrogramAiApply">Применить</string>
-  <string name="FrogramAiQuota">Лимит Telegram AI исчерпан. У Premium лимит выше.</string>
-  <string name="FrogramAiFailed">Telegram AI недоступен. Попробуйте позже.</string>
+  <string name="FrogramAiQuota">Лимит ИИ Telegram исчерпан. У Premium лимит выше.</string>
+  <string name="FrogramAiFailed">ИИ Telegram недоступен. Попробуйте позже.</string>
   <string name="FrogramOfflineUnsupported">Для локального распознавания нужен Android 5 или новее.</string>
   <string name="FrogramOfflineDownload">Расшифровка в Telegram недоступна. Скачайте модель на 190 МБ для распознавания на телефоне.</string>
   <string name="FrogramOfflineDownloadButton">Скачать модель</string>
@@ -39,5 +39,14 @@
   <string name="FrogramCallSpeakerOn">Динамик</string>
   <string name="FrogramCallCreate">Начать аудиочат</string>
   <string name="FrogramCallCreateConfirm">Начать аудиочат в этой группе?</string>
-  <string name="FrogramAiSecret">Telegram AI недоступен в секретных чатах.</string>
+  <string name="FrogramAiSecret">ИИ Telegram недоступен в секретных чатах.</string>
+  <string name="FrogramAiStyleTribal">Племенной</string>
+  <string name="FrogramAiStyleBiblical">Библейский</string>
+  <string name="FrogramAiStyleFormal">Официальный</string>
+  <string name="FrogramAiStyleShort">Краткий</string>
+  <string name="FrogramAiStyleCorp">Корпоративный</string>
+  <string name="FrogramAiStyleViking">В стиле викингов</string>
+  <string name="FrogramCallCloseVolume">Закрыть регулировку громкости</string>
+  <string name="FrogramFormattingPasteLink">Вставьте ссылку…</string>
+  <string name="FrogramFormattingMultipleLinks">Несколько ссылок</string>
 </resources>

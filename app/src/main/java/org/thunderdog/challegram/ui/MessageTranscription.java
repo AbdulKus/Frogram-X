@@ -30,12 +30,29 @@ final class MessageTranscription {
   private final Map<Pair<Long, Long>, Request> requests = new HashMap<>();
   private final LruCache<Pair<Long, Long>, String> results = new LruCache<>(64);
 
+  private final LruCache<Pair<Long, Long>, Boolean> collapsed = new LruCache<>(64);
+
   MessageTranscription (MessagesController owner) { this.owner = owner; }
 
-  static boolean canTranscribe (TdApi.Message message) {
-    return message != null && message.chatId != 0 && message.id > 0 && message.sendingState == null &&
+  static boolean supportsTranscription (TdApi.Message message) {
+    return message != null && message.chatId != 0 &&
       !ChatId.isSecret(message.chatId) && message.selfDestructType == null &&
       (message.content instanceof TdApi.MessageVoiceNote || message.content instanceof TdApi.MessageVideoNote);
+  }
+
+  static boolean canTranscribe (TdApi.Message message) {
+    return supportsTranscription(message) && message.id > 0 && message.sendingState == null;
+  }
+
+  String openedVoiceTranscript (TdApi.Message message) {
+    Pair<Long, Long> key = Pair.create(message.chatId, message.id);
+    return collapsed.get(key) == null ? results.get(key) : null;
+  }
+
+  void setVoiceTranscriptExpanded (TdApi.Message message, boolean expanded) {
+    Pair<Long, Long> key = Pair.create(message.chatId, message.id);
+    if (expanded) collapsed.remove(key);
+    else collapsed.put(key, true);
   }
 
   void start (TdApi.Message message, Listener listener) {
@@ -47,6 +64,7 @@ final class MessageTranscription {
       text = ((TdApi.SpeechRecognitionResultText) cached).text;
     }
     if (text != null) {
+      results.put(key, text);
       listener.onWorking(false);
       if (!text.trim().isEmpty()) listener.onResult(text);
       else UI.showToast(R.string.FrogramTranscriptionEmpty, android.widget.Toast.LENGTH_SHORT);

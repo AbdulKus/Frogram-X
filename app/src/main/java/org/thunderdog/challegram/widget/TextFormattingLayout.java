@@ -76,6 +76,9 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   private static final int MAX_BUTTON_SIZE = 40;
   private static final int PADDING_HORIZONTAL = 15;
   private static final int PADDING_VERTICAL = 20;
+  private static final int GLASS_INSET = 7;
+  private static final int GLASS_PADDING = 16;
+  private static final int GLASS_ROW_GAP = 6;
 
   public static final int FLAG_BOLD = 1;
   public static final int FLAG_ITALIC = 1 << 1;
@@ -125,7 +128,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   private boolean ignoreSelectionChangesForTranslatedText;
   private String languageToTranslate;
   private Delegate delegate;
-  private boolean glassBackground;
+  private View glassSurface;
 
   public interface Delegate {
     void onWantsCloseTextFormattingKeyboard ();
@@ -183,18 +186,33 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
   }
 
   public void setGlassBackground (java.util.function.BiFunction<View, Integer, ChatGlassDrawable> glassFactory) {
-    if (glassBackground) return;
-    glassBackground = true;
+    if (hasGlassBackground()) return;
     setBackground(null);
-    View surface = new View(getContext());
-    surface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-    LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-    params.setMargins(Screen.dp(7), Screen.dp(7), Screen.dp(7), Screen.dp(5));
-    addView(surface, 0, params);
-    surface.setBackground(glassFactory.apply(surface, ColorId.filling));
+    setPadding(Screen.dp(GLASS_PADDING), Screen.dp(GLASS_PADDING), Screen.dp(GLASS_PADDING), 0);
+    glassSurface = new View(getContext());
+    glassSurface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, 0);
+    int inset = Screen.dp(GLASS_INSET);
+    // Layout padding is shared by all rows; extend just the backdrop around them.
+    int out = inset - Screen.dp(GLASS_PADDING);
+    params.setMargins(out, out, out, 0);
+    addView(glassSurface, 0, params);
+    glassSurface.setBackground(glassFactory.apply(glassSurface, ColorId.filling));
+    for (int a = 0; a < buttons.size(); a++) {
+      Button button = buttons.valueAt(a);
+      button.setGlassStyle(parent, button.getId() == R.id.btn_frogramAi);
+    }
+    linkInput.setGlassStyle(parent, false);
+    linkInput.textView.setHint(Lang.getString(R.string.FrogramFormattingPasteLink));
+    langSelector.setGlassStyle(parent, false);
+    updateLanguageLabel(languageToTranslate);
   }
 
-  boolean hasGlassBackground () { return glassBackground; }
+  boolean hasGlassBackground () { return glassSurface != null; }
+
+  int getGlassKeyboardHeight (int width) {
+    return Params.buttonSizeForWidth(width, GLASS_PADDING) * 4 + Screen.dp(GLASS_ROW_GAP) * 3 + Screen.dp(GLASS_PADDING) * 2;
+  }
 
   public void init (ViewController<?> parent, InputView inputView, Delegate delegate) {
     this.parent = parent;
@@ -263,7 +281,10 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
         button.setIsActive(existingSpans != null && existingSpans.length > 0, animated);
         linkButton.setIsMultiple(existingSpans != null && existingSpans.length > 1, animated);
         linkInput.textView.setText(linksCount == 1 ? existingSpans[0].getURL() : null);
-        linkInput.textView.setHint(linksCount > 1 ? R.string.MultipleUrlPlaceholder : R.string.PasteUrlPlaceholder);
+        int hint = linksCount > 1 ?
+          (hasGlassBackground() ? R.string.FrogramFormattingMultipleLinks : R.string.MultipleUrlPlaceholder) :
+          (hasGlassBackground() ? R.string.FrogramFormattingPasteLink : R.string.PasteUrlPlaceholder);
+        linkInput.textView.setHint(Lang.getString(hint));
         linkInput.textView.setTypeface(linksCount > 1 ? Fonts.getRobotoItalic() : Fonts.getRobotoRegular());
         continue;
       }
@@ -289,14 +310,29 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
 
   private void setLanguageToTranslate (String language) {
     Settings.instance().setDefaultLanguageForTranslateDraft(languageToTranslate = language);
-    langSelector.setText(Lang.getLanguageName(language, Lang.getString(R.string.TranslateLangUnknown)));
+    updateLanguageLabel(language);
+  }
+
+  private void updateLanguageLabel (String language) {
+    String name = Lang.getLanguageName(language, Lang.getString(R.string.TranslateLangUnknown));
+    if (hasGlassBackground() && language != null && !language.isEmpty()) {
+      String localized = Lang.obtainLocale(language).getDisplayLanguage(Lang.locale());
+      if (!localized.isEmpty() && !localized.equalsIgnoreCase(language)) {
+        name = localized.substring(0, 1).toUpperCase(Lang.locale()) + localized.substring(1);
+      }
+    }
+    langSelector.setText(name);
   }
 
   @Override
   protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
     final int width = MeasureSpec.getSize(widthMeasureSpec);
     final int height = MeasureSpec.getSize(heightMeasureSpec);
-    lp.init(width, height);
+    lp.init(width, height, hasGlassBackground());
+    if (hasGlassBackground()) {
+      glassSurface.getLayoutParams().height = lp.getTop(3) + lp.buttonSizePx +
+        (Screen.dp(GLASS_PADDING) - Screen.dp(GLASS_INSET)) * 2;
+    }
     lp.apply(langSelector, 0, 2, 6);
     lp.apply(linkInput, 0, 1, 6);
 
@@ -556,6 +592,8 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     private final BoolAnimator isEnabled;
     private boolean needDrawWithoutRepainting;
     protected Drawable drawable;
+    private boolean glassStyle;
+    private boolean primary;
 
     public Button (Context context) {
       super(context);
@@ -573,6 +611,25 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
       } else {
         RippleSupport.setTransparentSelector(this, 6f, themeProvider);
       }
+    }
+
+    void setGlassStyle (ViewController<?> themeProvider, boolean primary) {
+      this.glassStyle = true;
+      this.primary = primary;
+      setWillNotDraw(false);
+      RippleSupport.setTransparentSelector(this, 10f, themeProvider);
+    }
+
+    @Override
+    protected void onDraw (Canvas canvas) {
+      if (glassStyle && getId() != R.id.btn_pasteUrl) {
+        int accent = primary ? Theme.textLinkColor() : ColorUtils.fromToArgb(Theme.textAccentColor(), Theme.textLinkColor(), isActive.getFloatValue());
+        float radius = Screen.dp(10);
+        float opacity = primary ? .24f : MathUtils.fromTo(.10f, .24f, isActive.getFloatValue());
+        canvas.drawRoundRect(0, 0, getWidth(), getHeight(), radius, radius,
+          Paints.fillingPaint(ColorUtils.alphaColor(opacity, accent)));
+      }
+      super.onDraw(canvas);
     }
 
     public void setNeedDrawWithoutRepainting (boolean needDrawWithoutRepainting) {
@@ -604,7 +661,9 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
 
     protected void drawDrawable (Canvas canvas, float cx, float cy, float alpha) {
       if (drawable != null) {
-        int color = ColorUtils.fromToArgb(Theme.iconColor(), Theme.getColor(ColorId.iconActive), isActive.getFloatValue());
+        int color = glassStyle ?
+          ColorUtils.fromToArgb(Theme.textAccentColor(), Theme.textLinkColor(), primary ? 1f : isActive.getFloatValue()) :
+          ColorUtils.fromToArgb(Theme.iconColor(), Theme.getColor(ColorId.iconActive), isActive.getFloatValue());
         color = ColorUtils.alphaColor(alpha, color);
         Drawables.drawCentered(canvas, drawable, cx, cy, needDrawWithoutRepainting ? null : Paints.getPorterDuffPaint(color));
       }
@@ -696,7 +755,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     @Override
     protected void dispatchDraw (Canvas canvas) {
       super.dispatchDraw(canvas);
-      Drawables.draw(canvas, arrowDrawable, getMeasuredWidth() - Screen.dp(26), Screen.dp(10), Paints.getPorterDuffPaint(Theme.iconColor()));
+      Drawables.draw(canvas, arrowDrawable, getMeasuredWidth() - Screen.dp(26), (getHeight() - arrowDrawable.getIntrinsicHeight()) / 2f, Paints.getPorterDuffPaint(Theme.iconColor()));
     }
   }
 
@@ -731,13 +790,18 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     private float paddingHorizontal = 0f;
     private float paddingVertical = 0f;
 
-    public void init(int width, int height) {
-      final int sizeW = (width - Screen.dp(PADDING_HORIZONTAL * 2 + MIN_PADDING_BETWEEN_BUTTONS * 6)) / 7;
-      final int sizeH = (height - Screen.dp(PADDING_VERTICAL * 2 + MIN_PADDING_BETWEEN_BUTTONS * 3)) / 4;
+    static int buttonSizeForWidth (int width, int padding) {
+      return Math.max(1, Math.min(Screen.dp(MAX_BUTTON_SIZE),
+        (width - Screen.dp(padding) * 2 - Screen.dp(MIN_PADDING_BETWEEN_BUTTONS) * 6) / 7));
+    }
 
-      buttonSizePx = Math.min(Math.min(sizeW, sizeH), Screen.dp(MAX_BUTTON_SIZE));
-      paddingHorizontal = Math.max(Screen.dp(MIN_PADDING_BETWEEN_BUTTONS), (width - Screen.dp(PADDING_HORIZONTAL * 2) - 7 * buttonSizePx) / 6f);
-      paddingVertical = Screen.dp(12);
+    public void init (int width, int height, boolean glass) {
+      int side = glass ? GLASS_PADDING : PADDING_HORIZONTAL;
+      int top = glass ? GLASS_PADDING : PADDING_VERTICAL;
+      paddingVertical = Screen.dp(glass ? GLASS_ROW_GAP : 12);
+      int sizeH = (height - Screen.dp(top) * 2 - Math.round(paddingVertical) * 3) / 4;
+      buttonSizePx = Math.max(1, Math.min(buttonSizeForWidth(width, side), sizeH));
+      paddingHorizontal = Math.max(0, (width - Screen.dp(side) * 2 - 7 * buttonSizePx) / 6f);
     }
 
     public void apply(View v, int left, int top) {

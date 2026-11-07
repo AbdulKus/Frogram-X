@@ -12,6 +12,7 @@ import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.UI;
+import java.util.Locale;
 import java.util.function.Consumer;
 
 /** Telegram AI transformations are previewed; only Apply can modify the draft. */
@@ -42,7 +43,7 @@ final class AiEditorDialog {
       LinearLayout choices = new LinearLayout(controller.context());
       choices.setOrientation(LinearLayout.VERTICAL);
       for (TdApi.TextCompositionStyle style : styles) {
-        TextView choice = panel.button(style.title, Theme.textAccentColor(), false, () -> {
+        TextView choice = panel.button(styleTitle(style), Theme.textAccentColor(), false, () -> {
           panel.dismiss();
           preview(style.name);
         });
@@ -53,6 +54,19 @@ final class AiEditorDialog {
       panel.addScrollable(choices, 6, 280);
     }
     panel.show();
+  }
+
+  private static String styleTitle (TdApi.TextCompositionStyle style) {
+    if (style.isCustom) return style.title;
+    switch (style.title.trim().toLowerCase(Locale.ROOT)) {
+      case "tribal": return Lang.getString(R.string.FrogramAiStyleTribal);
+      case "biblical": return Lang.getString(R.string.FrogramAiStyleBiblical);
+      case "formal": return Lang.getString(R.string.FrogramAiStyleFormal);
+      case "short": return Lang.getString(R.string.FrogramAiStyleShort);
+      case "corp": return Lang.getString(R.string.FrogramAiStyleCorp);
+      case "viking": return Lang.getString(R.string.FrogramAiStyleViking);
+      default: return style.title;
+    }
   }
 
   private void preview (String style) {

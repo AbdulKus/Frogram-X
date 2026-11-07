@@ -96,7 +96,7 @@ public class KeyboardFrameLayout extends FrameLayoutFix implements ViewTreeObser
 
   @Override
   protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
-    super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(getKeyboardHeight(), MeasureSpec.EXACTLY));
+    super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(getKeyboardHeight(MeasureSpec.getSize(widthMeasureSpec)), MeasureSpec.EXACTLY));
   }
 
   private static final int STATE_NONE = 0;
@@ -184,7 +184,7 @@ public class KeyboardFrameLayout extends FrameLayoutFix implements ViewTreeObser
       this.extraBottomInsetWithoutIme = extraBottomInsetWithoutIme;
       ViewGroup.LayoutParams layoutParams = contentView.getLayoutParams();
       if (layoutParams.height != ViewGroup.LayoutParams.MATCH_PARENT) {
-        layoutParams.height = getKeyboardHeight();
+        layoutParams.height = getKeyboardHeight(getMeasuredWidth());
         contentView.setLayoutParams(layoutParams);
       }
       contentView.emojiLayout.setExtraBottomInset(extraBottomInset, extraBottomInsetWithoutIme);
@@ -192,15 +192,15 @@ public class KeyboardFrameLayout extends FrameLayoutFix implements ViewTreeObser
     }
   }
 
-  private int getKeyboardHeight () {
-    return Keyboard.getSize() + extraBottomInset;
+  private int getKeyboardHeight (int width) {
+    return contentView.getKeyboardHeight(width) + extraBottomInset;
   }
 
   private void addContentViewToParent () {
     removeContentView();
 
     if (parentViewForDetachedMode instanceof RelativeLayout) {
-      RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, getKeyboardHeight());
+      RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, getKeyboardHeight(getMeasuredWidth()));
       params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
       contentView.setLayoutParams(params);
     } else {

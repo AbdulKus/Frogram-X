@@ -16,6 +16,7 @@ FetchContent_Declare(frogram_whisper_source
   URL_HASH SHA256=ec8e33f4c838ed459ad0a23da255c0262f150a6f54839a17e504ddf1495305d5
 )
 FetchContent_MakeAvailable(frogram_whisper_source)
+include(reuse_language_encoder.cmake)
 add_library(frogram_whisper SHARED whisper_jni.cpp)
 target_compile_features(frogram_whisper PRIVATE cxx_std_17)
 target_link_libraries(frogram_whisper PRIVATE whisper android log)
