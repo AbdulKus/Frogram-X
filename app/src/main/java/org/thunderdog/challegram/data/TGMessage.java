@@ -3915,10 +3915,6 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     return getActualRightContentEdge() - timePartWidth;
   }
 
-  protected static int getBubbleTimeBaseline () {
-    return Screen.dp(15.5f);
-  }
-
   protected int getBubbleTimePartOffsetY () {
     return Screen.dp(8f);
   }
@@ -4070,7 +4066,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     }
 
     if (time != null) {
-      c.drawText(time, startX, startY + getBubbleTimeBaseline(), Paints.colorPaint(mTimeBubble(), textColor));
+      c.drawText(time, startX, startY + Screen.dp(15.5f), Paints.colorPaint(mTimeBubble(), textColor));
       startX += pTimeWidth;
     }
 
@@ -6190,7 +6186,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     return useForward() ? xBubblePadding + xBubblePaddingSmall : getBubbleContentPadding();
   }
 
-  protected final int getBubblePaddingBottom () {
+  private int getBubblePaddingBottom () {
     if (useForward()) {
       return xBubblePadding + xBubblePaddingSmall;
     }

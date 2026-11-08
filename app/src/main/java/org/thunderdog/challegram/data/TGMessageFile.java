@@ -825,19 +825,6 @@ public class TGMessageFile extends TGMessage {
   }
 
   @Override
-  protected int getBubbleTimePartOffsetY () {
-    int offset = super.getBubbleTimePartOffsetY();
-    CaptionedFile last = filesList.get(filesList.size() - 1);
-    if (usesVoiceDurationRow(last) && !needExpandBubble(last.component.getLastLineWidth(),
-        computeBubbleTimePartWidth(true), getRealContentMaxWidth())) {
-      int normalBaseline = last.component.getHeight() + getBubblePaddingBottom() -
-        getBubbleTimePartHeight() - offset + getBubbleTimeBaseline();
-      offset += Math.round((normalBaseline - last.component.getVoiceDurationBaseline()) * (1f - last.transcriptFactor()));
-    }
-    return offset;
-  }
-
-  @Override
   protected int getBottomLineContentWidth () {
     return BOTTOM_LINE_DEFINE_BY_FACTOR;
   }

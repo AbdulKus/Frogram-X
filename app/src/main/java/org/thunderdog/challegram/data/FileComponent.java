@@ -406,7 +406,6 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     if (voice != null) {
       style = context.useBubbles() ? TGMessage.getTimeTextStyleProvider() : Paints.robotoStyleProvider(TGMessage.PLAIN_TIME_TEXT_SIZE);
       Paint.FontMetricsInt metrics = style.getTextPaint().getFontMetricsInt();
-      voiceDurationAscent = -metrics.ascent;
       voiceDurationHeight = metrics.descent - metrics.ascent + metrics.leading;
     }
     trimmedSubtitle = !StringUtils.isEmpty(subtitle) ? new Text.Builder(subtitle, maxWidth, style, context.getDecentColorSet()).singleLine().highlight(context.getHighlightedText(Highlight.Pool.KEY_FILE_SUBTITLE, subtitle)).build() : null;
@@ -495,7 +494,6 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   private int lastMaxWidth;
   private static final float TRANSCRIPT_BUTTON_HALF_SIZE = 12f;
   private static final float VOICE_ROW_GAP = 2f;
-  private int voiceDurationAscent;
   private int voiceDurationHeight;
 
   private Runnable transcriptionAction;
@@ -909,10 +907,6 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     return hasTranscription()
       ? getVoiceWaveCenterY() + Screen.dp(TRANSCRIPT_BUTTON_HALF_SIZE) + Screen.dp(VOICE_ROW_GAP)
       : (getPreviewSize() - voiceDurationHeight) / 2;
-  }
-
-  int getVoiceDurationBaseline () {
-    return getVoiceDurationTop() + voiceDurationAscent;
   }
 
   public int getLastLineWidth () {
