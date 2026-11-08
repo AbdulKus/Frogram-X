@@ -1338,12 +1338,19 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     return useBubbles() ? bottomContentEdge + TGInlineKeyboard.getButtonSpacing() : pContentY + getContentHeight() + getPaddingBottom() + (hasFooter() ? getFooterHeight() + getFooterPaddingTop() + getFooterPaddingBottom() : 0);
   }
 
+  protected boolean keepTopOnHeightChange () {
+    return false;
+  }
+
   protected boolean rebuildContentDimensions () {
     if ((flags & FLAG_LAYOUT_BUILT) != 0) {
       updateContentPositions(true);
       buildBubble(false);
       int oldHeight = height;
       height = computeHeight();
+      if (oldHeight != height && keepTopOnHeightChange()) {
+        manager.onMessageHeightChanged(getChatId(), getId(), oldHeight, height, true);
+      }
       return oldHeight != height;
     } else {
       return rebuildContent();
@@ -1358,7 +1365,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
       int oldHeight = height;
       height = computeHeight();
       if (oldHeight != height) {
-        manager.onMessageHeightChanged(getChatId(), getId(), oldHeight, height);
+        manager.onMessageHeightChanged(getChatId(), getId(), oldHeight, height, keepTopOnHeightChange());
       }
       return oldHeight != height;
     } else {
@@ -3074,7 +3081,9 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     int currentWidth = this.width;
 
     if ((flags & FLAG_HEADER_ENABLED) != 0 || useBubbles()) {
-      layoutAvatar();
+      if (chat == null) {
+        chat = tdlib.chat(msg.chatId);
+      }
       layoutInfo();
     }
 
@@ -3198,20 +3207,6 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
 
   public final boolean isMessageThread () {
     return messagesController().getMessageThread() != null;
-  }
-
-  private boolean hasAvatar;
-
-  private void layoutAvatar () {
-    if (useBubbles() && !needAvatar()) {
-      hasAvatar = false;
-      return;
-    }
-    if (this.chat == null) {
-      this.chat = tdlib.chat(msg.chatId);
-    }
-    hasAvatar = true;
-    // FIXME: better logic behind this method
   }
 
   protected static final float LETTERS_SIZE = 16f;
@@ -3894,7 +3889,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     if (height != oldHeight) {
       // FIXME?
       if (hasAnyTargetToInvalidate()) {
-        manager.onMessageHeightChanged(getChatId(), getId(), oldHeight, height);
+        manager.onMessageHeightChanged(getChatId(), getId(), oldHeight, height, keepTopOnHeightChange());
       }
       requestLayout();
     }
@@ -3918,6 +3913,10 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
 
   protected int getAbsolutelyRealRightContentEdge (View view, int timePartWidth) {
     return getActualRightContentEdge() - timePartWidth;
+  }
+
+  protected static int getBubbleTimeBaseline () {
+    return Screen.dp(15.5f);
   }
 
   protected int getBubbleTimePartOffsetY () {
@@ -4071,7 +4070,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     }
 
     if (time != null) {
-      c.drawText(time, startX, startY + Screen.dp(15.5f), Paints.colorPaint(mTimeBubble(), textColor));
+      c.drawText(time, startX, startY + getBubbleTimeBaseline(), Paints.colorPaint(mTimeBubble(), textColor));
       startX += pTimeWidth;
     }
 
@@ -4233,7 +4232,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
   }
 
   public final void requestAvatar (AvatarReceiver receiver, boolean force) {
-    if (hasAvatar || force) {
+    if (force || (hasHeader() && needAvatar())) {
       if (isSponsoredMessage()) {
         if (sponsoredMessage.sponsor.photo != null) {
           receiver.requestSpecific(tdlib, TD.toChatPhotoInfo(sponsoredMessage.sponsor.photo), AvatarReceiver.Options.NONE);
@@ -6191,7 +6190,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     return useForward() ? xBubblePadding + xBubblePaddingSmall : getBubbleContentPadding();
   }
 
-  private int getBubblePaddingBottom () {
+  protected final int getBubblePaddingBottom () {
     if (useForward()) {
       return xBubblePadding + xBubblePaddingSmall;
     }

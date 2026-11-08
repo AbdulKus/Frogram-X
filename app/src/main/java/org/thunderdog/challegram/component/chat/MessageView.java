@@ -272,6 +272,7 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   private void checkLegacyComponents (MessageView view) {
     if (msg != null) {
       msg.layoutAvatar(view, avatarReceiver);
+      msg.requestAvatar(avatarReceiver);
       msg.requestReply(replyReceiver, replyTextMediaReceiver);
     }
   }

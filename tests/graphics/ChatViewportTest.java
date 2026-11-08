@@ -46,6 +46,15 @@ public final class ChatViewportTest {
     equal(100, ChatViewport.messageOffset(280, 80, 0, false), "same pending jump after IME measurement");
     equal(-220, ChatViewport.messageOffset(280, 500, 0, false), "tall message shows its top above IME");
     equal(200, ChatViewport.messageOffset(280, 80, 0, true), "unread boundary below glass header");
+    // A reverse-layout voice message grows past the viewport without moving its top.
+    int viewportBottom = 680, voiceTop = 566, decoration = 6, collapsedHeight = 108;
+    int laidOutHeight = collapsedHeight;
+    for (int newHeight : new int[] {112, 157, 420, 801, 1435, 1238, 430, collapsedHeight}) {
+      int decoratedBottom = voiceTop + laidOutHeight + decoration;
+      int resizeOffset = ChatViewport.reverseResizeOffset(viewportBottom, decoratedBottom, laidOutHeight, newHeight);
+      equal(voiceTop, viewportBottom - resizeOffset - newHeight - decoration, "voice transcript keeps its top");
+      laidOutHeight = newHeight;
+    }
     System.out.println("Chat viewport regression tests passed");
   }
 }

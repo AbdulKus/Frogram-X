@@ -15,6 +15,7 @@
 package org.thunderdog.challegram.component.chat;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -71,6 +72,7 @@ import org.thunderdog.challegram.ui.MessagesController;
 import org.thunderdog.challegram.ui.SettingHolder;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.util.CancellableResultHandler;
+import org.thunderdog.challegram.util.ChatViewport;
 import org.thunderdog.challegram.util.ScrollJumpCompensator;
 import org.thunderdog.challegram.v.MessagesRecyclerView;
 
@@ -1884,7 +1886,15 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     }
   }
 
-  public void onMessageHeightChanged (final long chatId, final long messageId, final int oldHeight, final int newHeight) {
+  public void onMessageHeightChanged (long chatId, long messageId, int oldHeight, int newHeight) {
+    onMessageHeightChanged(chatId, messageId, oldHeight, newHeight, false);
+  }
+
+  public void onMessageHeightChanged (final long chatId, final long messageId, final int oldHeight, final int newHeight, boolean keepTop) {
+    if (keepTop) {
+      anchorResizedMessage(chatId, messageId, newHeight);
+      return;
+    }
     final long playingRoundVideoId = TdlibManager.instance().player().getMessageId();
     final boolean isPlayingRoundVideo = playingRoundVideoId == messageId;
     if (isPlayingRoundVideo) {
@@ -1937,6 +1947,32 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
         }
       }
     }
+  }
+
+  private final Rect resizeAnchorBounds = new Rect();
+
+  private void anchorResizedMessage (long chatId, long messageId, int newHeight) {
+    RecyclerView recycler = controller.getMessagesView();
+    if (recycler == null || manager == null || recycler.isComputingLayout() ||
+        recycler.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
+      return;
+    }
+    View view = findMessageView(chatId, messageId);
+    if (view == null || view.getBottom() <= recycler.getPaddingTop() ||
+        view.getTop() >= recycler.getHeight() - recycler.getPaddingBottom()) {
+      return;
+    }
+    int position = recycler.getChildAdapterPosition(view);
+    if (position == RecyclerView.NO_POSITION) {
+      return;
+    }
+    manager.getDecoratedBoundsWithMargins(view, resizeAnchorBounds);
+    // This chat uses reverse layout, so the offset refers to the bottom edge.
+    int offset = manager.getReverseLayout()
+      ? ChatViewport.reverseResizeOffset(recycler.getHeight() - recycler.getPaddingBottom(),
+          resizeAnchorBounds.bottom, view.getHeight(), newHeight)
+      : resizeAnchorBounds.top - recycler.getPaddingTop();
+    scrollToPositionWithOffsetImpl(position, offset);
   }
 
   private void scrollCompensation (View view, int offset) {
@@ -3037,7 +3073,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
 
   public int getTargetHeight () {
     int top = controller.hasFloatingHeader() ? manager.getPaddingTop() : controller.getTopOffset();
-    return org.thunderdog.challegram.util.ChatViewport.height(getRecyclerHeight(), top, 0);
+    return ChatViewport.height(getRecyclerHeight(), top, 0);
   }
 
   public int getRecyclerWidth () {
@@ -3091,7 +3127,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       i++;
     }
 
-    return org.thunderdog.challegram.util.ChatViewport.scrollBy(totalScrollBottom, desiredScrollBottom, contentHeight, getTargetHeight());
+    return ChatViewport.scrollBy(totalScrollBottom, desiredScrollBottom, contentHeight, getTargetHeight());
   }
 
   private void scrollToPositionWithOffset (final int index, final int offset, boolean smooth) {
@@ -3199,7 +3235,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
 
     final int targetMessageHeight = fullHeight;
     final boolean unread = highlightMode == HIGHLIGHT_MODE_UNREAD || highlightMode == HIGHLIGHT_MODE_UNREAD_NEXT;
-    scrollToViewportOffset(index, () -> org.thunderdog.challegram.util.ChatViewport.messageOffset(getTargetHeight(), targetMessageHeight, scrollMessage.findTopEdge(), unread), smooth, isPlayingRoundMessage);
+    scrollToViewportOffset(index, () -> ChatViewport.messageOffset(getTargetHeight(), targetMessageHeight, scrollMessage.findTopEdge(), unread), smooth, isPlayingRoundMessage);
     if (unread || fullHeight + scrollMessage.findTopEdge() >= height) {
       wasScrollByUser = false;
     }

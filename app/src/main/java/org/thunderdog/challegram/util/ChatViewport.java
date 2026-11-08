@@ -19,6 +19,10 @@ public final class ChatViewport {
     return (int) (current - Math.max(0, Math.min(maximum, desired)));
   }
 
+  public static int reverseResizeOffset (int viewportBottom, int decoratedBottom, int measuredHeight, int newHeight) {
+    return viewportBottom - decoratedBottom - (newHeight - measuredHeight);
+  }
+
   public static int messageOffset (int viewportHeight, int messageHeight, int topEdge, boolean unread) {
     return unread || messageHeight + topEdge >= viewportHeight ? viewportHeight - messageHeight :
       viewportHeight / 2 - messageHeight / 2 + topEdge;

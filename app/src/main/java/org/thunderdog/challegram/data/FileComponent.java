@@ -780,7 +780,7 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     if (hasTranscription()) {
       int playSize = Screen.dp(42);
       int playX = startX + (previewSize - playSize) / 2;
-      int playY = startY + Screen.dp(2);
+      int playY = startY + (previewSize - playSize) / 2;
       progress.setBounds(playX, playY, playX + playSize, playY + playSize);
     } else {
       progress.setBounds(startX, startY, startX + previewSize, startY + previewSize);
@@ -824,7 +824,7 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
       waveform.draw(c, seek, waveformLeft, cy, isPlaying && TD.isSelfDestructTypeImmediately(message));
       boolean align = context.isOutgoingBubble();
       int textX = hasTranscription() ? waveformLeft : waveformLeft + waveform.getWidth() + Screen.dp(12);
-      int textY = startY + Screen.dp(hasTranscription() ? 29 : 18);
+      int textY = startY + (hasTranscription() ? getVoiceDurationTop() : Screen.dp(18));
       if (unreadFactor != 0f) {
         float x = textX + getSubtitleWidth() + Screen.dp(6);
         float y = textY + Screen.dp(7);
@@ -881,9 +881,22 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     return false;
   }
 
+  private static int getVoiceDurationTop () {
+    return Screen.dp(29);
+  }
+
+  int getVoiceDurationBaseline () {
+    return getVoiceDurationTop() - Paints.getSubtitleStyleProvider().getTextPaint().getFontMetricsInt().ascent;
+  }
+
   public int getLastLineWidth () {
-    return waveform != null ? (hasTranscription() ? TGMessage.BOTTOM_LINE_EXPAND_HEIGHT : TGMessage.BOTTOM_LINE_KEEP_WIDTH) :
-      (int) sizeWidth + getPreviewSize() + getPreviewOffset();
+    if (hasTranscription() && waveform != null) {
+      if (Config.MOVE_BUBBLE_TIME_RTL_TO_LEFT && Lang.rtl()) {
+        return TGMessage.BOTTOM_LINE_EXPAND_HEIGHT;
+      }
+      return getPreviewSize() + getPreviewOffset() + (int) Math.ceil(sizeWidth) + Screen.dp(12);
+    }
+    return waveform != null ? TGMessage.BOTTOM_LINE_KEEP_WIDTH : (int) sizeWidth + getPreviewSize() + getPreviewOffset();
   }
 
   public void open () {

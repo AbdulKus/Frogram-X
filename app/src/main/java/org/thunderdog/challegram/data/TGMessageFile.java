@@ -197,8 +197,13 @@ public class TGMessageFile extends TGMessage {
       int height = measureTranscriptHeight();
       if (transcriptHeight != height) {
         transcriptHeight = height;
-        files.measure(false);
-        updateFileDimensions();
+        resizingTranscript = true;
+        try {
+          files.measure(false);
+          updateFileDimensions();
+        } finally {
+          resizingTranscript = false;
+        }
       }
     }
 
@@ -289,9 +294,15 @@ public class TGMessageFile extends TGMessage {
         return captionWrapper.getLastLineWidth();
       } else {
         if (getTranscriptHeight() == 0) return component.getLastLineWidth();
-        if (transcriptText.getLastLineIsRtl() != Lang.rtl()) return BOTTOM_LINE_EXPAND_HEIGHT;
-        return transcriptText.getLastLineWidth();
+        return getTranscriptLastLineWidth();
       }
+    }
+
+    private int getTranscriptLastLineWidth () {
+      if (transcriptText == null || transcriptText.getLastLineIsRtl() != Lang.rtl()) {
+        return BOTTOM_LINE_EXPAND_HEIGHT;
+      }
+      return transcriptText.getLastLineWidth();
     }
 
     private boolean needExpandHeight () {
@@ -350,6 +361,13 @@ public class TGMessageFile extends TGMessage {
   private final List<CaptionedFile> filesList = new ArrayList<>();
   private final ListAnimator<CaptionedFile> files = new ListAnimator<>(animator -> updateFileDimensions(),
     AnimatorUtils.DECELERATE_INTERPOLATOR, 200L);
+
+  private boolean resizingTranscript;
+
+  @Override
+  protected boolean keepTopOnHeightChange () {
+    return resizingTranscript;
+  }
 
   private void updateFileDimensions () {
     if (rebuildContentDimensions()) {
@@ -776,18 +794,47 @@ public class TGMessageFile extends TGMessage {
     }
   }
 
+  private boolean usesVoiceDurationRow (CaptionedFile file) {
+    return file.captionWrapper == null && file.component.hasTranscription() && !useForward() && !hasFooter() &&
+      (!useReactionBubbles() || messageReactions.getVisibility() == 0f);
+  }
+
   @Override
   protected float getIntermediateBubbleExpandFactor () {
     CaptionedFile last = filesList.get(filesList.size() - 1);
-    if (last.captionWrapper == null && last.component.hasTranscription() && last.transcriptHeight > 0) {
-      return last.needBottomLineExpand.get() == 0f ? 1f - last.transcriptFactor() : 1f;
+    if (usesVoiceDurationRow(last)) {
+      int timeWidth = computeBubbleTimePartWidth(true);
+      int maxWidth = getRealContentMaxWidth();
+      boolean separateCollapsed = needExpandBubble(last.component.getLastLineWidth(), timeWidth, maxWidth);
+      boolean separateExpanded = needExpandBubble(last.getTranscriptLastLineWidth(), timeWidth, maxWidth);
+      return MathUtils.fromTo(separateCollapsed ? 1f : 0f, separateExpanded ? 1f : 0f, last.transcriptFactor());
     }
     return last.needBottomLineExpand.get();
   }
 
   @Override
   protected int getAnimatedBottomLineWidth (int bubbleTimePartWidth) {
-    return Math.round(filesList.get(filesList.size() - 1).lastLineWidth.get());
+    CaptionedFile last = filesList.get(filesList.size() - 1);
+    if (usesVoiceDurationRow(last)) {
+      int available = Math.max(0, getRealContentMaxWidth() - bubbleTimePartWidth);
+      int duration = MathUtils.clamp(last.component.getLastLineWidth(), 0, available);
+      int transcript = MathUtils.clamp(last.getTranscriptLastLineWidth(), 0, available);
+      return MathUtils.fromTo(duration, transcript, last.transcriptFactor());
+    }
+    return Math.round(last.lastLineWidth.get());
+  }
+
+  @Override
+  protected int getBubbleTimePartOffsetY () {
+    int offset = super.getBubbleTimePartOffsetY();
+    CaptionedFile last = filesList.get(filesList.size() - 1);
+    if (usesVoiceDurationRow(last) && !needExpandBubble(last.component.getLastLineWidth(),
+        computeBubbleTimePartWidth(true), getRealContentMaxWidth())) {
+      int normalBaseline = last.component.getHeight() + getBubblePaddingBottom() -
+        getBubbleTimePartHeight() - offset + getBubbleTimeBaseline();
+      offset += Math.round((normalBaseline - last.component.getVoiceDurationBaseline()) * (1f - last.transcriptFactor()));
+    }
+    return offset;
   }
 
   @Override
