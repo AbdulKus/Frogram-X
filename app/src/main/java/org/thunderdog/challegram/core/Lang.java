@@ -1220,7 +1220,7 @@ public class Lang {
       case TdApi.MessageInvoice.CONSTRUCTOR:
       case TdApi.MessageGiftedPremium.CONSTRUCTOR:
       case TdApi.MessageGiftedStars.CONSTRUCTOR:
-      case TdApi.MessageGiftedTon.CONSTRUCTOR:
+      case TdApi.MessageGiftedGrams.CONSTRUCTOR:
       case TdApi.MessageGift.CONSTRUCTOR:
       case TdApi.MessageUpgradedGift.CONSTRUCTOR:
       case TdApi.MessageUpgradedGiftPurchaseOffer.CONSTRUCTOR:
@@ -1249,6 +1249,9 @@ public class Lang {
       case TdApi.MessageContactRegistered.CONSTRUCTOR:
       case TdApi.MessageCustomServiceAction.CONSTRUCTOR:
       case TdApi.MessageSupergroupChatCreate.CONSTRUCTOR:
+      case TdApi.MessageChatJoinFromCommunity.CONSTRUCTOR:
+      case TdApi.MessageTonConnectRequest.CONSTRUCTOR:
+      case TdApi.MessageTonWalletTransfer.CONSTRUCTOR:
       case TdApi.MessageUnsupported.CONSTRUCTOR:
       case TdApi.MessagePassportDataReceived.CONSTRUCTOR:
       case TdApi.MessagePassportDataSent.CONSTRUCTOR:
@@ -1297,7 +1300,7 @@ public class Lang {
       case TdApi.MessageChatRemovedFromCommunity.CONSTRUCTOR:
         break;
       default:
-        Td.assertMessageContent_a80283cf();
+        Td.assertMessageContent_f7758f8b();
         throw Td.unsupported(message.content);
     }
     if (format == null) {

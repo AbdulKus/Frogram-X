@@ -25,6 +25,7 @@ SDK_PACKAGE=$(read-property.sh version.properties version.sdk_package)
 CMAKE_VERSION=$(read-property.sh version.properties version.cmake)
 ANDROID_NDK_VERSION_PRIMARY=$(read-property.sh version.properties version.ndk_primary)
 ANDROID_NDK_VERSION_LEGACY=$(read-property.sh version.properties version.ndk_legacy)
+ANDROID_NDK_VERSION_TDLIB=$(read-property.sh version.properties version.ndk_tdlib)
 
 yes | "$ANDROID_SDK_ROOT"/cmdline-tools/latest/bin/sdkmanager --licenses
 yes | "$ANDROID_SDK_ROOT"/cmdline-tools/latest/bin/sdkmanager --update
@@ -33,6 +34,7 @@ yes | "$ANDROID_SDK_ROOT"/cmdline-tools/latest/bin/sdkmanager --install \
   "build-tools;$BUILD_TOOLS_VERSION" \
   "ndk;$ANDROID_NDK_VERSION_PRIMARY" \
   "ndk;$ANDROID_NDK_VERSION_LEGACY" \
+  "ndk;$ANDROID_NDK_VERSION_TDLIB" \
   "cmake;$CMAKE_VERSION"
 
 test -d "$ANDROID_SDK_ROOT" || (echo "ANDROID_SDK_ROOT ($ANDROID_SDK_ROOT) not found!" && exit 1)

@@ -690,10 +690,11 @@ public class TGInlineKeyboard {
             break;
           }
           case TdApi.InlineKeyboardButtonTypeCopyText.CONSTRUCTOR:
+          case TdApi.InlineKeyboardButtonTypeDisabled.CONSTRUCTOR:
           case TdApi.InlineKeyboardButtonTypeWebApp.CONSTRUCTOR:
             break;
           default: {
-            Td.assertInlineKeyboardButtonType_4c981aa8();
+            Td.assertInlineKeyboardButtonType_3a46e70a();
             throw Td.unsupported(type);
           }
         }
@@ -870,10 +871,11 @@ public class TGInlineKeyboard {
               case TdApi.InlineKeyboardButtonTypeCopyText.CONSTRUCTOR:
               case TdApi.InlineKeyboardButtonTypeSwitchInline.CONSTRUCTOR:
               case TdApi.InlineKeyboardButtonTypeUser.CONSTRUCTOR:
+              case TdApi.InlineKeyboardButtonTypeDisabled.CONSTRUCTOR:
               case TdApi.InlineKeyboardButtonTypeWebApp.CONSTRUCTOR:
                 break;
               default: {
-                Td.assertInlineKeyboardButtonType_4c981aa8();
+                Td.assertInlineKeyboardButtonType_3a46e70a();
                 throw Td.unsupported(type);
               }
             }
@@ -1118,6 +1120,9 @@ public class TGInlineKeyboard {
       }
 
       switch (type.getConstructor()) {
+        case TdApi.InlineKeyboardButtonTypeDisabled.CONSTRUCTOR:
+          return;
+
         case TdApi.InlineKeyboardButtonTypeBuy.CONSTRUCTOR:
         case TdApi.InlineKeyboardButtonTypeCopyText.CONSTRUCTOR:
           // TODO
@@ -1272,7 +1277,7 @@ public class TGInlineKeyboard {
           break;
         }
         default: {
-          Td.assertInlineKeyboardButtonType_4c981aa8();
+          Td.assertInlineKeyboardButtonType_3a46e70a();
           throw Td.unsupported(type);
         }
       }

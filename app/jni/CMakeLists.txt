@@ -109,28 +109,39 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${ADD_LINKER_FLAGS}"
 
 # tdjni
 
+set(TDLIB_OPENSSL_DIR "${TDLIB_DIR}/openssl/${TDLIB_BINARY_VARIANT}/${ANDROID_ABI}")
+
 add_library(crypto SHARED IMPORTED)
 set_target_properties(crypto PROPERTIES IMPORTED_LOCATION
-  ${TDLIB_DIR}/openssl/${ANDROID_ABI}/lib/libcryptox.so
+  ${TDLIB_OPENSSL_DIR}/lib/libcryptox.so
 )
 add_library(ssl SHARED IMPORTED)
 set_target_properties(ssl PROPERTIES IMPORTED_LOCATION
-  ${TDLIB_DIR}/openssl/${ANDROID_ABI}/lib/libsslx.so
+  ${TDLIB_OPENSSL_DIR}/lib/libsslx.so
 )
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.11.0")
   target_include_directories(crypto INTERFACE
-    ${TDLIB_DIR}/openssl/${ANDROID_ABI}/include
+    ${TDLIB_OPENSSL_DIR}/include
   )
   target_include_directories(ssl INTERFACE
-    ${TDLIB_DIR}/openssl/${ANDROID_ABI}/include
+    ${TDLIB_OPENSSL_DIR}/include
   )
 endif()
 
 add_library(tdjni SHARED IMPORTED)
 set_target_properties(tdjni PROPERTIES IMPORTED_LOCATION
-  ${TDLIB_DIR}/src/main/libs/${ANDROID_ABI}/libtdjni.so
+  ${TDLIB_DIR}/src/main/libs/${TDLIB_BINARY_VARIANT}/${ANDROID_ABI}/libtdjni.so
 )
-target_link_libraries(tdjni INTERFACE crypto ssl)
+# Bundle the runtime used by this TDLib binary independently of the app's NDK.
+string(REGEX REPLACE "/.*" "" TDLIB_NDK_VERSION "${TDLIB_BINARY_VARIANT}")
+set(TDLIB_TRIPLE_armeabi-v7a arm-linux-androideabi)
+set(TDLIB_TRIPLE_arm64-v8a aarch64-linux-android)
+set(TDLIB_TRIPLE_x86 i686-linux-android)
+set(TDLIB_TRIPLE_x86_64 x86_64-linux-android)
+set(TDLIB_CXX_RUNTIME "${ANDROID_NDK}/../${TDLIB_NDK_VERSION}/toolchains/llvm/prebuilt/${ANDROID_HOST_TAG}/sysroot/usr/lib/${TDLIB_TRIPLE_${ANDROID_ABI}}/libc++_shared.so")
+add_library(tdcxx SHARED IMPORTED)
+set_target_properties(tdcxx PROPERTIES IMPORTED_LOCATION "${TDLIB_CXX_RUNTIME}")
+target_link_libraries(tdjni INTERFACE crypto ssl tdcxx)
 
 # opus
 include("${PROJECT_SOURCE_DIR}/BuildOpus.cmake")

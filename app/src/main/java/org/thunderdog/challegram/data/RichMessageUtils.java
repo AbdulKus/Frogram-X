@@ -19,36 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class RichMessageUtils {
-  private static final int MESSAGE_PREVIEW_LENGTH = 700;
   private static final int CHAT_LIST_PREVIEW_LENGTH = 180;
-  private static final int MAX_PREVIEW_BLOCKS = 3;
 
   private RichMessageUtils () { }
-
-  public static TdApi.FormattedText buildMessagePreview (@Nullable TdApi.RichMessage richMessage) {
-    List<BlockText> blocks = collect(richMessage, MESSAGE_PREVIEW_LENGTH, MAX_PREVIEW_BLOCKS);
-    StringBuilder text = new StringBuilder();
-    List<TdApi.TextEntity> entities = new ArrayList<>();
-    for (BlockText block : blocks) {
-      if (text.length() > 0) {
-        text.append("\n\n");
-      }
-      int start = text.length();
-      text.append(block.text);
-      if (block.heading && block.text.length() > 0) {
-        entities.add(new TdApi.TextEntity(start, block.text.length(), new TdApi.TextEntityTypeBold()));
-      }
-    }
-    if (text.length() == 0) {
-      text.append(Lang.getString(R.string.RichMessage));
-    }
-    text.append("\n\n");
-    int actionStart = text.length();
-    String action = Lang.getString(R.string.OpenRichMessage);
-    text.append(action);
-    entities.add(new TdApi.TextEntity(actionStart, action.length(), new TdApi.TextEntityTypeBold()));
-    return new TdApi.FormattedText(text.toString(), entities.toArray(new TdApi.TextEntity[0]));
-  }
 
   public static String buildChatListPreview (@Nullable TdApi.RichMessage richMessage) {
     List<BlockText> blocks = collect(richMessage, CHAT_LIST_PREVIEW_LENGTH, 2);

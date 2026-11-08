@@ -154,6 +154,7 @@ public class EditRightsController extends EditBaseController<EditRightsControlle
                 true,
                 true,
                 true,
+                true,
                 creator.isAnonymous
               )
             );
@@ -205,6 +206,7 @@ public class EditRightsController extends EditBaseController<EditRightsControlle
         true,
         true,
         true,
+        false,
         false
       );
     }

@@ -451,7 +451,7 @@ public final class TGMessageService extends TGMessageServiceImpl {
             case TdApi.MessageGameScore.CONSTRUCTOR:
             case TdApi.MessageGiftedPremium.CONSTRUCTOR:
             case TdApi.MessageGiftedStars.CONSTRUCTOR:
-            case TdApi.MessageGiftedTon.CONSTRUCTOR:
+            case TdApi.MessageGiftedGrams.CONSTRUCTOR:
             case TdApi.MessagePremiumGiftCode.CONSTRUCTOR:
             case TdApi.MessageGiveawayCreated.CONSTRUCTOR:
             case TdApi.MessageGiveawayCompleted.CONSTRUCTOR:
@@ -469,6 +469,9 @@ public final class TGMessageService extends TGMessageServiceImpl {
             case TdApi.MessageProximityAlertTriggered.CONSTRUCTOR:
             case TdApi.MessageScreenshotTaken.CONSTRUCTOR:
             case TdApi.MessageSupergroupChatCreate.CONSTRUCTOR:
+            case TdApi.MessageChatJoinFromCommunity.CONSTRUCTOR:
+            case TdApi.MessageTonConnectRequest.CONSTRUCTOR:
+            case TdApi.MessageTonWalletTransfer.CONSTRUCTOR:
             case TdApi.MessageUnsupported.CONSTRUCTOR:
             case TdApi.MessageVideoChatEnded.CONSTRUCTOR:
             case TdApi.MessageVideoChatScheduled.CONSTRUCTOR:
@@ -512,7 +515,7 @@ public final class TGMessageService extends TGMessageServiceImpl {
               staticResId = R.string.ActionPinnedNoText;
               break;
             default:
-              Td.assertMessageContent_a80283cf();
+              Td.assertMessageContent_f7758f8b();
               throw Td.unsupported(message.content);
           }
           if (format == null) {

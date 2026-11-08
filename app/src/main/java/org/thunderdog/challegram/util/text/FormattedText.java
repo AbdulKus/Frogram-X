@@ -575,6 +575,21 @@ public class FormattedText {
         parseRichText(context, reference.text, out, entities, offset, flags | TextEntityCustom.FLAG_CLICKABLE, linkOffset, new int[1], TextEntityCustom.LINK_TYPE_REFERENCE, null, false, reference.referenceName, reference.url, openParameters);
         break;
       }
+      case TdApi.RichTextTonAddress.CONSTRUCTOR: {
+        TdApi.RichTextTonAddress address = (TdApi.RichTextTonAddress) in;
+        parseRichText(context, address.text, out, entities, offset, flags, linkOffset, linkLength, linkType, link, linkCached, referenceAnchorName, copyLink, openParameters);
+        break;
+      }
+      case TdApi.RichTextButton.CONSTRUCTOR: {
+        TdApi.InlineButton button = ((TdApi.RichTextButton) in).button;
+        if (button.type instanceof TdApi.InlineKeyboardButtonTypeUrl) {
+          String url = ((TdApi.InlineKeyboardButtonTypeUrl) button.type).url;
+          parseRichText(context, button.text, out, entities, offset, flags | TextEntityCustom.FLAG_CLICKABLE, linkOffset, new int[1], TextEntityCustom.LINK_TYPE_URL, url, false, referenceAnchorName, null, openParameters);
+        } else {
+          parseRichText(context, button.text, out, entities, offset, flags, linkOffset, linkLength, linkType, link, linkCached, referenceAnchorName, copyLink, openParameters);
+        }
+        break;
+      }
       case TdApi.RichTexts.CONSTRUCTOR: {
         TdApi.RichTexts texts = (TdApi.RichTexts) in;
         for (TdApi.RichText concatenatedText : texts.texts) {
@@ -583,7 +598,7 @@ public class FormattedText {
         break;
       }
       default: {
-        Td.assertRichText_d57ed958();
+        Td.assertRichText_801eae96();
         throw Td.unsupported(in);
       }
     }

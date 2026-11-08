@@ -4350,8 +4350,12 @@ public class TdlibUi extends Handler {
         });
         return; // async
       }
+      case TdApi.InternalLinkTypeTonConnect.CONSTRUCTOR:
+      case TdApi.InternalLinkTypeTonWalletTransfer.CONSTRUCTOR:
+        showLinkTooltip(tdlib, R.drawable.baseline_warning_24, Lang.getString(R.string.DeepLinkUnsupported), openParameters);
+        break;
       default: {
-        Td.assertInternalLinkType_44babac4();
+        Td.assertInternalLinkType_c232a5d5();
         throw Td.unsupported(linkType);
       }
     }

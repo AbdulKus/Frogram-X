@@ -51,7 +51,6 @@ import org.thunderdog.challegram.util.text.TextColorSets;
 import org.thunderdog.challegram.util.text.TextEntity;
 import org.thunderdog.challegram.util.text.TextStyleProvider;
 import org.thunderdog.challegram.util.text.TextWrapper;
-import org.thunderdog.challegram.widget.PageBlockView;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -464,13 +463,7 @@ public class PageBlockRichText extends PageBlock {
   private void setText (TdApi.RichText richText, TextStyleProvider textStyleProvider, TextColorSet colorSet, int flags, @Nullable  TdlibUi.UrlOpenParameters openParameters) {
     this.text = TextWrapper.parseRichText(context, context instanceof Text.ClickCallback ? (Text.ClickCallback) context : null, richText, textStyleProvider, colorSet, openParameters, (wrapper, text, specificMedia) -> {
       if (this.text == wrapper) {
-        for (View view : currentViews) {
-          if (view instanceof PageBlockView) {
-            if (!text.invalidateMediaContent(((PageBlockView) view).getIconReceiver(), specificMedia)) {
-              ((PageBlockView) view).invalidateIconsContent(this);
-            }
-          }
-        }
+        updateIconMedia(text, specificMedia);
       }
     });
     this.text.setViewProvider(currentViews);
@@ -496,14 +489,48 @@ public class PageBlockRichText extends PageBlock {
     }
   }
 
+  @Override
+  int requestInlineIcons (ComplexReceiver receiver, int offset) {
+    Text current = text != null ? text.getCurrent() : null;
+    if (current == null) {
+      return offset;
+    }
+    int count = current.getMediaCount();
+    current.requestMedia(receiver, offset, count);
+    return offset + count;
+  }
+
+  @Override
+  void setInline () {
+    super.setInline();
+    if (text != null) {
+      text.setMaxLines(10);
+    }
+  }
+
+  boolean isEllipsized () {
+    Text current = text != null ? text.getCurrent() : null;
+    return current != null && current.isEllipsized();
+  }
+
+  int getInlineWidth () {
+    return (text != null ? text.getWidth() : 0) + getTextPaddingLeft() + getTextPaddingRight() + quoteLevel * Screen.dp(QUOTE_OFFSET);
+  }
+
+  void destroyInlineText () {
+    if (text != null) {
+      text.performDestroy();
+    }
+  }
+
   private static final float QUOTE_OFFSET = 12f;
 
   private int getTextPaddingLeft () {
-    return Math.max(getMinimumContentPadding(true), !isPost && listItemInfo != null ? 0 : Screen.dp(textHorizontalOffset)) + (needAvatar ? Screen.dp(40f) + Screen.dp(14f) : 0) + (detailsOpened != null ? Screen.dp(24f) : 0);
+    return Math.max(getMinimumContentPadding(true), !isPost && listItemInfo != null ? 0 : Screen.dp(inline ? 0 : textHorizontalOffset)) + (needAvatar ? Screen.dp(40f) + Screen.dp(14f) : 0) + (detailsOpened != null ? Screen.dp(24f) : 0);
   }
 
   private int getTextPaddingRight () {
-    return Math.max(getMinimumContentPadding(false), Screen.dp(textHorizontalOffset));
+    return Math.max(getMinimumContentPadding(false), Screen.dp(inline ? 0 : textHorizontalOffset));
   }
 
   @Override
@@ -576,7 +603,7 @@ public class PageBlockRichText extends PageBlock {
   @Override
   public void drawInternal (View view, Canvas c, Receiver preview, Receiver receiver, @Nullable ComplexReceiver iconReceiver) {
     if (text != null) {
-      int viewWidth = view.getMeasuredWidth();
+      int viewWidth = getMaxWidth();
       int textLeft = getTextPaddingLeft();
       int textTop = getContentTop();
 
@@ -624,7 +651,7 @@ public class PageBlockRichText extends PageBlock {
           c.drawRect(rectF.left, 0, rectF.right, rectF.top + lineWidth, Paints.fillingPaint(lineColor));
         }
         if (mergeBottom) {
-          c.drawRect(rectF.left, rectF.bottom - lineWidth, rectF.right, view.getMeasuredHeight(), Paints.fillingPaint(lineColor));
+          c.drawRect(rectF.left, rectF.bottom - lineWidth, rectF.right, getComputedHeight(), Paints.fillingPaint(lineColor));
         }
       }
 

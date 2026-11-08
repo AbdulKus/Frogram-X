@@ -23,6 +23,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.drinkless.tdlib.TdApi;
+import org.thunderdog.challegram.R;
+import org.thunderdog.challegram.component.chat.MessageView;
+import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.loader.ComplexReceiver;
 import org.thunderdog.challegram.loader.DoubleImageReceiver;
 import org.thunderdog.challegram.loader.ImageReceiver;
@@ -41,6 +44,8 @@ import org.thunderdog.challegram.util.DrawableProvider;
 import org.thunderdog.challegram.util.text.Text;
 import org.thunderdog.challegram.util.text.TextColorSets;
 import org.thunderdog.challegram.util.text.TextStyleProvider;
+import org.thunderdog.challegram.util.text.TextMedia;
+import org.thunderdog.challegram.widget.PageBlockView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +62,37 @@ public abstract class PageBlock {
   protected MultipleViewProvider currentViews;
 
   protected boolean mergeBottom, mergeTop;
+  protected boolean inline;
+
+  void setInline () {
+    inline = true;
+  }
+
+  protected final void updateIconMedia (Text text, @Nullable TextMedia specificMedia) {
+    for (View view : currentViews) {
+      if (view instanceof PageBlockView) {
+        PageBlockView blockView = (PageBlockView) view;
+        if (!text.invalidateMediaContent(blockView.getIconReceiver(), specificMedia)) {
+          blockView.invalidateIconsContent(this);
+        }
+      } else if (view instanceof MessageView) {
+        MessageView messageView = (MessageView) view;
+        ComplexReceiver receiver = messageView.getComplexReceiver();
+        if (receiver != null && !text.invalidateMediaContent(receiver, specificMedia)) {
+          messageView.post(() -> {
+            if (messageView.getMessage() instanceof TGMessageRichMessage) {
+              TGMessage message = messageView.getMessage();
+              messageView.invalidateContentReceiver(message.getChatId(), message.getId(), -1);
+            }
+          });
+        }
+      }
+    }
+  }
+
+  int requestInlineIcons (ComplexReceiver receiver, int offset) {
+    return offset;
+  }
 
   public PageBlock (ViewController<?> context, TdApi.PageBlock block, int quoteLevel) {
     this.context = context;
@@ -341,6 +377,7 @@ public abstract class PageBlock {
   }
 
   public static class ParseContext {
+    @Nullable PageBlockButtons.Action buttonAction;
     public final String url;
     public final boolean isRtl;
     public final TGPlayerController.PlayListBuilder playListBuilder;
@@ -455,7 +492,15 @@ public abstract class PageBlock {
   }
 
   public static List<PageBlock> parse (ViewController<?> parent, String url, @NonNull TdApi.WebPageInstantView instantView, @Nullable PageBlock detailsBlock, TGPlayerController.PlayListBuilder playListBuilder, @Nullable TdlibUi.UrlOpenParameters urlOpenParameters) throws UnsupportedPageBlockException {
+    return parse(parent, url, instantView, detailsBlock, playListBuilder, urlOpenParameters, null);
+  }
+
+  public static List<PageBlock> parse (ViewController<?> parent, String url, @NonNull TdApi.WebPageInstantView instantView,
+                                       @Nullable PageBlock detailsBlock, TGPlayerController.PlayListBuilder playListBuilder,
+                                       @Nullable TdlibUi.UrlOpenParameters urlOpenParameters,
+                                       @Nullable PageBlockButtons.Action buttonAction) throws UnsupportedPageBlockException {
     PageBlock.ParseContext context = new PageBlock.ParseContext(url, instantView, playListBuilder);
+    context.buttonAction = buttonAction;
     context.detailsBlock = context.lastBlock = detailsBlock;
     TdApi.PageBlock[] blocks = detailsBlock != null ? ((TdApi.PageBlockDetails) detailsBlock.getOriginalBlock()).blocks : instantView.blocks;
     boolean needPadding = (detailsBlock != null && blocks.length > 0);
@@ -475,6 +520,25 @@ public abstract class PageBlock {
       if (instantView.viewCount > 0 || needReportButton) {
         // TODO view counter + "Wrong layout?"
       }
+    }
+    return out;
+  }
+
+  static List<PageBlock> parsePreview (ViewController<?> parent, TdApi.PageBlock[] blocks,
+                                      boolean rtl, PageBlockButtons.Action action) {
+    TdApi.WebPageInstantView view = new TdApi.WebPageInstantView(blocks, 0, 2, rtl, true, null);
+    ParseContext context = new ParseContext("", view, null);
+    context.buttonAction = action;
+    List<PageBlock> out = new ArrayList<>();
+    for (TdApi.PageBlock rawBlock : blocks) {
+      try {
+        parse(parent, out, context, rawBlock, null);
+      } catch (UnsupportedPageBlockException e) {
+        throw new IllegalStateException(e);
+      }
+    }
+    for (PageBlock block : out) {
+      block.setInline();
     }
     return out;
   }
@@ -582,13 +646,16 @@ public abstract class PageBlock {
       case TdApi.PageBlockBlockQuote.CONSTRUCTOR: {
         TdApi.PageBlockBlockQuote quoteRaw = (TdApi.PageBlockBlockQuote) block;
         context.openQuotes.add(quoteRaw);
+        int start = out.size();
         for (int i = 0; i < quoteRaw.blocks.length; i++) {
           TdApi.PageBlock quoteBlock = quoteRaw.blocks[i];
           parse(parent, out, context, quoteBlock, openParameters);
         }
         if (!Td.isEmpty(quoteRaw.credit)) {
           PageBlockRichText credit = new PageBlockRichText(parent, quoteRaw, context.quoteLevel(), openParameters);
-          credit.mergeWith(out.get(out.size() - 1));
+          if (out.size() > start) {
+            credit.mergeWith(out.get(out.size() - 1));
+          }
           context.process(credit, out);
         }
         context.openQuotes.remove(context.openQuotes.size() - 1);
@@ -632,6 +699,17 @@ public abstract class PageBlock {
           context.openedList = lastListItemInfo;
           itemIndex++;
         }
+        break;
+      }
+
+      case TdApi.PageBlockExpandableBlockQuote.CONSTRUCTOR: {
+        TdApi.PageBlockExpandableBlockQuote quote = (TdApi.PageBlockExpandableBlockQuote) block;
+        parse(parent, out, context, new TdApi.PageBlockBlockQuote(
+          new TdApi.PageBlock[] {new TdApi.PageBlockParagraph(quote.text)}, quote.credit), openParameters);
+        break;
+      }
+      case TdApi.PageBlockButtonRow.CONSTRUCTOR: {
+        context.process(new PageBlockButtons(parent, (TdApi.PageBlockButtonRow) block, context.quoteLevel(), context.buttonAction), out);
         break;
       }
 
@@ -770,6 +848,14 @@ public abstract class PageBlock {
       }
 
       // File
+      case TdApi.PageBlockDocument.CONSTRUCTOR: {
+        TdApi.PageBlockDocument document = (TdApi.PageBlockDocument) block;
+        if (document.document != null) {
+          context.process(new PageBlockFile(parent, document, context.quoteLevel(), context.url, context.playListBuilder), out);
+        }
+        context.processCaption(parent, document, document.caption, openParameters, out);
+        break;
+      }
       case TdApi.PageBlockAudio.CONSTRUCTOR: {
         TdApi.PageBlockAudio audioRaw = (TdApi.PageBlockAudio) block;
         if (audioRaw.audio != null) {
@@ -833,7 +919,9 @@ public abstract class PageBlock {
       }
 
       default: {
-        throw new UnsupportedOperationException(block.toString());
+        parse(parent, out, context, new TdApi.PageBlockParagraph(
+          new TdApi.RichTextItalic(new TdApi.RichTextPlain(Lang.getString(R.string.InstantViewSectionUnsupported)))), openParameters);
+        break;
       }
     }
   }

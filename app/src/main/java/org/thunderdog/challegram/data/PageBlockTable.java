@@ -13,7 +13,9 @@
 package org.thunderdog.challegram.data;
 
 import android.graphics.Canvas;
+import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -34,7 +36,6 @@ import org.thunderdog.challegram.util.DrawableProvider;
 import org.thunderdog.challegram.util.text.FormattedText;
 import org.thunderdog.challegram.util.text.Text;
 import org.thunderdog.challegram.util.text.TextColorSets;
-import org.thunderdog.challegram.widget.PageBlockView;
 
 import java.util.ArrayList;
 
@@ -98,25 +99,35 @@ public class PageBlockTable extends PageBlock implements Destroyable {
 
   @Override
   public void requestIcons (ComplexReceiver receiver) {
-    int iconCount = 0;
+    receiver.clearReceiversWithHigherKey(requestInlineIcons(receiver, 0));
+  }
+
+  @Override
+  int requestInlineIcons (ComplexReceiver receiver, int mediaOffset) {
     for (Cell cell : cellsList) {
       if (cell.text != null) {
-        cell.text.requestMedia(receiver, iconCount, cell.iconCount);
+        int mediaCount = cell.text.getMediaCount();
+        cell.text.requestMedia(receiver, mediaOffset, mediaCount);
+        mediaOffset += mediaCount;
       }
-      iconCount += cell.iconCount;
     }
-    receiver.clearReceiversWithHigherKey(iconCount);
+    return mediaOffset;
   }
 
   private int tableHeight;
   private int customTableWidth;
+  private @Nullable Path inlineOutline;
+  private @Nullable RectF inlineBounds;
 
   @Override
   protected int computeHeight (View view, final int maxContentWidth) {
-    final int horizontalMargin = Screen.dp(MARGIN_HORIZONTAL);
+    final int horizontalMargin = inline ? 0 : Screen.dp(MARGIN_HORIZONTAL);
     final int topMargin = getContentTop();
     final int bottomMargin = Screen.dp(MARGIN_BOTTOM);
-    final int defaultWidth = (maxContentWidth - horizontalMargin * 2);
+    final int defaultWidth = Math.max(1, maxContentWidth - horizontalMargin * 2);
+    if (cellsList.length == 0) {
+      return 0;
+    }
 
     for (Cell cell : cellsList) {
       cell.prepareToBuild(defaultWidth);
@@ -176,13 +187,23 @@ public class PageBlockTable extends PageBlock implements Destroyable {
     }
 
     this.tableHeight = Math.round(tableCordsY[tableCordsY.length - 1]);
+    if (inline) {
+      if (inlineOutline == null) {
+        inlineOutline = new Path();
+        inlineBounds = new RectF();
+      }
+      int radius = Screen.dp(7);
+      inlineBounds.set(0, topMargin, customTableWidth, topMargin + tableHeight);
+      inlineOutline.rewind();
+      inlineOutline.addRoundRect(inlineBounds, radius, radius, Path.Direction.CW);
+    }
 
     return topMargin + tableHeight + bottomMargin;
   }
 
   @Override
   public int getCustomWidth () {
-    return customTableWidth + Screen.dp(MARGIN_HORIZONTAL) * 2;
+    return customTableWidth + (inline ? 0 : Screen.dp(MARGIN_HORIZONTAL) * 2);
   }
 
   @Override
@@ -207,6 +228,10 @@ public class PageBlockTable extends PageBlock implements Destroyable {
   @Override
   protected <T extends View & DrawableProvider> void drawInternal (T view, Canvas c, Receiver preview, Receiver receiver, @Nullable ComplexReceiver iconReceiver) {
     final TdApi.PageBlockTable table = (TdApi.PageBlockTable) this.block;
+    int tableSave = Views.save(c);
+    if (inlineOutline != null) {
+      c.clipPath(inlineOutline);
+    }
     for (Cell cell : cellsList) {
       if (cell.cell.isHeader || (table.isStriped && cell.cellPositionStartY() % 2 == 0)) {
         c.drawRect(cell.bounds, Paints.fillingPaint(Theme.backgroundColor()));
@@ -229,11 +254,17 @@ public class PageBlockTable extends PageBlock implements Destroyable {
             y = cell.bounds.bottom - Screen.dp(PADDING_VERTICAL) - cell.text.getHeight();
             break;
           default:
-            throw new UnsupportedOperationException(cell.toString());
+            y = cell.bounds.top + Screen.dp(PADDING_VERTICAL);
+            break;
         }
         cell.text.draw(c, cell.bounds.left + Screen.dp(PADDING_HORIZONTAL), cell.bounds.right - Screen.dp(PADDING_VERTICAL), 0, y, null, 1f, iconReceiver);
         Views.restore(c, restoreCount);
       }
+    }
+    Views.restore(c, tableSave);
+    if (inlineBounds != null && table.isBordered) {
+      int radius = Screen.dp(7);
+      c.drawRoundRect(inlineBounds, radius, radius, Paints.strokeSeparatorPaint(Theme.separatorColor()));
     }
   }
 
@@ -310,7 +341,6 @@ public class PageBlockTable extends PageBlock implements Destroyable {
     private final PageBlockTable parent;
     private final @NonNull TdApi.PageBlockTableCell cell;
     private final int cellPositionX, cellPositionY;
-    private final int iconCount;
 
     private int heightForMinimalPossibleWidth;
     private int heightForMaximalPossibleWidth;
@@ -328,7 +358,6 @@ public class PageBlockTable extends PageBlock implements Destroyable {
       this.cellPositionX = cellPositionX;
       this.cellPositionY = cellPositionY;
       this.formattedText = formattedText;
-      this.iconCount = formattedText != null ? formattedText.getIconCount() : 0;
     }
 
     public int width (int metricType) {
@@ -375,18 +404,10 @@ public class PageBlockTable extends PageBlock implements Destroyable {
           text.performDestroy();
         }
 
-        final int maxTextWidth = maxCellWidth - Screen.dp(PADDING_HORIZONTAL) * 2;
+        final int maxTextWidth = Math.max(1, maxCellWidth - Screen.dp(PADDING_HORIZONTAL) * 2);
 
         Text.Builder b = new Text.Builder(formattedText.text, maxTextWidth, PageBlockRichText.getParagraphProvider(), TextColorSets.InstantView.NORMAL)
-          .entities(formattedText.entities, (text, specificMedia) -> {
-            for (View view : parent.currentViews) {
-              if (view instanceof PageBlockView) {
-                if (!text.invalidateMediaContent(((PageBlockView) view).getIconReceiver(), specificMedia)) {
-                  ((PageBlockView) view).invalidateIconsContent(parent);
-                }
-              }
-            }
-          })
+          .entities(formattedText.entities, parent::updateIconMedia)
           .textFlags(Text.FLAG_ARTICLE | Text.FLAG_CUSTOM_LONG_PRESS | Text.FLAG_ALWAYS_BREAK)
           .viewProvider(parent.currentViews);
         switch (cell.align.getConstructor()) {
@@ -420,7 +441,7 @@ public class PageBlockTable extends PageBlock implements Destroyable {
 
     public void build (int maxCellWidth) {
       if (text != null) {
-        text.changeMaxWidth(maxCellWidth - Screen.dp(PADDING_HORIZONTAL) * 2);
+        text.changeMaxWidth(Math.max(1, maxCellWidth - Screen.dp(PADDING_HORIZONTAL) * 2));
       }
     }
 

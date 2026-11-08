@@ -15,6 +15,8 @@
 package org.thunderdog.challegram.data;
 
 import android.graphics.Canvas;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 import android.view.View;
@@ -360,7 +362,7 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
     int height = 0;
 
     final int maxWidth = width - getMinimumContentPadding(false) - getMinimumContentPadding(true);
-    final float maxHeightFactor = collageContext != null ? .78f : isCover || isList ? 1.2f : 1.78f;
+    final float maxHeightFactor = inline ? 1.16f : collageContext != null ? .78f : isCover || isList ? 1.2f : 1.78f;
     final int maxHeight = (int) (Math.min(width * maxHeightFactor, (isCover ? Screen.widestSide() : Screen.currentHeight()) - HeaderView.getSize(true) * 2 - Screen.dp(16f) * 2));
 
     if (embedded != null) {
@@ -450,16 +452,39 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
       int x = !isIndependent() ? getMinimumContentPadding(true) : collageWidth < maxWidth ? (maxWidth - collageWidth) / 2 : 0;
       collageContext.draw(view, c, x, getContentTop(), ((PageBlockView) view).getMultipleReceiver());
     } else if (wrapper != null) {
-      final int x = ((view.getMeasuredWidth() - getMinimumContentPadding(true) - getMinimumContentPadding(false)) / 2 - wrapper.getCellWidth() / 2) + getMinimumContentPadding(true);
-      wrapper.draw(view, c, x, getContentTop(), preview, receiver, 1f);
+      final int x = ((getMaxWidth() - getMinimumContentPadding(true) - getMinimumContentPadding(false)) / 2 - wrapper.getCellWidth() / 2) + getMinimumContentPadding(true);
+      if (inline && wrapper.isPhoto()) {
+        if (inlinePhotoClip == null) {
+          inlinePhotoClip = new Path();
+        }
+        int top = getContentTop();
+        int radius = Screen.dp(8);
+        RectF bounds = Paints.getRectF();
+        bounds.set(x, top, x + wrapper.getCellWidth(), top + wrapper.getCellHeight());
+        inlinePhotoClip.rewind();
+        inlinePhotoClip.addRoundRect(bounds, radius, radius, Path.Direction.CW);
+        int save = Views.save(c);
+        c.clipPath(inlinePhotoClip);
+        wrapper.draw(view, c, x, top, preview, receiver, 1f);
+        Views.restore(c, save);
+      } else {
+        wrapper.draw(view, c, x, getContentTop(), preview, receiver, 1f);
+      }
       if (!StringUtils.isEmpty(url)) {
         Drawables.draw(c, linkIcon, receiver.getRight() - linkIcon.getMinimumWidth() - Screen.dp(9f), receiver.getTop() + Screen.dp(9f), Paints.whitePorterDuffPaint());
       }
     }
   }
 
+  void destroyInlineMedia () {
+    if (wrapper != null) {
+      wrapper.destroy();
+    }
+  }
+
   // OnClick
 
+  private @Nullable Path inlinePhotoClip;
   private ArrayList<PageBlockMedia> boundToList;
   private String source;
 
@@ -523,8 +548,10 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
         captions.add(media.caption);
       }
     } else {
-      wrappers = null;
-      captions = null;
+      wrappers = new ArrayList<>(1);
+      captions = new ArrayList<>(1);
+      wrappers.add(clickWrapper);
+      captions.add(caption);
     }
 
     if (wrappers == null || wrappers.isEmpty()) {
@@ -598,6 +625,9 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
       return null;
     }
 
+    if (inline) {
+      return null;
+    }
     View view = currentViews.findAnyTarget();
     if (view == null) {
       return null;

@@ -212,6 +212,7 @@ public class TD {
         false,
         false,
         false,
+        false,
         false
       );
     }
@@ -287,6 +288,7 @@ public class TD {
         false
       );
       new TdApi.ChatAdministratorRights(
+        false,
         false,
         false,
         false,
@@ -672,8 +674,10 @@ public class TD {
       case TdApi.TextEntityTypeMentionName.CONSTRUCTOR:
         return allowInternal;
 
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return false;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(type);
     }
   }
@@ -2742,6 +2746,12 @@ public class TD {
         getText(((TdApi.RichTextDiff) richText).text, b);
         break;
       }
+      case TdApi.RichTextTonAddress.CONSTRUCTOR:
+        getText(((TdApi.RichTextTonAddress) richText).text, b);
+        break;
+      case TdApi.RichTextButton.CONSTRUCTOR:
+        getText(((TdApi.RichTextButton) richText).button.text, b);
+        break;
       case TdApi.RichTexts.CONSTRUCTOR: {
         TdApi.RichTexts richTexts = (TdApi.RichTexts) richText;
         for (TdApi.RichText text : richTexts.texts) {
@@ -2754,7 +2764,7 @@ public class TD {
       case TdApi.RichTextAnchor.CONSTRUCTOR:
         break;
       default:
-        Td.assertRichText_d57ed958();
+        Td.assertRichText_801eae96();
         throw Td.unsupported(richText);
     }
   }
@@ -3813,7 +3823,7 @@ public class TD {
         // TODO rich message
         break;
       default:
-        Td.assertMessageContent_a80283cf();
+        Td.assertMessageContent_f7758f8b();
         break;
     }
     return false;
@@ -4806,8 +4816,10 @@ public class TD {
       case TdApi.TextEntityTypePhoneNumber.CONSTRUCTOR:
       case TdApi.TextEntityTypeUrl.CONSTRUCTOR:
         return null;
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return null;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(entityType);
     }
   }
@@ -5014,8 +5026,10 @@ public class TD {
       case TdApi.TextEntityTypePhoneNumber.CONSTRUCTOR:
       case TdApi.TextEntityTypeUrl.CONSTRUCTOR:
         return null;
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return null;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(type);
     }
     if (span instanceof TdlibEntitySpan) {
@@ -5085,8 +5099,10 @@ public class TD {
       case TdApi.TextEntityTypePhoneNumber.CONSTRUCTOR:
       case TdApi.TextEntityTypeUrl.CONSTRUCTOR:
         return false;
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return false;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(type);
     }
   }
@@ -5164,8 +5180,10 @@ public class TD {
       case TdApi.TextEntityTypePhoneNumber.CONSTRUCTOR:
       case TdApi.TextEntityTypeUrl.CONSTRUCTOR:
         return null;
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return null;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(type);
     }
   }
@@ -5625,7 +5643,7 @@ public class TD {
       case TdApi.MessagePaidMedia.CONSTRUCTOR:
         return true;
       default:
-        Td.assertMessageContent_a80283cf();
+        Td.assertMessageContent_f7758f8b();
         break;
     }
     return false;

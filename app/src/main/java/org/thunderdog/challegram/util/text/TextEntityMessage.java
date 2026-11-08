@@ -285,8 +285,10 @@ public class TextEntityMessage extends TextEntity {
       case TdApi.TextEntityTypeUnderline.CONSTRUCTOR: {
         return false;
       }
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return false;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(type);
     }
   }
@@ -566,10 +568,11 @@ public class TextEntityMessage extends TextEntity {
       case TdApi.TextEntityTypeSpoiler.CONSTRUCTOR:
       case TdApi.TextEntityTypeStrikethrough.CONSTRUCTOR:
       case TdApi.TextEntityTypeUnderline.CONSTRUCTOR:
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
         // Non-clickable
         break;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(clickableEntity.type);
     }
   }
@@ -660,8 +663,10 @@ public class TextEntityMessage extends TextEntity {
         return false;
       }
 
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return false;
       default: {
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(clickableEntity.type);
       }
     }
@@ -716,8 +721,11 @@ public class TextEntityMessage extends TextEntity {
             message = R.string.CopiedText;
             break;
           }
+          case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+            message = R.string.CopiedText;
+            break;
           default: {
-            Td.assertTextEntityType_aefd8e69();
+            Td.assertTextEntityType_b8214790();
             message = R.string.CopiedLink;
             break;
           }

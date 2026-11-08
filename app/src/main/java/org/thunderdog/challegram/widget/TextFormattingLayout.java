@@ -554,8 +554,10 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
         return -1;
 
       // unsupported
+      case TdApi.TextEntityTypeTonAddress.CONSTRUCTOR:
+        return -1;
       default:
-        Td.assertTextEntityType_aefd8e69();
+        Td.assertTextEntityType_b8214790();
         throw Td.unsupported(type);
     }
   }

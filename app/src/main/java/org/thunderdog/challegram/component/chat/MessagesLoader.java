@@ -1263,24 +1263,18 @@ public class MessagesLoader implements Client.ResultHandler {
   private TdApi.Message newMessage (final long chatId, final boolean isChannel, final TdApi.ChatEvent event) {
     TdApi.Message relatedMessage = Td.findRelatedMessage(event.action);
     boolean canBeSaved = relatedMessage == null || relatedMessage.canBeSaved;
-    return new TdApi.Message(
-      event.id,
-      event.memberId,
-      null,
-      chatId,
-      null,
-      null,
-      tdlib.isSelfSender(event.memberId),
-      false, false, canBeSaved, false,
-      isChannel, false, false, false, false,
-      event.date, 0,
-      null, null, null, null,
-      null, null, null, null,
-      null, 0, 0,
-      0, null, 0, 0, "", 0, null,
-      0, 0,
-      null, null, null, null, 0
-    );
+    TdApi.Message message = new TdApi.Message();
+    message.id = event.id;
+    message.senderId = event.memberId;
+    message.chatId = chatId;
+    message.isOutgoing = tdlib.isSelfSender(event.memberId);
+    message.canBeSaved = canBeSaved;
+    message.isChannelPost = isChannel;
+    message.date = event.date;
+    message.senderTag = "";
+    message.authorSignature = "";
+    message.summaryLanguageCode = "";
+    return message;
   }
 
   private TdApi.Message[] parseChatEvents (final long chatId, final TdApi.ChatEvent[] events) {

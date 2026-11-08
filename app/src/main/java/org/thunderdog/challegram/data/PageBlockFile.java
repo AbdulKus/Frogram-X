@@ -32,7 +32,13 @@ public class PageBlockFile extends PageBlock {
 
   public PageBlockFile (ViewController<?> context, TdApi.PageBlock pageBlock, int quoteLevel, String url, TGPlayerController.PlayListBuilder builder) {
     super(context, pageBlock, quoteLevel);
-    this.result = (InlineResultCommon) InlineResult.valueOf(context.context(), context.tdlib(), pageBlock, builder);
+    if (pageBlock instanceof TdApi.PageBlockDocument) {
+      TdApi.Document document = ((TdApi.PageBlockDocument) pageBlock).document;
+      TdApi.Message message = TD.newFakeMessage(0, null, new TdApi.MessageDocument(document, null));
+      this.result = new InlineResultCommon(context.context(), context.tdlib(), message, document);
+    } else {
+      this.result = (InlineResultCommon) InlineResult.valueOf(context.context(), context.tdlib(), pageBlock, builder);
+    }
     this.playListBuilder = builder;
     if (result == null)
       throw new UnsupportedOperationException(pageBlock.toString());
@@ -43,7 +49,7 @@ public class PageBlockFile extends PageBlock {
 
   @Override
   public boolean isClickable () {
-    return true;
+    return !(block instanceof TdApi.PageBlockDocument);
   }
 
   @Override

@@ -423,8 +423,8 @@ public abstract class MediaPreview implements ListAnimator.Measurable {
           return new MediaPreviewSimple(tdlib, size, cornerRadius, giftedStars.sticker);
         break;
       }
-      case TdApi.MessageGiftedTon.CONSTRUCTOR: {
-        TdApi.MessageGiftedTon giftedGram = (TdApi.MessageGiftedTon) message.content;
+      case TdApi.MessageGiftedGrams.CONSTRUCTOR: {
+        TdApi.MessageGiftedGrams giftedGram = (TdApi.MessageGiftedGrams) message.content;
         if (giftedGram.sticker != null)
           return new MediaPreviewSimple(tdlib, size, cornerRadius, giftedGram.sticker);
         break;
@@ -523,12 +523,15 @@ public abstract class MediaPreview implements ListAnimator.Measurable {
       case TdApi.MessagePollOptionDeleted.CONSTRUCTOR:
       case TdApi.MessageChatAddedToCommunity.CONSTRUCTOR:
       case TdApi.MessageChatRemovedFromCommunity.CONSTRUCTOR:
+      case TdApi.MessageChatJoinFromCommunity.CONSTRUCTOR:
+      case TdApi.MessageTonConnectRequest.CONSTRUCTOR:
+      case TdApi.MessageTonWalletTransfer.CONSTRUCTOR:
       case TdApi.MessageUnsupported.CONSTRUCTOR: {
         // No media preview.
         break;
       }
       default: {
-        Td.assertMessageContent_a80283cf();
+        Td.assertMessageContent_f7758f8b();
         throw Td.unsupported(message.content);
       }
     }

@@ -574,6 +574,7 @@ public class ChatEventUtil {
               true,
               true,
               true,
+              true,
               true
             );
           }

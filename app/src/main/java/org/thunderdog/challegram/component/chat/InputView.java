@@ -1267,13 +1267,14 @@ public class InputView extends NoClipEditText implements InlineSearchContext.Cal
           draft = "";
           break;
         }
+        case TdApi.DraftMessageContentInputRichMessage.CONSTRUCTOR:
         case TdApi.DraftMessageContentVoiceNote.CONSTRUCTOR:
         case TdApi.DraftMessageContentVideoNote.CONSTRUCTOR: {
           draft = "";
           break;
         }
         default: {
-          Td.assertDraftMessageContent_b637f166();
+          Td.assertDraftMessageContent_f690069b();
           throw Td.unsupported(draftContent);
         }
       }

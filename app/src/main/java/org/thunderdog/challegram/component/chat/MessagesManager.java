@@ -1723,7 +1723,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
       }
 
       default:
-        Td.assertInternalLinkType_44babac4();
+        Td.assertInternalLinkType_c232a5d5();
         break;
     }
     return true;

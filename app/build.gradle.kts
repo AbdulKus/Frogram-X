@@ -42,6 +42,14 @@ val config = extra["config"] as ApplicationConfig
 val useGoogleServices = loadProperties().getProperty("app.google_services", "true") == "true"
 
 //noinspection WrongGradleMethod
+val tdlibNdkVersion = loadProperties("version.properties").getProperty("version.ndk_tdlib")
+fun tdlibBinaryVariant (minSdk: Int): String = when {
+  minSdk < 21 -> "${config.legacyNdkVersion}/android-16"
+  minSdk < 23 -> "$tdlibNdkVersion/android-21"
+  minSdk < 24 -> "$tdlibNdkVersion/android-23"
+  else -> "$tdlibNdkVersion/android-24"
+}
+
 android {
   namespace = "org.thunderdog.challegram"
 
@@ -265,6 +273,7 @@ android {
           if (selectedMinSdk >= 21) targets += "frogram_whisper"
           arguments(
             "-DANDROID_PLATFORM=android-${selectedMinSdk}",
+            "-DTDLIB_BINARY_VARIANT=${tdlibBinaryVariant(selectedMinSdk)}",
             "-DTGX_FLAVOR=${variant.flavor}",
             "-DANDROID_STL=${if (Config.SHARED_STL) "c++_shared" else "c++_static"}",
             "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON",
@@ -425,7 +434,8 @@ android {
 
         var openSslVersionFull = ""
         var openSslReleaseDate = ""
-        val openSslVersionFile = File(project.rootDir.absoluteFile, "tdlib/openssl/${abiVariant.filters.first()}/include/openssl/opensslv.h")
+        val tdlibVariant = tdlibBinaryVariant(variant.minSdk.apiLevel)
+        val openSslVersionFile = rootProject.file("tdlib/openssl/$tdlibVariant/${abiVariant.filters.first()}/include/openssl/opensslv.h")
         openSslVersionFile.bufferedReader().use { reader ->
           val regex = Regex("^# define (OPENSSL_FULL_VERSION_STR|OPENSSL_RELEASE_DATE)\\s*\"([^\"]+)\"$")
           while (true) {
@@ -492,9 +502,6 @@ android {
         if (Config.SHARED_STL) {
           set.add("lib/$abi/libc++_shared.so")
         }
-        set.add("tdlib/openssl/$abi/lib/libcryptox.so")
-        set.add("tdlib/openssl/$abi/lib/libsslx.so")
-        set.add("tdlib/src/main/libs/$abi/libtdjni.so")
       }
     }
   }

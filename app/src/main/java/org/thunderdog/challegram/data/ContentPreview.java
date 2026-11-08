@@ -727,6 +727,9 @@ public class ContentPreview {
       case TdApi.MessagePaidMessagePriceChanged.CONSTRUCTOR:
 
       // Handled by getSimpleContentPreview, but unsupported
+      case TdApi.MessageChatJoinFromCommunity.CONSTRUCTOR:
+      case TdApi.MessageTonConnectRequest.CONSTRUCTOR:
+      case TdApi.MessageTonWalletTransfer.CONSTRUCTOR:
       case TdApi.MessageUnsupported.CONSTRUCTOR:
       case TdApi.MessageUsersShared.CONSTRUCTOR:
       case TdApi.MessageChatShared.CONSTRUCTOR:
@@ -746,7 +749,7 @@ public class ContentPreview {
       case TdApi.MessageSuggestedPostDeclined.CONSTRUCTOR:
       case TdApi.MessageSuggestedPostPaid.CONSTRUCTOR:
       case TdApi.MessageSuggestedPostRefunded.CONSTRUCTOR:
-      case TdApi.MessageGiftedTon.CONSTRUCTOR:
+      case TdApi.MessageGiftedGrams.CONSTRUCTOR:
       case TdApi.MessagePaymentSuccessfulBot.CONSTRUCTOR:
       case TdApi.MessageChatHasProtectedContentDisableRequested.CONSTRUCTOR:
       case TdApi.MessageChatHasProtectedContentToggled.CONSTRUCTOR:
@@ -763,7 +766,7 @@ public class ContentPreview {
       case TdApi.MessagePassportDataReceived.CONSTRUCTOR:
       case TdApi.MessageWebAppDataReceived.CONSTRUCTOR:
       default:
-        Td.assertMessageContent_a80283cf();
+        Td.assertMessageContent_f7758f8b();
         throw Td.unsupported(message.content);
     }
     Refresher refresher = null;
@@ -1222,11 +1225,13 @@ public class ContentPreview {
       case TdApi.PushMessageContentPollOptionAdded.CONSTRUCTOR:
       case TdApi.PushMessageContentChecklist.CONSTRUCTOR:
       case TdApi.PushMessageContentChecklistTasksAdded.CONSTRUCTOR:
+      case TdApi.PushMessageContentTonConnectRequest.CONSTRUCTOR:
+      case TdApi.PushMessageContentTonWalletTransfer.CONSTRUCTOR:
       case TdApi.PushMessageContentChecklistTasksDone.CONSTRUCTOR: {
         return getNotificationPreview(TdApi.MessageUnsupported.CONSTRUCTOR, tdlib, chatId, push.senderId, push.senderName, null);
       }
       default:
-        Td.assertPushMessageContent_fd03564b();
+        Td.assertPushMessageContent_497d2f0c();
         throw Td.unsupported(push.content);
     }
   }
@@ -1593,7 +1598,7 @@ public class ContentPreview {
       case TdApi.MessageSuggestedPostDeclined.CONSTRUCTOR:
       case TdApi.MessageSuggestedPostPaid.CONSTRUCTOR:
       case TdApi.MessageSuggestedPostRefunded.CONSTRUCTOR:
-      case TdApi.MessageGiftedTon.CONSTRUCTOR:
+      case TdApi.MessageGiftedGrams.CONSTRUCTOR:
       case TdApi.MessagePaymentSuccessfulBot.CONSTRUCTOR:
       case TdApi.MessageChatHasProtectedContentDisableRequested.CONSTRUCTOR:
       case TdApi.MessageChatHasProtectedContentToggled.CONSTRUCTOR:
@@ -1607,6 +1612,9 @@ public class ContentPreview {
         // TODO support these previews
         return new ContentPreview(EMOJI_QUIZ, R.string.UnsupportedMessage);
         
+      case TdApi.MessageChatJoinFromCommunity.CONSTRUCTOR:
+      case TdApi.MessageTonConnectRequest.CONSTRUCTOR:
+      case TdApi.MessageTonWalletTransfer.CONSTRUCTOR:
       case TdApi.MessageUnsupported.CONSTRUCTOR:
         return new ContentPreview(EMOJI_QUIZ, R.string.UnsupportedMessageType);
 
@@ -1614,7 +1622,7 @@ public class ContentPreview {
       case TdApi.MessagePassportDataReceived.CONSTRUCTOR:
       case TdApi.MessageWebAppDataReceived.CONSTRUCTOR:
       default:
-        Td.assertMessageContent_a80283cf();
+        Td.assertMessageContent_f7758f8b();
         throw new UnsupportedOperationException(Integer.toString(type));
     }
   }

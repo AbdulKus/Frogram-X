@@ -37,6 +37,7 @@ import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.data.InlineResult;
 import org.thunderdog.challegram.data.InlineResultCommon;
 import org.thunderdog.challegram.data.PageBlock;
+import org.thunderdog.challegram.data.PageBlockButtons;
 import org.thunderdog.challegram.data.PageBlockFile;
 import org.thunderdog.challegram.data.PageBlockMedia;
 import org.thunderdog.challegram.data.PageBlockRichText;
@@ -80,8 +81,7 @@ public class InstantViewController extends ViewController<InstantViewController.
     public TdApi.WebPageInstantView instantView;
     public String anchorLink;
     public @Nullable TdApi.RichMessage richMessage;
-    public long richMessageChatId;
-    public long richMessageId;
+    private @Nullable TdApi.Message richMessageSource;
 
     public Args (TdApi.LinkPreview linkPreview, TdApi.WebPageInstantView instantView, String anchorLink) {
       this.linkPreview = linkPreview;
@@ -89,11 +89,10 @@ public class InstantViewController extends ViewController<InstantViewController.
       this.anchorLink = anchorLink;
     }
 
-    public static Args forRichMessage (long chatId, long messageId, TdApi.RichMessage richMessage) {
+    public static Args forRichMessage (TdApi.Message source, TdApi.RichMessage richMessage) {
       Args args = new Args(null, toInstantView(richMessage), null);
       args.richMessage = richMessage;
-      args.richMessageChatId = chatId;
-      args.richMessageId = messageId;
+      args.richMessageSource = source;
       return args;
     }
 
@@ -177,7 +176,7 @@ public class InstantViewController extends ViewController<InstantViewController.
   @Override
   public CharSequence getName () {
     Args args = getArgumentsStrict();
-    return args.isRichMessage() ? tdlib.chatTitle(args.richMessageChatId) : args.linkPreview.siteName;
+    return args.isRichMessage() ? tdlib.chatTitle(args.richMessageSource.chatId) : args.linkPreview.siteName;
   }
 
   @Override
@@ -217,7 +216,7 @@ public class InstantViewController extends ViewController<InstantViewController.
         if (isOpen) {
           final List<PageBlock> blocks;
           try {
-            blocks = PageBlock.parse(this, getUrl(), getArgumentsStrict().instantView, pageBlock, this, null);
+            blocks = PageBlock.parse(this, getUrl(), getArgumentsStrict().instantView, pageBlock, this, null, getRichButtonAction());
           } catch (Throwable t) {
             Log.e("Exception in instant view block", t);
             context().tooltipManager().builder(view).show(tdlib, t instanceof UnsupportedOperationException ? R.string.InstantViewSectionUnsupported : R.string.InstantViewError).hideDelayed();
@@ -486,7 +485,14 @@ public class InstantViewController extends ViewController<InstantViewController.
   }
 
   private List<PageBlock> parsePageBlocks (TdApi.WebPageInstantView instantView) throws PageBlock.UnsupportedPageBlockException {
-    return PageBlock.parse(this, getUrl(), instantView, null, this, null);
+    return PageBlock.parse(this, getUrl(), instantView, null, this, null, getRichButtonAction());
+  }
+
+  private @Nullable PageBlockButtons.Action getRichButtonAction () {
+    Args args = getArgumentsStrict();
+    return args.isRichMessage()
+      ? button -> PageBlockButtons.open(this, args.richMessageSource, button)
+      : null;
   }
 
   private void buildCells (List<PageBlock> blocks, boolean isReplace) {
@@ -518,7 +524,7 @@ public class InstantViewController extends ViewController<InstantViewController.
 
     if (!isReplace && args.isRichMessage()) {
       if (!args.richMessage.isFull) {
-        tdlib.send(new TdApi.GetFullRichMessage(args.richMessageChatId, args.richMessageId), (richMessage, error) -> {
+        tdlib.send(new TdApi.GetFullRichMessage(args.richMessageSource.chatId, args.richMessageSource.id), (richMessage, error) -> {
           if (error != null) {
             UI.showError(error);
             return;

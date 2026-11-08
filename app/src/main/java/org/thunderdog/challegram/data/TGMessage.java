@@ -8088,7 +8088,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
       new TdApi.InlineKeyboardButton[] {
         new TdApi.InlineKeyboardButton(sponsoredMessage.buttonText, 0, new TdApi.ButtonStyleDefault(), type)
       }
-    });
+    }, false);
     return fakeMessage;
   }
 
@@ -8469,10 +8469,13 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
         case TdApi.MessageSuggestedPostDeclined.CONSTRUCTOR:
         case TdApi.MessageSuggestedPostPaid.CONSTRUCTOR:
         case TdApi.MessageSuggestedPostRefunded.CONSTRUCTOR:
-        case TdApi.MessageGiftedTon.CONSTRUCTOR:
+        case TdApi.MessageGiftedGrams.CONSTRUCTOR:
         case TdApi.MessagePaymentSuccessfulBot.CONSTRUCTOR:
           break;
 
+        case TdApi.MessageChatJoinFromCommunity.CONSTRUCTOR:
+        case TdApi.MessageTonConnectRequest.CONSTRUCTOR:
+        case TdApi.MessageTonWalletTransfer.CONSTRUCTOR:
         case TdApi.MessageUnsupported.CONSTRUCTOR:
           unsupportedStringRes = R.string.UnsupportedMessageType;
           break;
@@ -8483,7 +8486,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
           break;
         }
         default: {
-          Td.assertMessageContent_a80283cf();
+          Td.assertMessageContent_f7758f8b();
           throw Td.unsupported(msg.content);
         }
       }
