@@ -15,6 +15,7 @@
 package org.thunderdog.challegram.data;
 
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Color;
 import android.os.SystemClock;
 import android.view.MotionEvent;
@@ -59,6 +60,7 @@ import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.util.DrawableProvider;
 import org.thunderdog.challegram.util.text.Highlight;
 import org.thunderdog.challegram.util.text.Text;
+import org.thunderdog.challegram.util.text.TextStyleProvider;
 import org.thunderdog.challegram.widget.FileProgressComponent;
 
 import java.io.File;
@@ -400,9 +402,16 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   }
 
   private void trimSubtitle (int maxWidth) {
-    trimmedSubtitle = !StringUtils.isEmpty(subtitle) ? new Text.Builder(subtitle, maxWidth, Paints.getSubtitleStyleProvider(), context.getDecentColorSet()).singleLine().highlight(context.getHighlightedText(Highlight.Pool.KEY_FILE_SUBTITLE, subtitle)).build() : null;
+    TextStyleProvider style = Paints.getSubtitleStyleProvider();
+    if (voice != null) {
+      style = context.useBubbles() ? TGMessage.getTimeTextStyleProvider() : Paints.robotoStyleProvider(TGMessage.PLAIN_TIME_TEXT_SIZE);
+      Paint.FontMetricsInt metrics = style.getTextPaint().getFontMetricsInt();
+      voiceDurationAscent = -metrics.ascent;
+      voiceDurationHeight = metrics.descent - metrics.ascent + metrics.leading;
+    }
+    trimmedSubtitle = !StringUtils.isEmpty(subtitle) ? new Text.Builder(subtitle, maxWidth, style, context.getDecentColorSet()).singleLine().highlight(context.getHighlightedText(Highlight.Pool.KEY_FILE_SUBTITLE, subtitle)).build() : null;
     if (!StringUtils.isEmpty(subtitleMeasure)) {
-      Text trimmedBigSubtitle = new Text.Builder(subtitleMeasure, maxWidth, Paints.getSubtitleStyleProvider(), context.getDecentColorSet()).singleLine().highlight(context.getHighlightedText(Highlight.Pool.KEY_FILE_SUBTITLE, subtitleMeasure)).build();
+      Text trimmedBigSubtitle = new Text.Builder(subtitleMeasure, maxWidth, style, context.getDecentColorSet()).singleLine().highlight(context.getHighlightedText(Highlight.Pool.KEY_FILE_SUBTITLE, subtitleMeasure)).build();
       sizeWidth = Math.max(Math.max(sizeWidth, getSubtitleWidth()), trimmedBigSubtitle.getWidth());
     } else {
       sizeWidth = Math.max(sizeWidth, getSubtitleWidth());
@@ -484,6 +493,11 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   private int lastPreviewLeft, lastPreviewTop, lastPreviewRight, lastPreviewBottom;
 
   private int lastMaxWidth;
+  private static final float TRANSCRIPT_BUTTON_HALF_SIZE = 12f;
+  private static final float VOICE_ROW_GAP = 2f;
+  private int voiceDurationAscent;
+  private int voiceDurationHeight;
+
   private Runnable transcriptionAction;
   private boolean transcriptionEnabled;
   private boolean transcriptionCaught;
@@ -599,8 +613,10 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
       float x = event.getX();
       float y = event.getY();
       int left = getTranscriptButtonLeft(startX);
+      int centerY = startY + getVoiceWaveCenterY();
+      int touchRadius = Screen.dp(TRANSCRIPT_BUTTON_HALF_SIZE + 5f);
       boolean inside = x >= left - Screen.dp(2) && x <= left + Screen.dp(28) &&
-        y >= startY && y <= startY + Screen.dp(34);
+        Math.abs(y - centerY) <= touchRadius;
       if (action == MotionEvent.ACTION_DOWN) {
         transcriptionCaught = inside;
       }
@@ -820,14 +836,14 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
         seek = .68f;
       }
       int waveformLeft = startX + previewSize + getPreviewOffset();
-      int cy = startY + Screen.dp(hasTranscription() ? 15 : FileProgressComponent.DEFAULT_FILE_RADIUS);
+      int cy = startY + getVoiceWaveCenterY();
       waveform.draw(c, seek, waveformLeft, cy, isPlaying && TD.isSelfDestructTypeImmediately(message));
       boolean align = context.isOutgoingBubble();
       int textX = hasTranscription() ? waveformLeft : waveformLeft + waveform.getWidth() + Screen.dp(12);
-      int textY = startY + (hasTranscription() ? getVoiceDurationTop() : Screen.dp(18));
+      int textY = startY + getVoiceDurationTop();
       if (unreadFactor != 0f) {
         float x = textX + getSubtitleWidth() + Screen.dp(6);
-        float y = textY + Screen.dp(7);
+        float y = textY + voiceDurationHeight / 2f;
         if (!hasTranscription()) {
           int radius = Screen.dp(FileProgressComponent.DEFAULT_FILE_RADIUS);
           float diagonal = (float) (radius / Math.sqrt(2));
@@ -850,7 +866,7 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
   private <T extends View & DrawableProvider> void drawTranscriptButton (T view, Canvas canvas, int left, int cy, float alpha) {
     int accent = Theme.getColor(context.isOutgoingBubble() ? ColorId.bubbleOut_file : ColorId.file);
     int radius = Screen.dp(7);
-    int half = Screen.dp(12);
+    int half = Screen.dp(TRANSCRIPT_BUTTON_HALF_SIZE);
     int cx = left + half;
     canvas.drawRoundRect(left, cy - half, left + half * 2, cy + half, radius, radius,
       Paints.fillingPaint(ColorUtils.alphaColor((transcriptExpanded ? .24f : .14f) * alpha, accent)));
@@ -881,12 +897,22 @@ public class FileComponent extends BaseComponent implements FileProgressComponen
     return false;
   }
 
-  private static int getVoiceDurationTop () {
-    return Screen.dp(29);
+  private int getVoiceWaveCenterY () {
+    if (hasTranscription()) {
+      // Center the waveform/button and the duration as a single stack beside Play.
+      return (getPreviewSize() - Screen.dp(VOICE_ROW_GAP) - voiceDurationHeight) / 2;
+    }
+    return getPreviewSize() / 2;
+  }
+
+  private int getVoiceDurationTop () {
+    return hasTranscription()
+      ? getVoiceWaveCenterY() + Screen.dp(TRANSCRIPT_BUTTON_HALF_SIZE) + Screen.dp(VOICE_ROW_GAP)
+      : (getPreviewSize() - voiceDurationHeight) / 2;
   }
 
   int getVoiceDurationBaseline () {
-    return getVoiceDurationTop() - Paints.getSubtitleStyleProvider().getTextPaint().getFontMetricsInt().ascent;
+    return getVoiceDurationTop() + voiceDurationAscent;
   }
 
   public int getLastLineWidth () {

@@ -7803,12 +7803,15 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     return Paints.getMediumTextPaint(14f, needFakeBold);
   }
 
+  private static final float BUBBLE_TIME_TEXT_SIZE = 11f;
+  static final float PLAIN_TIME_TEXT_SIZE = 12f;
+
   protected static TextPaint mTimeBubble () {
-    return Paints.getRegularTextPaint(11f);
+    return Paints.getRegularTextPaint(BUBBLE_TIME_TEXT_SIZE);
   }
 
   protected static TextPaint mTime (boolean willDraw) {
-    TextPaint paint = Paints.getRegularTextPaint(12f);
+    TextPaint paint = Paints.getRegularTextPaint(PLAIN_TIME_TEXT_SIZE);
     if (willDraw)
       paint.setColor(Theme.getColor(ColorId.textLight));;
     return paint;
@@ -7890,7 +7893,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
 
   public static TextStyleProvider getTimeTextStyleProvider () {
     if (timeProvider == null) {
-      timeProvider = new TextStyleProvider(Fonts.newRobotoStorage()).setTextSize(11f);
+      timeProvider = new TextStyleProvider(Fonts.newRobotoStorage()).setTextSize(BUBBLE_TIME_TEXT_SIZE);
     }
     return timeProvider;
   }
