@@ -504,7 +504,7 @@ public class PageBlockRichText extends PageBlock {
   void setInline () {
     super.setInline();
     if (text != null) {
-      text.setMaxLines(10);
+      text.setMaxLines(36);
     }
   }
 

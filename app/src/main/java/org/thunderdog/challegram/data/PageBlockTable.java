@@ -27,6 +27,7 @@ import org.thunderdog.challegram.loader.ComplexReceiver;
 import org.thunderdog.challegram.loader.Receiver;
 import org.thunderdog.challegram.navigation.ViewController;
 import org.thunderdog.challegram.telegram.TdlibUi;
+import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
@@ -39,6 +40,7 @@ import org.thunderdog.challegram.util.text.TextColorSets;
 
 import java.util.ArrayList;
 
+import me.vkryl.core.ColorUtils;
 import me.vkryl.core.collection.LongSparseIntArray;
 import me.vkryl.core.lambda.Destroyable;
 import tgx.td.Td;
@@ -228,16 +230,20 @@ public class PageBlockTable extends PageBlock implements Destroyable {
   @Override
   protected <T extends View & DrawableProvider> void drawInternal (T view, Canvas c, Receiver preview, Receiver receiver, @Nullable ComplexReceiver iconReceiver) {
     final TdApi.PageBlockTable table = (TdApi.PageBlockTable) this.block;
+    boolean dark = Theme.isDark();
+    int textColor = Theme.getColor(ColorId.iv_text);
+    int border = dark ? ColorUtils.alphaColor(.20f, textColor) : Theme.separatorColor();
     int tableSave = Views.save(c);
     if (inlineOutline != null) {
       c.clipPath(inlineOutline);
     }
     for (Cell cell : cellsList) {
       if (cell.cell.isHeader || (table.isStriped && cell.cellPositionStartY() % 2 == 0)) {
-        c.drawRect(cell.bounds, Paints.fillingPaint(Theme.backgroundColor()));
+        int background = dark ? ColorUtils.alphaColor(cell.cell.isHeader ? .10f : .045f, textColor) : Theme.backgroundColor();
+        c.drawRect(cell.bounds, Paints.fillingPaint(background));
       }
       if (table.isBordered) {
-        c.drawRect(cell.bounds, Paints.strokeSeparatorPaint(Theme.separatorColor()));
+        c.drawRect(cell.bounds, Paints.strokeSeparatorPaint(border));
       }
       if (cell.text != null) {
         int restoreCount = Views.save(c);
@@ -264,7 +270,7 @@ public class PageBlockTable extends PageBlock implements Destroyable {
     Views.restore(c, tableSave);
     if (inlineBounds != null && table.isBordered) {
       int radius = Screen.dp(7);
-      c.drawRoundRect(inlineBounds, radius, radius, Paints.strokeSeparatorPaint(Theme.separatorColor()));
+      c.drawRoundRect(inlineBounds, radius, radius, Paints.strokeSeparatorPaint(border));
     }
   }
 

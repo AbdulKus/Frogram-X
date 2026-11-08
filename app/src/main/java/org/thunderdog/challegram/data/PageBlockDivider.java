@@ -63,8 +63,9 @@ public class PageBlockDivider extends PageBlock {
   @Override
   public void drawInternal (View view, Canvas c, Receiver preview, Receiver receiver, ComplexReceiver iconReceiver) {
     int top = Screen.dp(9f);
-    int viewWidth = (view.getMeasuredWidth() - getTotalContentPadding()) / 2;
-    int x = viewWidth - viewWidth / 2 + getMinimumContentPadding(true);
-    c.drawRect(x, top, x + viewWidth, top + Screen.dp(1f), Paints.fillingPaint(Theme.getColor(ColorId.iv_separator)));
+    int left = getMinimumContentPadding(true);
+    int width = Math.max(0, getMaxWidth() - left - getMinimumContentPadding(false));
+    int start = left + width / 4;
+    c.drawRect(start, top, start + width / 2, top + Screen.dp(1f), Paints.fillingPaint(Theme.getColor(ColorId.iv_separator)));
   }
 }

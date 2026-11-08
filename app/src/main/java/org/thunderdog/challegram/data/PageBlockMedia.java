@@ -28,6 +28,7 @@ import androidx.annotation.Nullable;
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.Log;
 import org.thunderdog.challegram.R;
+import org.thunderdog.challegram.component.chat.MessageView;
 import org.thunderdog.challegram.U;
 import org.thunderdog.challegram.component.MediaCollectorDelegate;
 import org.thunderdog.challegram.core.Lang;
@@ -352,8 +353,54 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
   public void autoDownloadContent () {
     if (collageContext != null) {
       collageContext.autoDownloadContent();
-    } else if (wrapper != null) {
-      wrapper.getFileProgress().downloadAutomatically();
+    } else {
+      MediaWrapper display = getDisplayWrapper();
+      if (display != null) {
+        display.getFileProgress().downloadAutomatically();
+      }
+    }
+  }
+
+  boolean isInlineSlideshow () {
+    return inline && isList && getCount() > 1;
+  }
+
+  private @Nullable MediaWrapper getDisplayWrapper () {
+    return inline && isList ? getWrapper(selectedPage) : wrapper;
+  }
+
+  int getInlineReceiverCount () {
+    return collageContext != null ? getCount() : 1;
+  }
+
+  void requestInlineMedia (ComplexReceiver receiver, long key) {
+    if (collageContext != null) {
+      collageContext.requestFiles(receiver, false, key);
+      return;
+    }
+    MediaWrapper display = getDisplayWrapper();
+    if (display == null) {
+      receiver.clearReceivers(key);
+      return;
+    }
+    display.requestPreview(receiver.getPreviewReceiver(key));
+    if (useGif || display.needGif()) {
+      receiver.getImageReceiver(key).clear();
+      display.requestGif(receiver.getGifReceiver(key));
+    } else {
+      receiver.getGifReceiver(key).clear();
+      display.requestImage(receiver.getImageReceiver(key));
+    }
+  }
+
+  void drawInlineMedia (MessageView view, Canvas c, ComplexReceiver receiver, long key) {
+    if (collageContext != null) {
+      drawCollage(view, c, receiver, key);
+      return;
+    }
+    MediaWrapper display = getDisplayWrapper();
+    if (display != null) {
+      draw(view, c, receiver.getPreviewReceiver(key), receiver.getReceiver(key, useGif || display.needGif()), receiver);
     }
   }
 
@@ -404,6 +451,11 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
         wrapper.buildContent(isCover ? width : photoWidth, photoHeight);
         height += wrapper.getCellHeight();
       } else if (isList) {
+        if (inline && wrappers != null) {
+          for (MediaWrapper item : wrappers) {
+            item.buildContent(photoWidth, photoHeight);
+          }
+        }
         height += photoHeight;
       }
     }
@@ -422,16 +474,82 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
 
   @Override
   protected int getContentHeight () {
-    return collageContext != null ? collageContext.getCachedHeight() : wrapper != null ? wrapper.getCellHeight() : 0;
+    MediaWrapper display = getDisplayWrapper();
+    return collageContext != null ? collageContext.getCachedHeight() : display != null ? display.getCellHeight() : 0;
   }
 
   @Override
   public boolean handleTouchEvent (View view, MotionEvent e) {
     if (collageContext != null) {
       return collageContext.onTouchEvent(view, e, 0, getContentTop());
-    } else {
-      return wrapper != null && wrapper.onTouchEvent(view, e);
     }
+    MediaWrapper display = getDisplayWrapper();
+    if (display == null) {
+      return false;
+    }
+    if (!isInlineSlideshow()) {
+      return display.onTouchEvent(view, e);
+    }
+    return onSlideshowTouch(view, e, display);
+  }
+
+  private float galleryStartX, galleryStartY;
+  private boolean galleryDragging;
+
+  private boolean onSlideshowTouch (View view, MotionEvent event, MediaWrapper display) {
+    int action = event.getActionMasked();
+    if (action == MotionEvent.ACTION_DOWN) {
+      if (event.getY() < getContentTop() || event.getY() >= getContentTop() + getContentHeight()) {
+        return false;
+      }
+      galleryStartX = event.getX();
+      galleryStartY = event.getY();
+      galleryDragging = false;
+      display.onTouchEvent(view, event);
+      return true;
+    }
+    float dx = event.getX() - galleryStartX;
+    float dy = event.getY() - galleryStartY;
+    if (action == MotionEvent.ACTION_MOVE && !galleryDragging &&
+        Math.abs(dx) > Screen.getTouchSlop() && Math.abs(dx) > Math.abs(dy) * 1.3f) {
+      galleryDragging = true;
+      MotionEvent cancel = MotionEvent.obtain(event);
+      cancel.setAction(MotionEvent.ACTION_CANCEL);
+      display.onTouchEvent(view, cancel);
+      cancel.recycle();
+      if (view.getParent() != null) {
+        view.getParent().requestDisallowInterceptTouchEvent(true);
+      }
+    }
+    if (!galleryDragging) {
+      return display.onTouchEvent(view, event);
+    }
+    if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+      galleryDragging = false;
+      if (view.getParent() != null) {
+        view.getParent().requestDisallowInterceptTouchEvent(false);
+      }
+      if (action == MotionEvent.ACTION_UP && Math.abs(dx) > Screen.dp(26)) {
+        int page = Math.max(0, Math.min(getCount() - 1, selectedPage + (dx < 0 ? 1 : -1)));
+        if (page != selectedPage && view instanceof MessageView) {
+          setSelectedPage(page);
+          TGMessage message = ((MessageView) view).getMessage();
+          if (message != null) {
+            message.invalidateContentReceiver();
+            message.invalidate();
+            autoDownloadContent();
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  private <T extends View & DrawableProvider> void drawCollage (T view, Canvas c, ComplexReceiver receiver, long key) {
+    int maxWidth = getMaxWidth() - getMinimumContentPadding(true) - getMinimumContentPadding(false);
+    int collageWidth = collageContext.getWidth();
+    int x = getMinimumContentPadding(true) + (isIndependent() ? Math.max(0, maxWidth - collageWidth) / 2 : 0);
+    collageContext.draw(view, c, x, getContentTop(), receiver, key);
   }
 
   @Override
@@ -447,28 +565,39 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
       }
       receiver.draw(c);
     } else if (collageContext != null && view instanceof PageBlockView) {
-      int maxWidth = view.getMeasuredWidth() - getMinimumContentPadding(true) - getMinimumContentPadding(false);
-      int collageWidth = collageContext.getWidth();
-      int x = !isIndependent() ? getMinimumContentPadding(true) : collageWidth < maxWidth ? (maxWidth - collageWidth) / 2 : 0;
-      collageContext.draw(view, c, x, getContentTop(), ((PageBlockView) view).getMultipleReceiver());
-    } else if (wrapper != null) {
-      final int x = ((getMaxWidth() - getMinimumContentPadding(true) - getMinimumContentPadding(false)) / 2 - wrapper.getCellWidth() / 2) + getMinimumContentPadding(true);
-      if (inline && wrapper.isPhoto()) {
+      drawCollage(view, c, ((PageBlockView) view).getMultipleReceiver(), 0);
+    } else {
+      MediaWrapper display = getDisplayWrapper();
+      if (display == null) {
+        return;
+      }
+      final int x = ((getMaxWidth() - getMinimumContentPadding(true) - getMinimumContentPadding(false)) / 2 - display.getCellWidth() / 2) + getMinimumContentPadding(true);
+      if (inline && display.isPhoto()) {
         if (inlinePhotoClip == null) {
           inlinePhotoClip = new Path();
         }
         int top = getContentTop();
         int radius = Screen.dp(8);
         RectF bounds = Paints.getRectF();
-        bounds.set(x, top, x + wrapper.getCellWidth(), top + wrapper.getCellHeight());
+        bounds.set(x, top, x + display.getCellWidth(), top + display.getCellHeight());
         inlinePhotoClip.rewind();
         inlinePhotoClip.addRoundRect(bounds, radius, radius, Path.Direction.CW);
         int save = Views.save(c);
         c.clipPath(inlinePhotoClip);
-        wrapper.draw(view, c, x, top, preview, receiver, 1f);
+        display.draw(view, c, x, top, preview, receiver, 1f);
         Views.restore(c, save);
       } else {
-        wrapper.draw(view, c, x, getContentTop(), preview, receiver, 1f);
+        display.draw(view, c, x, getContentTop(), preview, receiver, 1f);
+      }
+      if (isInlineSlideshow()) {
+        float spacing = Screen.dp(10);
+        float cx = x + display.getCellWidth() / 2f - spacing * (getCount() - 1) / 2f;
+        float cy = getContentTop() + display.getCellHeight() - Screen.dp(12);
+        for (int i = 0; i < getCount(); i++) {
+          c.drawCircle(cx + spacing * i, cy, Screen.dp(2), Paints.fillingPaint(0x90000000));
+          c.drawCircle(cx + spacing * i, cy, Screen.dpf(1.5f),
+            Paints.fillingPaint(i == selectedPage ? 0xffffffff : 0xaaffffff));
+        }
       }
       if (!StringUtils.isEmpty(url)) {
         Drawables.draw(c, linkIcon, receiver.getRight() - linkIcon.getMinimumWidth() - Screen.dp(9f), receiver.getTop() + Screen.dp(9f), Paints.whitePorterDuffPaint());
@@ -477,7 +606,11 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
   }
 
   void destroyInlineMedia () {
-    if (wrapper != null) {
+    if (wrappers != null) {
+      for (MediaWrapper item : wrappers) {
+        item.destroy();
+      }
+    } else if (wrapper != null) {
       wrapper.destroy();
     }
   }

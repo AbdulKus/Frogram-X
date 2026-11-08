@@ -110,7 +110,11 @@ public class CollageContext {
 
   public final void requestFiles (ComplexReceiver multipleReceiver, boolean invalidate) {
     multipleReceiver.clearReceiversWithHigherKey(items.size());
-    int i = 0;
+    requestFiles(multipleReceiver, invalidate, 0);
+  }
+
+  public final void requestFiles (ComplexReceiver multipleReceiver, boolean invalidate, long keyOffset) {
+    long i = keyOffset;
     for (CollageItem item : items) {
       if (!invalidate) {
         item.wrapper.requestPreview(multipleReceiver.getPreviewReceiver(i));
@@ -141,7 +145,12 @@ public class CollageContext {
   }
 
   public final <T extends View & DrawableProvider> void draw (T view, Canvas c, int startX, int startY, ComplexReceiver multipleReceiver) {
-    int i = 0;
+    draw(view, c, startX, startY, multipleReceiver, 0);
+  }
+
+  public final <T extends View & DrawableProvider> void draw (T view, Canvas c, int startX, int startY,
+                                                             ComplexReceiver multipleReceiver, long keyOffset) {
+    long i = keyOffset;
     for (CollageItem item : items) {
       item.wrapper.draw(view, c, startX + item.x, startY + item.y, multipleReceiver.getPreviewReceiver(i), multipleReceiver.getReceiver(i, item.wrapper.needGif()), 1f);
       i++;

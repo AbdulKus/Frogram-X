@@ -36,6 +36,7 @@ import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.data.ContentPreview;
 import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.data.TGMessage;
+import org.thunderdog.challegram.data.TGMessageRichMessage;
 import org.thunderdog.challegram.data.TGMessageBotInfo;
 import org.thunderdog.challegram.data.TGMessageLocation;
 import org.thunderdog.challegram.data.TGMessageSticker;
@@ -1555,6 +1556,9 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   private boolean startSwipeIfNeeded (MotionEvent e, float diffX) {
+    if (msg instanceof TGMessageRichMessage && ((TGMessageRichMessage) msg).isTouchingGallery()) {
+      return false;
+    }
     if (msg == null || msg.isNotSent() || !msg.canSwipe() || msg.isSponsoredMessage() || UI.getContext(getContext()).getRecordAudioVideoController().isOpen()) {
       return false;
     }

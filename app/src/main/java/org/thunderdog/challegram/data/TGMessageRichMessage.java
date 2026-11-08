@@ -25,7 +25,6 @@ import org.thunderdog.challegram.loader.ComplexReceiver;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.ui.InstantViewController;
-import org.thunderdog.challegram.ui.ListItem;
 import org.thunderdog.challegram.util.text.Text;
 import org.thunderdog.challegram.util.text.TextColorSets;
 
@@ -36,8 +35,8 @@ import me.vkryl.android.util.ClickHelper;
 import me.vkryl.core.lambda.Destroyable;
 
 public class TGMessageRichMessage extends TGMessage {
-  private static final int MAX_PREVIEW_BLOCKS = 14;
-  private static final long MEDIA_KEY = -1;
+  private static final int MAX_PREVIEW_BLOCKS = 32;
+  private static final int MAX_PREVIEW_TEXT_HEIGHT = 1000;
   private TdApi.RichMessage richMessage;
   private List<PageBlock> blocks;
   private final ArrayList<PreviewBlock> visibleBlocks = new ArrayList<>();
@@ -72,25 +71,21 @@ public class TGMessageRichMessage extends TGMessage {
     }
     this.richMessage = message;
     ArrayList<TdApi.PageBlock> preview = new ArrayList<>();
-    boolean hasMedia = false;
-    int count = 0;
+    hasMoreBlocks = !message.isFull;
     for (TdApi.PageBlock block : message.blocks) {
+      if (preview.size() == MAX_PREVIEW_BLOCKS) {
+        hasMoreBlocks = true;
+        break;
+      }
       if (block instanceof TdApi.PageBlockCover) {
         block = ((TdApi.PageBlockCover) block).cover;
       }
-      if (count == MAX_PREVIEW_BLOCKS || !isPreviewBlock(block)) {
-        break;
+      if (isPreviewBlock(block)) {
+        preview.add(block);
+      } else {
+        hasMoreBlocks = true;
       }
-      boolean media = block instanceof TdApi.PageBlockPhoto || block instanceof TdApi.PageBlockVideo ||
-        block instanceof TdApi.PageBlockAnimation;
-      if (media && hasMedia) {
-        break;
-      }
-      hasMedia |= media;
-      preview.add(block);
-      count++;
     }
-    hasMoreBlocks = !message.isFull || count < message.blocks.length;
     blocks = PageBlock.parsePreview(messagesController(), preview.toArray(new TdApi.PageBlock[0]), message.isRtl,
       button -> PageBlockButtons.open(messagesController(), msg, button));
     activeBlock = null;
@@ -121,6 +116,8 @@ public class TGMessageRichMessage extends TGMessage {
       case TdApi.PageBlockPhoto.CONSTRUCTOR:
       case TdApi.PageBlockVideo.CONSTRUCTOR:
       case TdApi.PageBlockAnimation.CONSTRUCTOR:
+      case TdApi.PageBlockSlideshow.CONSTRUCTOR:
+      case TdApi.PageBlockCollage.CONSTRUCTOR:
       case TdApi.PageBlockButtonRow.CONSTRUCTOR:
       case TdApi.PageBlockDivider.CONSTRUCTOR:
       case TdApi.PageBlockAnchor.CONSTRUCTOR:
@@ -185,14 +182,22 @@ public class TGMessageRichMessage extends TGMessage {
       return;
     }
     boolean needsOpen = hasMoreBlocks;
+    int textHeight = 0;
+    long mediaOffset = 0;
     for (PageBlock block : blocks) {
       int height = block.getHeight(null, maxWidth);
-      boolean media = block instanceof PageBlockMedia;
+      boolean countsTowardsTextHeight = block instanceof PageBlockRichText || block instanceof PageBlockTable;
       int gap = contentHeight == 0 || block.mergeTop ? 0 : Screen.dp(3);
-      if ((contentHeight > 0 && contentHeight + gap + height > Screen.dp(480)) ||
-          (block instanceof PageBlockTable && block.getCustomWidth() > maxWidth)) {
+      if (block instanceof PageBlockTable && block.getCustomWidth() > maxWidth) {
         needsOpen = true;
-        break;
+        continue;
+      }
+      if (countsTowardsTextHeight) {
+        textHeight += block.getContentHeight();
+        if (textHeight > Screen.dp(MAX_PREVIEW_TEXT_HEIGHT)) {
+          needsOpen = true;
+          break;
+        }
       }
       if (height == 0) {
         continue;
@@ -200,7 +205,10 @@ public class TGMessageRichMessage extends TGMessage {
       int width = block instanceof PageBlockRichText ? ((PageBlockRichText) block).getInlineWidth() : maxWidth;
       contentWidth = Math.min(maxWidth, Math.max(contentWidth, width));
       contentHeight += gap;
-      visibleBlocks.add(new PreviewBlock(block, contentHeight, height, media));
+      if (block instanceof PageBlockMedia) {
+        mediaOffset -= ((PageBlockMedia) block).getInlineReceiverCount();
+      }
+      visibleBlocks.add(new PreviewBlock(block, contentHeight, height, mediaOffset));
       contentHeight += height;
       if (block instanceof PageBlockRichText && ((PageBlockRichText) block).isEllipsized()) {
         needsOpen = true;
@@ -249,32 +257,22 @@ public class TGMessageRichMessage extends TGMessage {
   @Override
   public void requestMediaContent (ComplexReceiver receiver, boolean invalidate, int invalidateArg) {
     int offset = 0;
-    boolean hasMedia = false;
+    long mediaOffset = 0;
     for (PreviewBlock item : visibleBlocks) {
-      PageBlock block = item.block;
-      offset = block.requestInlineIcons(receiver, offset);
-      if (item.media) {
-        hasMedia = true;
-        block.requestPreview(receiver.getPreviewReceiver(MEDIA_KEY));
-        if (item.isGif()) {
-          receiver.getImageReceiver(MEDIA_KEY).clear();
-          block.requestGif(receiver.getGifReceiver(MEDIA_KEY));
-        } else {
-          receiver.getGifReceiver(MEDIA_KEY).clear();
-          block.requestImage(receiver.getImageReceiver(MEDIA_KEY));
-        }
+      offset = item.block.requestInlineIcons(receiver, offset);
+      if (item.block instanceof PageBlockMedia) {
+        ((PageBlockMedia) item.block).requestInlineMedia(receiver, item.mediaKey);
+        mediaOffset = item.mediaKey;
       }
     }
     receiver.clearReceiversWithHigherKey(offset);
-    if (!hasMedia) {
-      receiver.clearReceivers(MEDIA_KEY);
-    }
+    receiver.clearReceiversRange(Long.MIN_VALUE, mediaOffset);
   }
 
   @Override
   public void autoDownloadContent (TdApi.ChatType type) {
     for (PreviewBlock item : visibleBlocks) {
-      if (item.media) {
+      if (item.block instanceof PageBlockMedia) {
         item.block.autoDownloadContent();
       }
     }
@@ -285,8 +283,8 @@ public class TGMessageRichMessage extends TGMessage {
     for (PreviewBlock item : visibleBlocks) {
       int save = Views.save(canvas);
       canvas.translate(startX, startY + item.top);
-      if (item.media) {
-        item.block.draw(view, canvas, receiver.getPreviewReceiver(MEDIA_KEY), receiver.getReceiver(MEDIA_KEY, item.isGif()), receiver);
+      if (item.block instanceof PageBlockMedia) {
+        ((PageBlockMedia) item.block).drawInlineMedia(view, canvas, receiver, item.mediaKey);
       } else {
         item.block.draw(view, canvas, null, null, receiver);
       }
@@ -323,6 +321,11 @@ public class TGMessageRichMessage extends TGMessage {
       return handled;
     }
     return false;
+  }
+
+  public boolean isTouchingGallery () {
+    return activeBlock != null && activeBlock.block instanceof PageBlockMedia &&
+      ((PageBlockMedia) activeBlock.block).isInlineSlideshow();
   }
 
   private boolean dispatchBlockTouch (MessageView view, MotionEvent event, PreviewBlock item) {
@@ -382,17 +385,13 @@ public class TGMessageRichMessage extends TGMessage {
   private static final class PreviewBlock {
     final PageBlock block;
     final int top, height;
-    final boolean media;
+    final long mediaKey;
 
-    PreviewBlock (PageBlock block, int top, int height, boolean media) {
+    PreviewBlock (PageBlock block, int top, int height, long mediaKey) {
       this.block = block;
       this.top = top;
       this.height = height;
-      this.media = media;
-    }
-
-    boolean isGif () {
-      return block.getRelatedViewType() == ListItem.TYPE_PAGE_BLOCK_GIF;
+      this.mediaKey = mediaKey;
     }
   }
 }
