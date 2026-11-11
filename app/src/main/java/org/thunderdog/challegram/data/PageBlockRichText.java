@@ -213,9 +213,10 @@ public class PageBlockRichText extends PageBlock {
     }
   }
 
-  public PageBlockRichText (ViewController<?> context, TdApi.PageBlockParagraph paragraph, int quoteLevel, @Nullable TdlibUi.UrlOpenParameters openParameters) {
+  public PageBlockRichText (ViewController<?> context, TdApi.PageBlockParagraph paragraph, int quoteLevel, boolean inline, @Nullable TdlibUi.UrlOpenParameters openParameters) {
     super(context, paragraph, quoteLevel);
-    setText(paragraph.text, getParagraphProvider(), TextColorSets.InstantView.NORMAL, Text.FLAG_ARTICLE, openParameters);
+    setText(paragraph.text, inline ? TGMessage.getTextStyleProvider() : getParagraphProvider(),
+      TextColorSets.InstantView.NORMAL, inline ? 0 : Text.FLAG_ARTICLE, openParameters);
   }
 
   public PageBlockRichText (ViewController<?> context, TdApi.PageBlockPreformatted preformatted, int quoteLevel, @Nullable TdlibUi.UrlOpenParameters openParameters) {
@@ -385,7 +386,7 @@ public class PageBlockRichText extends PageBlock {
     this.textHorizontalOffset = TEXT_HORIZONTAL_OFFSET_PULL_QUOTE;
   }
 
-  public PageBlockRichText (ViewController<?> context, TdApi.PageBlock mediaBlock, int quoteLevel, TdApi.PageBlockCaption caption, boolean isCredit, boolean isCover, @Nullable TdlibUi.UrlOpenParameters openParameters) {
+  public PageBlockRichText (ViewController<?> context, TdApi.PageBlock mediaBlock, int quoteLevel, TdApi.PageBlockCaption caption, boolean isCredit, boolean isCover, boolean inline, @Nullable TdlibUi.UrlOpenParameters openParameters) {
     super(context, mediaBlock, quoteLevel);
     if (isCredit) {
       if (!Td.isEmpty(caption.text)) {
@@ -402,7 +403,8 @@ public class PageBlockRichText extends PageBlock {
         paddingBottom = isCover ? 2f : 8f;
       }
       paddingTop = 10f;
-      setText(caption.text, getCaptionProvider(), TextColorSets.InstantView.CAPTION, Text.FLAG_ARTICLE, openParameters);
+      setText(caption.text, inline ? TGMessage.getTextStyleProvider() : getCaptionProvider(),
+        TextColorSets.InstantView.CAPTION, inline ? 0 : Text.FLAG_ARTICLE, openParameters);
     }
   }
 
@@ -498,19 +500,6 @@ public class PageBlockRichText extends PageBlock {
     int count = current.getMediaCount();
     current.requestMedia(receiver, offset, count);
     return offset + count;
-  }
-
-  @Override
-  void setInline () {
-    super.setInline();
-    if (text != null) {
-      text.setMaxLines(36);
-    }
-  }
-
-  boolean isEllipsized () {
-    Text current = text != null ? text.getCurrent() : null;
-    return current != null && current.isEllipsized();
   }
 
   int getInlineWidth () {

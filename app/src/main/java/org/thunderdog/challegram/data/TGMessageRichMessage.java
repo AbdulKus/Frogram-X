@@ -35,8 +35,6 @@ import me.vkryl.android.util.ClickHelper;
 import me.vkryl.core.lambda.Destroyable;
 
 public class TGMessageRichMessage extends TGMessage {
-  private static final int MAX_PREVIEW_BLOCKS = 32;
-  private static final int MAX_PREVIEW_TEXT_HEIGHT = 1000;
   private TdApi.RichMessage richMessage;
   private List<PageBlock> blocks;
   private final ArrayList<PreviewBlock> visibleBlocks = new ArrayList<>();
@@ -73,10 +71,6 @@ public class TGMessageRichMessage extends TGMessage {
     ArrayList<TdApi.PageBlock> preview = new ArrayList<>();
     hasMoreBlocks = !message.isFull;
     for (TdApi.PageBlock block : message.blocks) {
-      if (preview.size() == MAX_PREVIEW_BLOCKS) {
-        hasMoreBlocks = true;
-        break;
-      }
       if (block instanceof TdApi.PageBlockCover) {
         block = ((TdApi.PageBlockCover) block).cover;
       }
@@ -126,9 +120,6 @@ public class TGMessageRichMessage extends TGMessage {
         return isSimpleGroup(((TdApi.PageBlockBlockQuote) block).blocks);
       case TdApi.PageBlockList.CONSTRUCTOR: {
         TdApi.PageBlockListItem[] items = ((TdApi.PageBlockList) block).items;
-        if (items.length > 6) {
-          return false;
-        }
         for (TdApi.PageBlockListItem item : items) {
           if (!isSimpleGroup(item.blocks)) {
             return false;
@@ -158,15 +149,20 @@ public class TGMessageRichMessage extends TGMessage {
   }
 
   private static boolean isSimpleGroup (TdApi.PageBlock[] blocks) {
-    if (blocks.length > 3) {
-      return false;
-    }
     for (TdApi.PageBlock block : blocks) {
       if (!(block instanceof TdApi.PageBlockParagraph) && !(block instanceof TdApi.PageBlockPreformatted)) {
         return false;
       }
     }
     return true;
+  }
+
+  @Override
+  public void onUpdateTextSize () {
+    super.onUpdateTextSize();
+    for (PageBlock block : blocks) {
+      block.invalidateCachedHeight();
+    }
   }
 
   @Override
@@ -182,48 +178,39 @@ public class TGMessageRichMessage extends TGMessage {
       return;
     }
     boolean needsOpen = hasMoreBlocks;
-    int textHeight = 0;
     long mediaOffset = 0;
     for (PageBlock block : blocks) {
       int height = block.getHeight(null, maxWidth);
-      boolean countsTowardsTextHeight = block instanceof PageBlockRichText || block instanceof PageBlockTable;
-      int gap = contentHeight == 0 || block.mergeTop ? 0 : Screen.dp(3);
       if (block instanceof PageBlockTable && block.getCustomWidth() > maxWidth) {
         needsOpen = true;
         continue;
-      }
-      if (countsTowardsTextHeight) {
-        textHeight += block.getContentHeight();
-        if (textHeight > Screen.dp(MAX_PREVIEW_TEXT_HEIGHT)) {
-          needsOpen = true;
-          break;
-        }
       }
       if (height == 0) {
         continue;
       }
       int width = block instanceof PageBlockRichText ? ((PageBlockRichText) block).getInlineWidth() : maxWidth;
       contentWidth = Math.min(maxWidth, Math.max(contentWidth, width));
-      contentHeight += gap;
       if (block instanceof PageBlockMedia) {
         mediaOffset -= ((PageBlockMedia) block).getInlineReceiverCount();
       }
-      visibleBlocks.add(new PreviewBlock(block, contentHeight, height, mediaOffset));
-      contentHeight += height;
-      if (block instanceof PageBlockRichText && ((PageBlockRichText) block).isEllipsized()) {
-        needsOpen = true;
-        break;
-      }
+      visibleBlocks.add(new PreviewBlock(block, mediaOffset));
     }
     if (needsOpen || visibleBlocks.isEmpty()) {
-      actionTop = contentHeight;
       openAction = new Text.Builder(Lang.getString(R.string.OpenRichMessage), maxWidth,
         PageBlockRichText.getCaptionProvider(), TextColorSets.Regular.LINK).allBold().maxLineCount(2).build();
       contentWidth = Math.max(contentWidth, openAction.getWidth());
-      contentHeight += openAction.getHeight() + Screen.dp(12);
     }
     for (PreviewBlock item : visibleBlocks) {
-      item.block.getHeight(null, contentWidth);
+      if (contentHeight != 0 && !item.block.mergeTop) {
+        contentHeight += Screen.dp(3);
+      }
+      item.top = contentHeight;
+      item.height = item.block.getHeight(null, contentWidth);
+      contentHeight += item.height;
+    }
+    if (openAction != null) {
+      actionTop = contentHeight;
+      contentHeight += openAction.getHeight() + Screen.dp(12);
     }
     invalidateContentReceiver();
   }
@@ -384,13 +371,11 @@ public class TGMessageRichMessage extends TGMessage {
 
   private static final class PreviewBlock {
     final PageBlock block;
-    final int top, height;
+    int top, height;
     final long mediaKey;
 
-    PreviewBlock (PageBlock block, int top, int height, long mediaKey) {
+    PreviewBlock (PageBlock block, long mediaKey) {
       this.block = block;
-      this.top = top;
-      this.height = height;
       this.mediaKey = mediaKey;
     }
   }

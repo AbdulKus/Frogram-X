@@ -219,6 +219,10 @@ public abstract class PageBlock {
     return maxWidth;
   }
 
+  final void invalidateCachedHeight () {
+    maxWidth = 0;
+  }
+
   public final void invalidateHeight (View view) {
     final int lastWidth = this.maxWidth;
     if (lastWidth != 0) {
@@ -378,6 +382,7 @@ public abstract class PageBlock {
 
   public static class ParseContext {
     @Nullable PageBlockButtons.Action buttonAction;
+    private boolean inline;
     public final String url;
     public final boolean isRtl;
     public final TGPlayerController.PlayListBuilder playListBuilder;
@@ -413,14 +418,14 @@ public abstract class PageBlock {
       PageBlockRichText captionBlock = null;
       boolean needMerge = (lastBlock != null && lastBlock.block == mediaBlock) || mediaBlock.getConstructor() == TdApi.PageBlockEmbeddedPost.CONSTRUCTOR;
       if (!Td.isEmpty(caption.text)) {
-        captionBlock = new PageBlockRichText(parent, mediaBlock, quoteLevel, caption, false, isCover, openParameters);
+        captionBlock = new PageBlockRichText(parent, mediaBlock, quoteLevel, caption, false, isCover, inline, openParameters);
         if (needMerge) {
           captionBlock.mergeWith(lastBlock);
         }
         process(captionBlock, out);
       }
       if (!Td.isEmpty(caption.credit)) {
-        PageBlockRichText credit = new PageBlockRichText(parent, mediaBlock, quoteLevel, caption, true, isCover, openParameters);
+        PageBlockRichText credit = new PageBlockRichText(parent, mediaBlock, quoteLevel, caption, true, isCover, inline, openParameters);
         if (captionBlock != null || needMerge) {
           credit.mergeWith(captionBlock != null ? captionBlock : lastBlock);
         }
@@ -529,6 +534,7 @@ public abstract class PageBlock {
     TdApi.WebPageInstantView view = new TdApi.WebPageInstantView(blocks, 0, 2, rtl, true, null);
     ParseContext context = new ParseContext("", view, null);
     context.buttonAction = action;
+    context.inline = true;
     List<PageBlock> out = new ArrayList<>();
     for (TdApi.PageBlock rawBlock : blocks) {
       try {
@@ -601,7 +607,7 @@ public abstract class PageBlock {
         break;
       }
       case TdApi.PageBlockParagraph.CONSTRUCTOR: {
-        PageBlockRichText text = new PageBlockRichText(parent, (TdApi.PageBlockParagraph) block, context.quoteLevel(), openParameters);
+        PageBlockRichText text = new PageBlockRichText(parent, (TdApi.PageBlockParagraph) block, context.quoteLevel(), context.inline, openParameters);
         context.process(text, out);
         break;
       }
