@@ -105,6 +105,8 @@ public class TGCallService extends Service implements
     void onVideoStateChanged (boolean supported, boolean localVideoEnabled, @VideoState int remoteVideoState, boolean frontCamera);
   }
 
+  private static final String EXTRA_ANSWER_WITH_VIDEO = "answer_with_video";
+
   @Override
   public IBinder onBind (Intent intent) {
     return null;
@@ -243,7 +245,7 @@ public class TGCallService extends Service implements
       }
 
       if (Intents.ACTION_ANSWER_CALL.equals(action)) {
-        acceptIncomingCall();
+        acceptIncomingCall(intent.getBooleanExtra(EXTRA_ANSWER_WITH_VIDEO, true));
         return;
       }
     }
@@ -724,9 +726,9 @@ public class TGCallService extends Service implements
 
   // Implementation
 
-  private void acceptIncomingCall () {
+  private void acceptIncomingCall (boolean withVideo) {
     if (call != null) {
-      tdlib.context().calls().acceptCall(this, tdlib, call.id);
+      tdlib.context().calls().acceptCall(this, tdlib, call.id, withVideo);
       if (UI.getUiState() != UI.State.RESUMED) {
         bringCallToFront();
       }
@@ -1016,7 +1018,7 @@ public class TGCallService extends Service implements
     }
 
     builder
-      .setContentTitle(Lang.getString(R.string.CallBrandingIncoming))
+      .setContentTitle(Lang.getString(call != null && call.isVideo ? R.string.IncomingVideoCall : R.string.CallBrandingIncoming))
       .setContentText(TD.getUserName(user))
       .setSmallIcon(CALL_ICON_RES)
       .setContentIntent(PendingIntent.getActivity(UI.getContext(), 0, Intents.valueOfCall(), PendingIntent.FLAG_ONE_SHOT | Intents.mutabilityFlags(false)));
@@ -1039,12 +1041,25 @@ public class TGCallService extends Service implements
       Intent answerIntent = new Intent();
       Intents.secureIntent(answerIntent, false);
       answerIntent.setAction(Intents.ACTION_ANSWER_CALL);
-      CharSequence answerTitle = Lang.getString(R.string.AnswerCall);
+      answerIntent.putExtra(EXTRA_ANSWER_WITH_VIDEO, true);
+      CharSequence answerTitle = Lang.getString(call != null && call.isVideo ? R.string.AnswerWithVideo : R.string.AnswerCall);
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
         answerTitle = new SpannableString(answerTitle);
         ((SpannableString) answerTitle).setSpan(new ForegroundColorSpan(Theme.getColor(ColorId.circleButtonPositive)), 0, answerTitle.length(), 0);
       }
-      builder.addAction(R.drawable.round_call_24_white, answerTitle, PendingIntent.getBroadcast(this, 0, answerIntent, PendingIntent.FLAG_ONE_SHOT | Intents.mutabilityFlags(false)));
+      if (call != null && call.isVideo) {
+        Intent audioAnswerIntent = new Intent();
+        Intents.secureIntent(audioAnswerIntent, false);
+        audioAnswerIntent.setAction(Intents.ACTION_ANSWER_CALL);
+        audioAnswerIntent.putExtra(EXTRA_ANSWER_WITH_VIDEO, false);
+        CharSequence audioAnswerTitle = Lang.getString(R.string.AnswerWithoutVideo);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+          audioAnswerTitle = new SpannableString(audioAnswerTitle);
+          ((SpannableString) audioAnswerTitle).setSpan(new ForegroundColorSpan(Theme.getColor(ColorId.circleButtonPositive)), 0, audioAnswerTitle.length(), 0);
+        }
+        builder.addAction(R.drawable.round_call_24_white, audioAnswerTitle, PendingIntent.getBroadcast(this, 1, audioAnswerIntent, PendingIntent.FLAG_ONE_SHOT | Intents.mutabilityFlags(false)));
+      }
+      builder.addAction(R.drawable.round_call_24_white, answerTitle, PendingIntent.getBroadcast(this, 2, answerIntent, PendingIntent.FLAG_ONE_SHOT | Intents.mutabilityFlags(false)));
       builder.setPriority(Notification.PRIORITY_MAX);
     }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
@@ -1509,7 +1524,8 @@ public class TGCallService extends Service implements
         lastNetworkType,
         audioGainControlEnabled,
         echoCancellationStrength,
-        isMicDisabled
+        isMicDisabled,
+        tdlib.context().calls().shouldStartVideo(tdlib, call.id)
       );
     } catch (Throwable t) {
       tgcallsTemp = null;

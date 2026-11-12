@@ -14,6 +14,9 @@
 
   <string name="AudioCall">Audio call</string>
   <string name="VideoCall">Video call</string>
+  <string name="IncomingVideoCall">Incoming video call</string>
+  <string name="AnswerWithVideo">With video</string>
+  <string name="AnswerWithoutVideo">Without video</string>
   <string name="VideoCallUnavailable">Video calls aren\'t supported by this user or device</string>
   <string name="TurnCameraOn">Turn camera on</string>
   <string name="TurnCameraOff">Turn camera off</string>

@@ -370,7 +370,8 @@ public class VoIP {
     @CallNetworkType int networkType,
     boolean audioGainControlEnabled,
     int echoCancellationStrength,
-    boolean isMicDisabled
+    boolean isMicDisabled,
+    boolean allowInitialVideo
   ) throws IllegalArgumentException {
     final String libtgvoipVersion = VoIPController.getVersion();
     final String[] tgCallsVersions = N.getTgCallsVersions();
@@ -384,7 +385,7 @@ public class VoIP {
     final boolean preferSystemNoiseSuppressor = VoIPServerConfig.getBoolean("use_system_ns", true);
 
     // These do not change during the call
-    final boolean startWithVideo = call.isVideo && (
+    final boolean startWithVideo = allowInitialVideo && call.isVideo && (
       Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
       ContextUtils.getApplicationContext().checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
     );
