@@ -2739,9 +2739,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
           .chatTextSize()
           .show(tdlib, tdlib.isChannel(chat.id) ? R.string.EventLogInfoDetailChannel : R.string.EventLogInfoDetail);
       } else if (viewId == R.id.btn_chatAction) {
-        if (previewMode == PREVIEW_MODE_EVENT_LOG) {
-          processChatAction();
-        }
+        processChatAction();
       } else if (viewId == R.id.btn_scroll) {
         scrollToUnreadOrStartMessage();
       }
@@ -3915,7 +3913,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
     if (inPreviewSearchMode()) {
       setInputVisible(false, false);
       if (arePinnedMessages()) {
-        showBottomButton(BOTTOM_ACTION_UNPIN_ALL, 0, isUpdate);
+        hideBottomBar(isUpdate);
+        showActionButton(canPinAnyMessage(false) ? R.string.UnpinAll : R.string.DismissAllPinned, ACTION_UNPIN_ALL);
+      } else {
+        hideActionButton();
+        hideBottomBar(isUpdate);
       }
       return;
     }
@@ -7424,6 +7426,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private static final int ACTION_EMPTY = 6;
   private static final int ACTION_EVENT_LOG_SETTINGS = 7;
   private static final int ACTION_AWAITING_REPLY = 8;
+  private static final int ACTION_UNPIN_ALL = 9;
 
   private FrameLayoutFix actionButtonWrap;
   private TextView actionButton;
@@ -7499,9 +7502,33 @@ public class MessagesController extends ViewController<MessagesController.Argume
     removeThemeListenerByTarget(actionButton);
     addThemeTextColorListener(actionButton, isActive ? ColorId.textLink : ColorId.text);
     Views.setMediumText(actionButton, text);
+    if (actionButtonWrap != null) {
+      ImageView helpView = actionButtonWrap.findViewById(R.id.btn_help);
+      if (mode == ACTION_EVENT_LOG_SETTINGS) {
+        if (helpView == null) {
+          helpView = new ImageView(context());
+          helpView.setOnClickListener(this);
+          helpView.setScaleType(ImageView.ScaleType.CENTER);
+          helpView.setImageResource(R.drawable.baseline_help_outline_24);
+          helpView.setColorFilter(Theme.getColor(ColorId.textNeutral));
+          addThemeFilterListener(helpView, ColorId.textNeutral);
+          helpView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(49f), Screen.dp(49f), Gravity.RIGHT | Gravity.CENTER_VERTICAL));
+          helpView.setId(R.id.btn_help);
+          actionButtonWrap.addView(helpView);
+        } else {
+          helpView.setVisibility(View.VISIBLE);
+        }
+      } else if (helpView != null) {
+        helpView.setVisibility(View.GONE);
+      }
+    }
   }
 
   public void showActionButton (CharSequence text, int mode, boolean isActive) {
+    if (bottomWrap != null && bottomWrap.getVisibility() != View.VISIBLE) {
+      bottomWrap.setVisibility(View.VISIBLE);
+    }
+
     if (actionShowing) {
       hideSoftwareKeyboard();
       updateActionButton(text, mode, isActive);
@@ -7530,18 +7557,6 @@ public class MessagesController extends ViewController<MessagesController.Argume
       actionButton.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
       actionButtonWrap.addView(actionButton);
-
-      if (mode == ACTION_EVENT_LOG_SETTINGS) {
-        ImageView imageView = new ImageView(context());
-        imageView.setOnClickListener(this);
-        imageView.setScaleType(ImageView.ScaleType.CENTER);
-        imageView.setImageResource(R.drawable.baseline_help_outline_24);
-        imageView.setColorFilter(Theme.getColor(ColorId.textNeutral));
-        addThemeFilterListener(imageView, ColorId.textNeutral);
-        imageView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(49f), Screen.dp(49f), Gravity.RIGHT | Gravity.CENTER_VERTICAL));
-        imageView.setId(R.id.btn_help);
-        actionButtonWrap.addView(imageView);
-      }
 
       initialized = true;
     } else {
@@ -7583,7 +7598,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
 
     actionButtonWrap.setVisibility(View.GONE);
-    if (inputView != null) {
+    if (inPreviewMode) {
+      if (bottomWrap != null) {
+        bottomWrap.setVisibility(View.GONE);
+      }
+    } else if (inputView != null) {
       inputView.setVisibility(View.VISIBLE);
       checkSendButton(false);
     }
@@ -7658,6 +7677,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
       case ACTION_EVENT_LOG_SETTINGS: {
         openEventLogSettings();
+        break;
+      }
+      case ACTION_UNPIN_ALL: {
+        dismissPinnedMessage();
         break;
       }
     }
