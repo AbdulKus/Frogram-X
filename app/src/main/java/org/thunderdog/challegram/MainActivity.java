@@ -631,7 +631,35 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
     return controller.isUnauthorized();
   }
 
+  private boolean handleDebugDemoIntent (Intent intent) {
+    if (BuildConfig.DEBUG && intent != null && account != null && !account.tdlib().isAuthorized()) {
+      String demo = intent.getStringExtra("demo");
+      String action = intent.getAction();
+      boolean isPinned = "pinned".equalsIgnoreCase(demo) || "org.thunderdog.challegram.DEMO_PINNED".equalsIgnoreCase(action);
+      boolean isEventLog = "event_log".equalsIgnoreCase(demo) || "recent_actions".equalsIgnoreCase(demo) || "org.thunderdog.challegram.DEMO_RECENT_ACTIONS".equalsIgnoreCase(action);
+      if (isPinned || isEventLog) {
+        ViewController<?> parent = navigation.getCurrentStackItem();
+        if (parent == null) {
+          parent = new IntroController(this);
+          navigation.initController(parent);
+        }
+        if (isPinned) {
+          org.thunderdog.challegram.demo.DebugChatDemo.openPinnedMessages(parent);
+        } else {
+          org.thunderdog.challegram.demo.DebugChatDemo.openEventLog(parent);
+        }
+        intent.removeExtra("demo");
+        intent.setAction(Intent.ACTION_MAIN);
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void initUnauthorizedController () {
+    if (handleDebugDemoIntent(getIntent())) {
+      return;
+    }
     ViewController<?> c = generateUnauthorizedController(account.tdlib());
     if (c != null) {
       navigation.initController(c);
@@ -716,6 +744,9 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
   @Override
   protected void onNewIntent (Intent intent) {
     super.onNewIntent(intent);
+    if (handleDebugDemoIntent(intent)) {
+      return;
+    }
     String action = intent != null ? intent.getAction() : null;
     if (!StringUtils.isEmpty(action)) {
       handleIntent(action, intent, false);

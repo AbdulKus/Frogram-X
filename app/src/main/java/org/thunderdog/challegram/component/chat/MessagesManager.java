@@ -515,7 +515,15 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     return pinnedMessages != null ? pinnedMessages.getMaxMessageId() : 0;
   }
 
+  public boolean isDemoChat () {
+    return controller.isDebugDemo();
+  }
+
   public int getPinnedMessageCount () {
+    if (isDemoChat()) {
+      int known = getKnownTotalMessageCount();
+      return known > 0 ? known : adapter.getMessageCount();
+    }
     return pinnedMessages != null ? pinnedMessages.getTotalCount() : ListManager.COUNT_UNKNOWN;
   }
 
@@ -614,7 +622,7 @@ public class MessagesManager implements Client.ResultHandler, MessagesSearchMana
     loader.setChat(chat, null, null, null, MessagesLoader.SPECIAL_MODE_SEARCH, filter);
     loader.setSearchParameters(query, sender, filter);
     adapter.setChatType(chat.type);
-    if (filter != null && Td.isPinnedFilter(filter)) {
+    if (filter != null && Td.isPinnedFilter(filter) && !isDemoChat()) {
       initPinned(chat.id, null, 1, 1);
     }
     if (highlightMessageId != null) {

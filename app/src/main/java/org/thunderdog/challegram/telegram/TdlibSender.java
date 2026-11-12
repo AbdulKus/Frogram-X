@@ -88,7 +88,9 @@ public class TdlibSender {
         this.usernames = user != null ? user.usernames : null;
         this.photo = profilePhoto != null ? new TdApi.ChatPhotoInfo(profilePhoto.small, profilePhoto.big, profilePhoto.minithumbnail, profilePhoto.hasAnimation, profilePhoto.isPersonal) : null;
         this.letters = TD.getLetters(user);
-        this.placeholderMetadata = tdlib.cache().userPlaceholderMetadata(userId, user, false);
+        this.placeholderMetadata = isDemo && user != null
+          ? new AvatarPlaceholder.Metadata(tdlib.accentColor(user.accentColorId), this.letters)
+          : tdlib.cache().userPlaceholderMetadata(userId, user, false);
 
         flags = BitwiseUtils.setFlag(flags, FLAG_BOT, TD.isBot(user));
         flags = BitwiseUtils.setFlag(flags, FLAG_SERVICE_ACCOUNT, tdlib.isServiceNotificationsChat(ChatId.fromUserId(userId)));

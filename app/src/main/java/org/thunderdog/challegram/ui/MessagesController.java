@@ -608,34 +608,52 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private int floatingOverlayTop, glassControlsColor;
   public static int getGlassIconColorId () { return Theme.isDark() ? ColorId.icon : ColorId.text; }
 
+  public boolean isGlassPreviewMode () {
+    return inPreviewMode && (isEventLog() || arePinnedMessages());
+  }
+
+  public boolean isDebugDemo () {
+    return BuildConfig.DEBUG && getArguments() != null && getArguments().debugDemo;
+  }
+
   private View getComposerContent () {
     return actionShowing && actionButtonWrap != null ? actionButtonWrap : inputView;
   }
 
   /** Establish the viewport before RecyclerView lays out a pending unread/history jump. */
   public boolean updateMeasuredFloatingInsets () {
-    if (!newChatInput || inputView == null || inputView.getParent() != bottomWrap || inPreviewMode || isInForceTouchMode()) return false;
+    if (isInForceTouchMode()) return false;
+    if (inPreviewMode) {
+      if (!isGlassPreviewMode() || messagesView == null) return false;
+      return messagesView.setOverlayPadding(floatingOverlayTop, calculateFloatingBottomInset());
+    }
+    if (!newChatInput || inputView == null || inputView.getParent() != bottomWrap) return false;
     return messagesView.setOverlayPadding(floatingOverlayTop, calculateFloatingBottomInset());
   }
 
   private int calculateFloatingBottomInset () {
     int bottom = extraBottomInset;
-    if (bottomWrap.getVisibility() == View.VISIBLE) {
+    if (bottomWrap != null && bottomWrap.getVisibility() == View.VISIBLE) {
       View composer = getComposerContent();
-      LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) composer.getLayoutParams();
-      RelativeLayout.LayoutParams wrapParams = (RelativeLayout.LayoutParams) bottomWrap.getLayoutParams();
-      int inputTop = bottomWrap.getPaddingTop() + inputParams.topMargin;
-      float shown = replyBarVisible.getFloatValue() * (1f - getSearchTransformFactor());
-      bottom = org.thunderdog.challegram.util.ChatViewport.composerInset(bottomWrap.getMeasuredHeight(),
-        wrapParams.bottomMargin, inputTop, shown, getReplyOffset(), getKeyboardOffset(), getAttachedFilesOffset(), Screen.dp(6f));
+      if (composer != null) {
+        ViewGroup.LayoutParams lp = composer.getLayoutParams();
+        int topMargin = lp instanceof ViewGroup.MarginLayoutParams ? ((ViewGroup.MarginLayoutParams) lp).topMargin : 0;
+        RelativeLayout.LayoutParams wrapParams = (RelativeLayout.LayoutParams) bottomWrap.getLayoutParams();
+        int inputTop = bottomWrap.getPaddingTop() + topMargin;
+        float shown = replyBarVisible != null ? replyBarVisible.getFloatValue() * (1f - getSearchTransformFactor()) : 0f;
+        bottom = org.thunderdog.challegram.util.ChatViewport.composerInset(bottomWrap.getMeasuredHeight(),
+          wrapParams != null ? wrapParams.bottomMargin : 0, inputTop, shown, getReplyOffset(), getKeyboardOffset(), getAttachedFilesOffset(), Screen.dp(6f));
+      }
     }
     // Channel search controls can cover the list even when there is no composer.
     return Math.max(bottom, Math.round(getSearchControlsOffset()));
   }
 
   private boolean syncFloatingLayout () {
-    if (messagesView == null || inputView == null || inPreviewMode || isInForceTouchMode() || isDestroyed() || !contentView.isShown()) return true;
-    if (newChatInput) {
+    if (messagesView == null || isInForceTouchMode() || isDestroyed() || !contentView.isShown()) return true;
+    if (inPreviewMode && !isGlassPreviewMode()) return true;
+    if (!inPreviewMode && inputView == null) return true;
+    if (newChatInput && inputView != null) {
       int icon = Theme.getColor(getGlassIconColorId());
       if (glassControlsColor != icon) {
         glassControlsColor = icon;
@@ -645,17 +663,20 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
     }
     int bottom = calculateFloatingBottomInset();
-    if (composerGlassView != null) composerGlassView.setVisibility(newChatInput && bottomWrap.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
-    if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE) {
-      View composer = getComposerContent();
+    View composer = getComposerContent();
+    boolean hasComposer = composer != null && composer.getHeight() > 0;
+    if (composerGlassView != null) composerGlassView.setVisibility(newChatInput && bottomWrap.getVisibility() == View.VISIBLE && hasComposer ? View.VISIBLE : View.GONE);
+    if (newChatInput && bottomWrap.getVisibility() == View.VISIBLE && hasComposer) {
       float top = bottomWrap.getY() + composer.getTop();
-      if (getReplyOffset() > 0f) top = Math.min(top, replyBarView.getY());
+      if (getReplyOffset() > 0f && replyBarView != null) top = Math.min(top, replyBarView.getY());
       // Reserve the reply row once; animate the drawable inset, never the View height.
       float inputTop = bottomWrap.getY() + composer.getTop();
       int reserve = replyBarView != null ? replyBarView.getLayoutParams().height + Math.max(0, composer.getTop()) : 0;
       Views.setLayoutHeight(composerGlassView, composer.getHeight() + reserve);
       composerGlassView.setTranslationY(inputTop - reserve);
-      inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
+      if (inputGlass != null) {
+        inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
+      }
       // Use the same geometry as measurement; stale child coordinates during an
       // IME resize must not change the padding after a jump has been laid out.
     }
@@ -669,7 +690,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private final android.graphics.Rect floatingReplyClip = new android.graphics.Rect();
 
   private boolean useFloatingChatHeader () {
-    return !inPreviewMode && !isInForceTouchMode();
+    return (!inPreviewMode || isGlassPreviewMode()) && !isInForceTouchMode();
   }
 
   public int getFloatingBottomInset () {
@@ -718,7 +739,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       int top = header > 0 ? header + listBarHeight + Screen.dp(6f) + getFloatingPlayerInset() : 0;
       int bottom = bottomWrap.getVisibility() == View.VISIBLE ? 0 : extraBottomInset;
       floatingOverlayTop = top;
-      messagesView.setOverlayPadding(top, newChatInput && inputView != null ? calculateFloatingBottomInset() : bottom);
+      messagesView.setOverlayPadding(top, (newChatInput && inputView != null) || isGlassPreviewMode() ? calculateFloatingBottomInset() : bottom);
       if (topGlassView != null) {
         // Include the status bar in the backdrop, but keep the island below it.
         Views.setTopMargin(topGlassView, -header);
@@ -757,7 +778,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void applyNewChatUi () {
-    if (inputView == null || inPreviewMode || isInForceTouchMode()) return;
+    if (isInForceTouchMode()) return;
+    if (inPreviewMode && !isGlassPreviewMode()) return;
+    if (!inPreviewMode && inputView == null) return;
     boolean floatingHeader = useFloatingChatHeader();
     int header = floatingHeader ? getGlassTopExtension() : 0;
     RelativeLayout.LayoutParams wallpaperParams = (RelativeLayout.LayoutParams) wallpaperView.getLayoutParams();
@@ -767,36 +790,47 @@ public class MessagesController extends ViewController<MessagesController.Argume
     contentView.setClipChildren(!floatingHeader);
     contentView.setClipToPadding(!floatingHeader);
 
-    if (inputGlass == null) {
+    boolean hasComposer = inputView != null || actionShowing;
+    if (inputGlass == null && (inputView != null || isGlassPreviewMode())) {
       inputGlass = new ChatGlassDrawable(wallpaperView, composerGlassView, ColorId.filling);
       inputGlass.setMessages(messagesView);
       inputGlass.setVideoLayer(this::drawVideoForGlass);
     }
     newChatInput = true;
-    recordButton.setGlassMode(true);
-    messageSenderButton.setGlassMode(true);
-    composerGlassView.setBackground(inputGlass);
-    bottomBar.setGlassSurface(this);
+    if (recordButton != null) recordButton.setGlassMode(true);
+    if (messageSenderButton != null) messageSenderButton.setGlassMode(true);
+    if (composerGlassView != null && inputGlass != null) composerGlassView.setBackground(inputGlass);
+    if (bottomBar != null) bottomBar.setGlassSurface(this);
     for (CircleButton button : new CircleButton[] {scrollToBottomButton, mentionButton, reactionsButton}) {
       if (button != null) button.setGlassSurface(this);
     }
-    Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
-    Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme + getFloatingBottomClearance());
+    if (bottomBar != null) {
+      Views.setLayoutHeight(bottomBar, getActionBarHeight() + extraBottomInsetWithoutIme);
+      Views.setPaddingBottom(bottomBar, extraBottomInsetWithoutIme + getFloatingBottomClearance());
+    }
     if (needBigPadding) manager.rebuildLastItem();
-    inputGlass.setEnabled(true);
-    inputView.setBackground(null);
-    replyBarView.setBackground(null);
-    replyBarView.setFloatingSurface(true);
-    replyBarView.setAlpha(replyBarVisible.getFloatValue());
-    RelativeLayout.LayoutParams replyParams = (RelativeLayout.LayoutParams) replyBarView.getLayoutParams();
-    replyParams.leftMargin = replyParams.rightMargin = Screen.dp(8f);
-    replyBarView.setLayoutParams(replyParams);
-    composerGlassView.setVisibility(View.VISIBLE);
-    LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
+    if (inputGlass != null) inputGlass.setEnabled(true);
+    if (inputView != null) {
+      inputView.setBackground(null);
+    }
+    if (replyBarView != null) {
+      replyBarView.setBackground(null);
+      replyBarView.setFloatingSurface(true);
+      replyBarView.setAlpha(replyBarVisible.getFloatValue());
+      RelativeLayout.LayoutParams replyParams = (RelativeLayout.LayoutParams) replyBarView.getLayoutParams();
+      replyParams.leftMargin = replyParams.rightMargin = Screen.dp(8f);
+      replyBarView.setLayoutParams(replyParams);
+    }
     int side = Screen.dp(8f);
     int gap = Screen.dp(6f);
-    inputParams.setMargins(side, gap, side, gap + getFloatingBottomClearance());
-    inputView.setLayoutParams(inputParams);
+    if (composerGlassView != null) {
+      composerGlassView.setVisibility(bottomWrap != null && bottomWrap.getVisibility() == View.VISIBLE && hasComposer ? View.VISIBLE : View.GONE);
+    }
+    if (inputView != null) {
+      LinearLayout.LayoutParams inputParams = (LinearLayout.LayoutParams) inputView.getLayoutParams();
+      inputParams.setMargins(side, gap, side, gap + getFloatingBottomClearance());
+      inputView.setLayoutParams(inputParams);
+    }
     if (actionButtonWrap != null) {
       LinearLayout.LayoutParams actionParams = (LinearLayout.LayoutParams) actionButtonWrap.getLayoutParams();
       actionParams.setMargins(side, gap, side, gap + getFloatingBottomClearance());
@@ -804,12 +838,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
       RippleSupport.setTransparentSelector(actionButton, Screen.dp(24f), null);
     }
     for (View button : new View[] {emojiButton, attachButtons, sendButton, messageSenderButton}) {
-      RelativeLayout.LayoutParams buttonParams = (RelativeLayout.LayoutParams) button.getLayoutParams();
-      buttonParams.leftMargin = buttonParams.rightMargin = side;
-      button.setLayoutParams(buttonParams);
+      if (button != null) {
+        RelativeLayout.LayoutParams buttonParams = (RelativeLayout.LayoutParams) button.getLayoutParams();
+        buttonParams.leftMargin = buttonParams.rightMargin = side;
+        button.setLayoutParams(buttonParams);
+      }
     }
-    bottomSpace.setBackground(null);
-    bottomShadowView.setAlpha(0f);
+    if (bottomSpace != null) bottomSpace.setBackground(null);
+    if (bottomShadowView != null) bottomShadowView.setAlpha(0f);
 
     RelativeLayout.LayoutParams listParams = (RelativeLayout.LayoutParams) messagesView.getLayoutParams();
     listParams.topMargin = -header;
@@ -826,7 +862,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     topBar.setLayoutParams(topParams);
     topBar.setTranslationY(floatingHeader ? 0f : floatingPlayerOffset);
     topBar.setFloatingSurface(floatingHeader);
-    pinnedMessagesBar.setFloatingSurface(floatingHeader);
+    if (pinnedMessagesBar != null) pinnedMessagesBar.setFloatingSurface(floatingHeader);
     if (topGlassView == null) {
       topGlassView = new View(context()) {
         @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
@@ -891,7 +927,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     headerCell.setContentInsetY(getHeaderControlsInset());
     headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
     if (headerView != null) headerView.resetColors(this, null);
-    inputView.checkPlaceholderWidth();
+    if (inputView != null) inputView.checkPlaceholderWidth();
     updateFloatingInsets();
     updateButtonsY();
   }
@@ -2125,6 +2161,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
       contentView.addView(searchControlsLayout);
 
       addStaticListeners();
+    } else if (isGlassPreviewMode()) {
+      applyNewChatUi();
+      wallpaperView.setGlassInvalidationListener(this::invalidateChatGlass);
+      messagesView.setBackdropRegionInvalidationListener(this::invalidateChatGlass);
     }
 
     if (backgroundParamsView != null) {
@@ -3109,6 +3149,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     public TdApi.SearchMessagesFilter searchFilter;
 
     public boolean areScheduled, openKeyboard;
+    public boolean debugDemo;
 
     public final @Nullable ThreadInfo messageThread;
     public final @Nullable TdApi.MessageTopic messageTopicId;
@@ -6853,6 +6894,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   public boolean canPinAnyMessage (boolean checkUi) {
+    if (isDebugDemo() && arePinnedMessages()) return true;
     return (checkUi ? canWriteMessages() : hasWritePermission()) && chat != null && tdlib.canPinMessages(chat) && !areScheduled;
   }
 
@@ -7529,6 +7571,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
 
     hideSoftwareKeyboard();
+    if (useFloatingChatHeader()) {
+      updateFloatingInsets();
+      invalidateChatGlass();
+    }
   }
 
   public void hideActionButton () {
@@ -7545,6 +7591,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
     displayEmojiButton();
 
     actionShowing = false;
+    if (useFloatingChatHeader()) {
+      updateFloatingInsets();
+      invalidateChatGlass();
+    }
   }
 
   private void processChatAction () {
@@ -9554,7 +9604,11 @@ public class MessagesController extends ViewController<MessagesController.Argume
       .build(),
       (itemView, id) -> {
         if (id == R.id.btn_unpinMessage) {
-          tdlib.send(new TdApi.UnpinAllChatMessages(getChatId()), tdlib.typedOkHandler());
+          if (isDebugDemo()) {
+            manager.dismissPinnedMessage();
+          } else {
+            tdlib.send(new TdApi.UnpinAllChatMessages(getChatId()), tdlib.typedOkHandler());
+          }
         } else if (id == R.id.btn_dismissForSelf) {
           manager.dismissPinnedMessage();
         }
@@ -10730,6 +10784,17 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private RunnableData<TdApi.ChatAdministrators> pendingChatAdminsCallback;
 
   private void loadChannelAdmins (RunnableData<TdApi.ChatAdministrators> after) {
+    if (isDebugDemo()) {
+      if (chatAdmins == null) {
+        chatAdmins = new TdApi.ChatAdministrators(new TdApi.ChatAdministrator[] {
+          new TdApi.ChatAdministrator(1L, "Создатель", true, false),
+          new TdApi.ChatAdministrator(2L, "Администратор", false, false),
+          new TdApi.ChatAdministrator(3L, "Модератор", false, false)
+        });
+      }
+      after.runWithData(chatAdmins);
+      return;
+    }
     if (chatAdmins != null) {
       after.runWithData(chatAdmins);
       return;

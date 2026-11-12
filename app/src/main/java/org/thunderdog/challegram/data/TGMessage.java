@@ -1518,7 +1518,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
   }
 
   protected final boolean isDemoChat () {
-    return msg.chatId == 0;
+    return msg.chatId == 0 || manager.isDemoChat();
   }
 
   protected final boolean isDemoGroupChat () {
@@ -3332,7 +3332,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     }
 
     if (!(tdlib.isSelfChat(chat) && forwardInfo != null) && !hasBot && !isForward && sender.isUser()) {
-      hAuthorEmojiStatus = EmojiStatusHelper.makeDrawable(null, tdlib, tdlib.cache().user(sender.getUserId()), colorTheme, (text1, specificMedia) -> invalidateEmojiStatusReceiver());
+      hAuthorEmojiStatus = EmojiStatusHelper.makeDrawable(null, tdlib, userForId(sender.getUserId()), colorTheme, (text1, specificMedia) -> invalidateEmojiStatusReceiver());
       hAuthorEmojiStatus.invalidateTextMedia();
       maxWidth -= hAuthorEmojiStatus.getWidth(Screen.dp(3));
     }

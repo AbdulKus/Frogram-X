@@ -637,6 +637,54 @@ public class MessagesLoader implements Client.ResultHandler {
     });
   }
 
+  private void loadDemoPinnedMessages () {
+    reuse();
+    canLoadTop = false;
+    canLoadBottom = false;
+    isLoading = true;
+    loadingMode = MODE_INITIAL;
+
+    Background.instance().post(() -> {
+      LongSparseArray<TdApi.User> participants = org.thunderdog.challegram.demo.DebugChatDemo.createDemoParticipants();
+      List<TdApi.Message> messages = org.thunderdog.challegram.demo.DebugChatDemo.createDemoPinnedMessages();
+
+      manager.setDemoParticipants(participants, true);
+
+      TdApi.Message[] messagesArray = new TdApi.Message[messages.size()];
+      messages.toArray(messagesArray);
+      processMessages(
+        contextId, messagesArray,
+        messagesArray.length, null, 0,
+        true, null
+      );
+    });
+  }
+
+  private void loadDemoEventLog () {
+    reuse();
+    canLoadTop = false;
+    canLoadBottom = false;
+    isLoading = true;
+    loadingMode = MODE_INITIAL;
+
+    Background.instance().post(() -> {
+      LongSparseArray<TdApi.User> participants = org.thunderdog.challegram.demo.DebugChatDemo.createDemoParticipants();
+      List<TdApi.ChatEvent> events = org.thunderdog.challegram.demo.DebugChatDemo.createDemoChatEvents();
+
+      manager.setDemoParticipants(participants, true);
+
+      TdApi.ChatEvent[] eventsArray = new TdApi.ChatEvent[events.size()];
+      events.toArray(eventsArray);
+      TdApi.Message[] messagesArray = parseChatEvents(getChatId(), eventsArray);
+
+      processMessages(
+        contextId, messagesArray,
+        messagesArray.length, null, 0,
+        true, null
+      );
+    });
+  }
+
   private static class PreviewMessage {
     public final int date;
     public final int after;
@@ -1160,11 +1208,19 @@ public class MessagesLoader implements Client.ResultHandler {
 
       switch (specialMode) {
         case SPECIAL_MODE_EVENT_LOG:
+          if (manager.isDemoChat()) {
+            loadDemoEventLog();
+            return;
+          }
           Log.ensureReturnType(TdApi.GetChatEventLog.class, TdApi.ChatEvents.class);
           function = new TdApi.GetChatEventLog(sourceChatId, manager.getEventLogQuery(), (lastFromMessageId = fromMessageId).getMessageId(), lastLimit = limit, manager.getEventLogFilters(), manager.getEventLogUserIds());
           break;
         case SPECIAL_MODE_SEARCH: {
           long chatId = getChatId();
+          if (manager.isDemoChat()) {
+            loadDemoPinnedMessages();
+            return;
+          }
           if (ChatId.isSecret(chatId)) {
             Log.ensureReturnType(TdApi.SearchSecretMessages.class, TdApi.FoundMessages.class);
             function = new TdApi.SearchSecretMessages(sourceChatId, searchQuery, lastSearchNextOffset, limit, searchFilter);

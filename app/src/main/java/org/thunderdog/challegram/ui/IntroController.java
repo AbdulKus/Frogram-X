@@ -1151,6 +1151,15 @@ public class IntroController extends ViewController<Void> implements GLSurfaceVi
       icons.append(R.drawable.baseline_android_24);
       strings.append("Run automatic setup");
     }
+    if (BuildConfig.DEBUG) {
+      ids.append(R.id.btn_events_pinnedMessages);
+      icons.append(R.drawable.deproko_baseline_pin_24);
+      strings.append("Демо: Закреплённые сообщения");
+
+      ids.append(R.id.btn_recentActions);
+      icons.append(R.drawable.baseline_history_24);
+      strings.append("Демо: Недавние действия (Admin log)");
+    }
 
     showOptions(null, ids.get(), strings.get(), null, icons.get(), (itemView, id) -> {
       if (id == R.id.btn_tdlib_debugDatacenter) {
@@ -1166,6 +1175,10 @@ public class IntroController extends ViewController<Void> implements GLSurfaceVi
           UI.TEST_MODE = UI.TEST_MODE_USER;
           proceedInDebugMode(true);
         }
+      } else if (id == R.id.btn_events_pinnedMessages) {
+        org.thunderdog.challegram.demo.DebugChatDemo.openPinnedMessages(this);
+      } else if (id == R.id.btn_recentActions) {
+        org.thunderdog.challegram.demo.DebugChatDemo.openEventLog(this);
       }
       return true;
     });

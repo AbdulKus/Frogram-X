@@ -503,8 +503,10 @@ public class ChatEventUtil {
           }
         }
 
-        String userName = tdlib.senderName(memberId);
-        String username = tdlib.senderUsername(memberId);
+        TdApi.User demoUser = context.isDemoChat() && memberId instanceof TdApi.MessageSenderUser
+          ? context.demoParticipant(((TdApi.MessageSenderUser) memberId).userId) : null;
+        String userName = demoUser != null ? TD.getUserName(demoUser) : tdlib.senderName(memberId);
+        String username = demoUser != null ? Td.primaryUsername(demoUser) : tdlib.senderUsername(memberId);
 
         b.append(Lang.getString(stringRes));
 
