@@ -146,7 +146,7 @@ public class CustomEmojiSpanImpl extends EmojiSpanImpl implements TdlibEmojiMana
 
   @Override
   public void onOverlayDraw (Canvas c, View view, Layout layout) {
-    if (customEmoji == null || customEmoji.isNotFound() || isDestroyed) {
+    if (customEmoji == null || customEmoji.isNotFound() || isDestroyed || layout == null) {
       return;
     }
     if (drawRect.left == drawRect.right || drawRect.top == drawRect.bottom) {
@@ -155,15 +155,23 @@ public class CustomEmojiSpanImpl extends EmojiSpanImpl implements TdlibEmojiMana
     if (customEmojiSize != size.getSize() && size.getSize() > 0) {
       prepareCustomEmoji(size.getSize());
     }
-    int paddingLeft = view.getPaddingLeft();
-    int paddingTop = view.getPaddingTop();
+    // TextView translates its Layout by the compound padding and the vertical
+    // gravity offset. The overlay runs after TextView has restored the canvas.
+    // Plain padding puts custom icons above vertically centered button labels.
+    int paddingLeft = view instanceof android.widget.TextView ?
+      ((android.widget.TextView) view).getTotalPaddingLeft() : view.getPaddingLeft();
+    int paddingTop = view instanceof android.widget.TextView ?
+      ((android.widget.TextView) view).getTotalPaddingTop() : view.getPaddingTop();
     boolean translate = paddingLeft != 0 || paddingTop != 0;
     if (translate) {
       drawRect.offset(paddingLeft, paddingTop);
     }
-    drawCustomEmoji(c);
-    if (translate) {
-      drawRect.offset(-paddingLeft, -paddingTop);
+    try {
+      drawCustomEmoji(c);
+    } finally {
+      if (translate) {
+        drawRect.offset(-paddingLeft, -paddingTop);
+      }
     }
   }
 

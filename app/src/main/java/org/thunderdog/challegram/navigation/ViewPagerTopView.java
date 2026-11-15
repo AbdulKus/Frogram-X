@@ -1574,7 +1574,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
             }
           } else {
             int start = getMeasuredHeight();
-            boolean inSlideOff = topView.slideOffDirection == SLIDE_OFF_DIRECTION_TOP ? touchY <= start : touchY >= start;
+            boolean inSlideOff = topView.slideOffDirection == SLIDE_OFF_DIRECTION_TOP ? touchY <= 0f : touchY >= start;
             if (this.inSlideOff != inSlideOff) {
               this.inSlideOff = inSlideOff;
               if (inSlideOff) {

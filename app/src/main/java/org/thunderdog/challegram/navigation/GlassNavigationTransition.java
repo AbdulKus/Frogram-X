@@ -62,12 +62,12 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     }
 
     public Scene top (View view, IntSupplier height) {
-      if (view != null) { hide(view); top.add(new Layer(findHidden(view), height)); }
+      if (view != null) { hide(view); top.add(new Layer(findHidden(view), height, true)); }
       return this;
     }
 
     public Scene bottom (View view) {
-      if (view != null) { hide(view); bottom.add(new Layer(findHidden(view), view::getHeight)); }
+      if (view != null) { hide(view); bottom.add(new Layer(findHidden(view), view::getHeight, false)); }
       return this;
     }
 
@@ -135,12 +135,14 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     private void capture (Layer layer, View root) {
       View view = layer.hidden.view;
       int height = Math.min(view.getHeight(), layer.height.getAsInt());
-      layer.visible = view.getVisibility() == VISIBLE && layer.hidden.alpha > 0f && height > 0;
+      // A child of a hidden composer can remain VISIBLE itself. Capturing it
+      // would both spend a frame rasterizing it and reveal a ghost control.
+      layer.visible = view.isShown() && layer.hidden.alpha > 0f && height > 0;
       if (!layer.visible) return;
       position(view, root, layer.bounds, height);
       layer.clipped = view.getClipBounds(layer.clip);
       if (!layer.captured || layer.capturedHeight != height) {
-        layer.captured = layer.snapshot.capture(view, height);
+        layer.captured = layer.snapshot.capture(view, height, layer.useHardware);
         layer.capturedHeight = height;
       }
     }
@@ -223,7 +225,8 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     final Rect clip = new Rect();
     int capturedHeight;
     boolean captured, visible, clipped;
-    Layer (HiddenView hidden, IntSupplier height) { this.hidden = hidden; this.height = height; }
+    final boolean useHardware;
+    Layer (HiddenView hidden, IntSupplier height, boolean useHardware) { this.hidden = hidden; this.height = height; this.useHardware = useHardware; }
   }
 
   private final HeaderView header;

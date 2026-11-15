@@ -96,3 +96,213 @@ hardware behavior and coordinate bookkeeping were checked separately. In the
 emulator's isolated fully-clipped-text benchmark, the median for 1,000 draws
 was 80.75 ms before and 0.49 ms after. This isolates avoidable work, not the
 overall chat transition; device frame measurements are still needed for that.
+
+
+## Hardware emulator audit, 2026-11-15
+
+The test host is an Intel i3-9100 with UHD Graphics 630 and 8 GB RAM. The
+Android 11 / API 30 x86_64 AVD runs at 1080 × 2340, density 440, 60 Hz, with
+KVM and `-gpu host`. A headless Intel Xorg display supplies real OpenGL; both
+`glxinfo` and SurfaceFlinger identify UHD Graphics 630. The unrelated second
+emulator is stopped. Builds and profiling are run separately to avoid host
+memory pressure. These are emulator measurements, not a physical-device FPS
+certification.
+
+The baseline is Frogram build 171, commit
+`56d4110a4e30c68edaf8e759c75f8b5629f8902d`. Source debug comparisons use the
+same x64 native libraries, graphics backend and account. For the final release
+comparison, the published build 171 R8 Java/resources are repackaged with the
+exact same x64 native libraries as the candidate (all 12 library byte streams
+verified equal). Only its manifest version counter and local test signature
+are adjusted to permit account-preserving updates. Its Java ABI flavor label
+is still arm64; rendering does not branch on that label. The measured navigation candidate is
+0.29.2.1970-x64, built with R8, resource shrinking, vital lint and a verified
+compiled ART baseline profile. Local test APKs use a local debug certificate;
+the normal release signing key is not changed.
+
+### Changes and correctness checks
+
+- Navigation foregrounds record their content once into a `Picture`. On API
+  29+ hardware canvases, header layers use a composited `RenderNode`. Composer
+  controls use bitmap textures to avoid the cost of many small GPU layers.
+  Only the small header blur halo is rasterized. Older APIs and software
+  canvases retain a bounded bitmap fallback. Blur buffers are reused when dimensions
+  match. This removes software header rasterization and header texture uploads
+  from transition preparation.
+- Transition captures respect ancestor visibility. A composer inside a hidden
+  parent no longer contributes detached-looking controls to channel transitions.
+- Hidden glass surfaces retain their dirty flag without invalidating their host
+  or walking changed-row coordinates. They refresh when visible again. Pre-draw
+  invalidation for changed visible samples is retained so Android re-records
+  their cached display lists.
+- Custom emoji overlays use TextView's total padding, including compound
+  padding and vertical gravity. This aligns bot keyboard icons with the labels.
+  Draw bounds are restored even if drawing fails.
+- Bot reply keyboards use one rounded glass surface with side/bottom clearance
+  and rounded buttons. Cell layout uses the measured wrapper width and local
+  coordinates, including when markup replaces existing rows.
+- Custom emoji receivers attach only while their view and window are visible.
+  Keyboard frame listeners follow window attachment and are removed on
+  destruction. Retained keyboard views can close and reopen normally.
+
+An Android instrumentation fixture injects local test markup and a local custom
+emoji image; it never presses bot command buttons or sends messages. The old
+receiver state was `visible=true, hidden=true, reopened=true`. The final build
+passes `visible=true, hidden=false, reopened=true`. The light/dark keyboard
+appearance and icon placement were inspected on the hardware renderer.
+
+A separate fixture renders navigation snapshots at opacity 1, 0.7, 0.4 and 0.1
+on hardware and software canvases. Comparing the same content region with the
+old implementation gave mean RGB differences of 0.058/255 (hardware) and
+0.022/255 (software); no missing text or opaque rectangular alpha artifacts
+were observed. This covers the tested shapes/text and opacity levels, not every
+possible Android drawing primitive.
+
+The eight `tests/performance` regressions execute extracted production methods in
+JVM fixtures, including hardware API gates, software replay and bounded
+legacy allocation, centered/compound padding, exceptional draw cleanup,
+hidden backdrop invalidation, receiver attach/hide/reopen and observer teardown.
+All pass. The four standalone `tests/graphics` programs also pass, covering
+blur/sampling, navigation geometry and chat viewport behavior.
+
+### Measurement protocol
+
+Before each scenario, reset the main list to the top. Locate the selected
+chat by matching its avatar before every open, aborting if it cannot be found.
+Save a warm-up screenshot to verify the target; fixed row coordinates are not
+safe because incoming messages reorder the list. After warming the target
+chat, collect three rounds of five open/back cycles.
+For scrolling, collect three rounds of three up/down swipe pairs (450 ms per
+swipe, with settling between gestures). Capture `gfx`, `view`, `sched` and
+`freq` using `atrace -a org.frogram.messenger`; reset `dumpsys gfxinfo` before
+each round and save `framestats` afterwards. Keep chat contents, scroll position,
+resolution, animation scale and renderer consistent. Stop Gradle before runs.
+
+Trace section durations include scheduling delays. Report per-run percentiles
+and their median, separately from frame deadline misses and bitmap uploads.
+For navigation UI-thread frame timings, include frames intersecting the window
+from 20 ms before to 450 ms after each navigation-start marker; idle frames
+otherwise distort the distribution.
+Android 11 emulator `gfxinfo` can report high input-latency jank even when frame
+deadline misses are much rarer; its overall janky-frame percentage must not be
+presented as physical-device FPS.
+
+
+### Final release results
+
+The following are the avatar-verified runs. Earlier runs that used stale row
+coordinates after an incoming message reordered the list are excluded. All
+percentiles below are the median of three per-run percentiles, in milliseconds.
+These are observed timings from this emulator sample, without statistical
+confidence intervals.
+
+| Transition metric | Build 171 baseline | Final 1970 |
+| --- | ---: | ---: |
+| Group foreground capture, p95 | 5.93 | 3.10 |
+| Channel foreground capture, p95 | 3.37 | 2.85 |
+| Group active UI frame, p95 | 28.33 | 26.57 |
+| Channel active UI frame, p95 | 23.02 | 21.58 |
+| Group slow bitmap uploads, total over 15 open/back cycles | 21 | 15 |
+| Channel slow bitmap uploads, total over 15 open/back cycles | 17 | 5 |
+
+The reduction in capture work is clearer than the overall frame improvement.
+Steady scrolling does not use the foreground snapshot path. The scrolling
+results do **not** establish a consistent overall frame-rate gain:
+
+| Scenario, three rounds | Baseline deadline misses / rendered frames | Final deadline misses / rendered frames | Baseline UI frame p95 | Final UI frame p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Group open/back | 105 / 1001 | 102 / 996 | 28.33 | 26.57 |
+| Channel open/back | 62 / 1021 | 57 / 1015 | 23.02 | 21.58 |
+| Chat-list scrolling | 16 / 1658 | 18 / 1609 | 13.40 | 16.19 |
+| Channel-history scrolling | 32 / 1331 | 44 / 1315 | 15.54 | 16.61 |
+
+Transition UI frame timings use the active navigation windows described above;
+scrolling timings cover the complete gesture/settling sequence. Counts come
+from `gfxinfo` and include the complete scenario. Content, caches and emulator
+scheduling introduce variation. History viewport positions can also evolve as
+browsing continues. Do not interpret the small scrolling differences as a
+proven causal improvement or regression. Neither build rendered any frames in
+the five-second settled chat-list idle check.
+
+History readiness and navigation duration remain unchanged. The fixes remove
+avoidable rendering and lifecycle work; they do not prove perfectly smooth
+animation or parity with the original client. Physical-device frame-timeline
+measurements remain necessary for that claim.
+
+
+### Official Telegram X reference
+
+The reference APK is official
+[Telegram X 0.29.1.1817](https://github.com/TGX-Android/Telegram-X/releases/tag/v0.29.1.1817).
+It contains ARM64/ARMv7 libraries, and Android reports its installed ABI as
+arm64-v8a. Frogram runs native x86_64. Attempts to install an ARM64 Frogram test
+repack on this AVD were rejected during ABI derivation, so an architecture-matched
+comparison was not obtained. Both apps retain their authorized test sessions.
+
+The original was also tested with avatar-verified selection of the same group
+and channel, list scrolling and channel-history scrolling. Whole-scenario
+observations follow; these are not a claim of device FPS parity. The original
+has different chrome, native code and caches, and its navigation does not emit
+Frogram's active-window markers. Idle/animated frame counts also differ.
+
+| Original Telegram X scenario | Deadline misses / rendered frames | Whole-scenario UI frame p95, ms |
+| --- | ---: | ---: |
+| Group open/back | 76 / 2347 | 19.08 |
+| Channel open/back | 54 / 1191 | 19.09 |
+| Chat-list scrolling | 24 / 1428 | 7.78 |
+| Channel-history scrolling | 32 / 1340 | 7.81 |
+
+The original still has lower observed UI-thread cost in the scrolling reference.
+A supplementary ART sampling trace of Frogram history scrolling identifies
+renderer synchronization and software text replay among the remaining active
+costs. Sampling perturbs execution; it is used for diagnosis rather than frame
+rate reporting.
+The measured navigation APK is `Frogram-X-0.29.2.1970-x64.apk`, SHA-256
+`03ec3be3dae50396648d4f984820d7e3610cb1c48cce8a58d2ebe839252607a5`.
+It is signed with the local test certificate and installed on the Intel-backed
+AVD. The emulator is retained in the transient user service
+`frogram-test-emulator`; this does not enable boot-time autostart. Account data
+was preserved throughout updates and emulator restarts.
+
+
+### Anchored filter menu, build 1971
+
+The filter surface previously lived at the top of `pagerWrap`, whose negative
+floating-header margin moved its first rows above and behind the header. Touch
+handling separately reconstructed offsets, and the release path accidentally
+used the X offset for Y. It could also apply the row from the last move rather
+than the actual release position.
+
+The replacement is a rounded glass surface above the main content, placed from
+the tab's actual transformed bounds. `ViewCoordinateMapper` shares the complete
+ancestor layout/scroll/matrix conversion between placement and pointer mapping.
+The menu respects the floating header/player, preferred side, viewport margins
+and bottom inset. Its height is limited to available space, with a scrollable
+row list and edge-hold scrolling on short screens.
+
+Releasing a held gesture performs the row under that release point. Padding,
+outside release and cancellation do not select a filter. Rows also support
+ordinary accessible clicks. Closing/detaching clears the pressed row and pending
+scroll callbacks; the backdrop is reused during the short reveal animation.
+Bottom-tab gestures now cross the top edge of the tab, rather than treating
+positions inside it as already outside.
+
+The coordinate regression covers nested translations, scrolling, animated
+scale/pivots, mirrored/rotated views, singular transforms and different roots.
+The standalone placement test covers four densities, edge clamps, bottom tabs,
+side flipping and short viewports. Android tests in light/dark themes verify
+placement below the header, release into a different row without an extra move,
+selection during reveal, cancellation, padding/outside release and row clicks.
+A 2340 × 900 viewport also passed edge-hold scrolling. The original display size,
+filter and theme are restored afterwards. The navigation measurements above
+belong to build 1970; build 1971 adds this menu repair without changing those
+navigation/sampling algorithms.
+
+
+The final build 1971 passed the same real gesture checks in its R8 release APK,
+using standard UI controls rather than controller reflection: selection of
+Groups, release into Channels without another move, cancellation and restoration
+of the original filter. Release signing, vital lint and the compiled ART profile
+checks pass. Final artifact SHA-256:
+`05e0a0d4ba050fad38d31cc492ae5f08255757cce0e54e9f8f8706514b02d8cf`.
+The installed test artifact is `Frogram-X-0.29.2.1971-x64.apk`.

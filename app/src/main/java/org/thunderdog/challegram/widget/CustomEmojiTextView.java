@@ -17,6 +17,7 @@ package org.thunderdog.challegram.widget;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.text.Layout;
+import android.view.View;
 
 import androidx.annotation.Nullable;
 
@@ -37,15 +38,49 @@ public class CustomEmojiTextView extends EmojiTextView implements CustomEmojiSur
   private final @Nullable Tdlib tdlib;
   private final RefreshRateLimiter refreshRateLimiter;
   private final ComplexMediaHolder<EmojiSpan> mediaHolder;
+  private boolean mediaAttached;
+  private boolean destroyed;
 
   public CustomEmojiTextView (Context context, @Nullable Tdlib tdlib) {
     super(context);
     this.tdlib = tdlib;
     this.refreshRateLimiter = new RefreshRateLimiter(this, Config.MAX_ANIMATED_EMOJI_REFRESH_RATE);
     this.mediaHolder = new ComplexMediaHolder<>(this);
+    this.mediaHolder.receiver.detach();
     this.mediaHolder.setUpdateListener((usages, displayMediaKey) ->
       refreshRateLimiter.invalidate()
     );
+  }
+
+  private void setMediaAttached (boolean attached) {
+    if (mediaHolder == null || mediaAttached == attached) return;
+    mediaAttached = attached;
+    if (attached) mediaHolder.receiver.attach();
+    else mediaHolder.receiver.detach();
+  }
+
+  private void updateMediaAttachment () {
+    setMediaAttached(!destroyed && getWindowToken() != null && getWindowVisibility() == View.VISIBLE && isShown());
+  }
+
+  @Override protected void onAttachedToWindow () {
+    super.onAttachedToWindow();
+    updateMediaAttachment();
+  }
+
+  @Override protected void onDetachedFromWindow () {
+    setMediaAttached(false);
+    super.onDetachedFromWindow();
+  }
+
+  @Override protected void onVisibilityChanged (View changedView, int visibility) {
+    super.onVisibilityChanged(changedView, visibility);
+    updateMediaAttachment();
+  }
+
+  @Override protected void onWindowVisibilityChanged (int visibility) {
+    super.onWindowVisibilityChanged(visibility);
+    updateMediaAttachment();
   }
 
   @Override
@@ -87,6 +122,9 @@ public class CustomEmojiTextView extends EmojiTextView implements CustomEmojiSur
 
   @Override
   public void performDestroy () {
+    if (destroyed) return;
+    destroyed = true;
+    setMediaAttached(false);
     super.performDestroy();
     mediaHolder.performDestroy();
   }

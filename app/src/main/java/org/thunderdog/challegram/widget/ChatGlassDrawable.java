@@ -158,6 +158,10 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     }
   }
 
+  private boolean isHostVisible () {
+    return host.getWindowToken() != null && host.isShown() && hasVisibleAlpha();
+  }
+
   @Override public void onViewAttachedToWindow (View view) {
     if (released) return;
     if (observer != null && observer.isAlive()) observer.removeOnPreDrawListener(prepareFrame);
@@ -356,13 +360,19 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   public void invalidateBackdrop () {
     if (!released && enabled) {
       backdropDirty = true;
-      host.invalidate();
+      // Hidden FAB menu items still need a fresh sample when shown, but must
+      // not request frames or dirty their RenderNodes while the menu is closed.
+      if (isHostVisible()) host.invalidate();
     }
   }
 
   /** Ignore animated rows outside the captured area, including the blur overscan. */
   public void invalidateBackdrop (@Nullable View changed) {
     if (released || !enabled) return;
+    if (!isHostVisible()) {
+      backdropDirty = true;
+      return;
+    }
     if (changed == null || sample == null || geometryDirty || changed.getWindowToken() == null ||
         !changed.getMatrix().isIdentity()) {
       // Transformed rows can expose their previous position as well as the new
@@ -385,6 +395,10 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
   /** Content-only changes (video frames) already have their transformed window bounds. */
   public void invalidateBackdropRegion (RectF region) {
     if (released || !enabled || region.isEmpty()) return;
+    if (!isHostVisible()) {
+      backdropDirty = true;
+      return;
+    }
     if (sample == null || geometryDirty) {
       invalidateBackdrop();
       return;

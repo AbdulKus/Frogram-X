@@ -31,7 +31,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.os.SystemClock;
 import android.provider.ContactsContract;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -128,7 +127,9 @@ import org.thunderdog.challegram.util.StringList;
 import org.thunderdog.challegram.util.text.Counter;
 import org.thunderdog.challegram.util.text.IconSpan;
 import org.thunderdog.challegram.util.text.TextColorSet;
-import org.thunderdog.challegram.widget.BubbleLayout;
+import org.thunderdog.challegram.widget.ChatFilterMenu;
+import org.thunderdog.challegram.util.AnchoredMenuGeometry;
+import org.thunderdog.challegram.util.ViewCoordinateMapper;
 import org.thunderdog.challegram.widget.ChatGlassDrawable;
 import org.thunderdog.challegram.v.CustomRecyclerView;
 import org.thunderdog.challegram.widget.FillingSpace;
@@ -322,6 +323,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     mainPlayerView.setTranslationY(-Screen.dp(8f) * (1f - visibility));
     mainPlayerView.setVisibility(hasFloatingPlayer() && visibility > 0f ? View.VISIBLE : View.GONE);
     invalidateMainGlass();
+    if (menu != null && menu.isBubbleVisible() && menuAnchor != null) layoutMenu(menuAnchor);
   }
 
   private void applyMainGlass () {
@@ -454,6 +456,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     }
     Views.setPaddingBottom(updateSnackBar, extraBottomInsetWithoutIme);
     updateBottomBarMargins();
+    if (menu != null) Views.setBottomMargin(menu, extraBottomInsetWithoutIme);
     checkMargins();
   }
 
@@ -575,55 +578,21 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
         @Override
         public void onSlideOffFinish (View view, MotionEvent event, int index, boolean apply) {
-          float offsetX = getOffsetX(view);
-          float offsetY = getOffsetX(view);
-          if (apply && selectedSection != -1) {
-            View selectedView = menu.getChildAt(selectedSection);
-            int selectedFilter = (int) selectedView.getTag(R.id.btn_filter);
-            requestChatsFilter(selectedFilter, selectedPagerItemId);
-            setSelectedSection(-1, event, offsetX, offsetY, true);
-          } else {
-            setSelectedSection(-1, event, offsetX, offsetY, false);
+          if (menu != null) {
+            int selected = apply && menu.isBubbleVisible() ? menu.trackPointer(view, event.getX(), event.getY()) : -1;
+            menu.stopTracking();
+            if (selected != -1) menu.getItemAt(selected).performClick();
           }
           setMenuVisible(view, selectedPagerItemId, false);
           selectedPagerItemId = INVALID_PAGER_ITEM_ID;
+          if (composeWrap != null && displayTabsAtBottom()) showComposeWrap(null);
         }
 
         @Override
         public void onSlideOffMovement (View view, MotionEvent event, int index) {
-          float x = event.getX();
-          float y = event.getY();
-          float offsetX = getOffsetX(view);
-          float offsetY = getOffsetY(view);
-          x -= offsetX;
-          y -= offsetY + mainWrap.getTranslationY() + pagerWrap.getTranslationY();
-          int selectedSection = -1;
-          if (x >= 0 && x < menu.getMeasuredWidth()) {
-            int firstItemEnd = menu.getChildAt(0).getBottom();
-            if (y <= firstItemEnd) {
-              selectedSection = 0;
-            } else if (y < menu.getHeight()) {
-              for (int section = 1; section < menu.getChildCount(); section++) {
-                View child = menu.getChildAt(section);
-                if (y >= child.getTop() && y < child.getBottom() && child.getVisibility() != View.GONE) {
-                  selectedSection = section;
-                  break;
-                }
-              }
-            }
-          }
-          setSelectedSection(selectedSection, event, offsetX, offsetY, false);
+          if (menu != null && menu.isBubbleVisible()) menu.trackPointer(view, event.getX(), event.getY());
         }
 
-        private float getOffsetX (View view) {
-          return menu.getX() - getX(view, headerCell.getView());
-        }
-
-        private float getOffsetY (View view) {
-          FrameLayoutFix.LayoutParams lp = (FrameLayoutFix.LayoutParams) menu.getLayoutParams();
-          int verticalGravity = Gravity.VERTICAL_GRAVITY_MASK & lp.gravity;
-          return verticalGravity == Gravity.BOTTOM ? -menu.getHeight() : view.getHeight();
-        }
       });
       if (Settings.instance().chatFoldersEnabled()) {
         headerCell.getTopView().setCounterAlphaProvider(new ViewPagerTopView.CounterAlphaProvider() {
@@ -698,29 +667,12 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   // Menu
 
-  private int selectedSection = -1;
-  private long downTime;
-
-  private void setSelectedSection (int section, MotionEvent event, float xOffset, float yOffset, boolean apply) {
-    float eventX = event.getX() - xOffset;
-    float eventY = event.getY() - yOffset;
-    if (this.selectedSection != section) {
-      if (this.selectedSection != -1) {
-        View view = menu.getChildAt(this.selectedSection);
-        view.dispatchTouchEvent(MotionEvent.obtain(this.downTime, event.getEventTime(), apply ? MotionEvent.ACTION_UP : MotionEvent.ACTION_CANCEL, eventX, eventY - view.getTop(), event.getMetaState()));
-      }
-      this.selectedSection = section;
-      if (section != -1) {
-        View view = menu.getChildAt(this.selectedSection);
-        view.dispatchTouchEvent(MotionEvent.obtain(this.downTime = SystemClock.uptimeMillis(), event.getEventTime(), MotionEvent.ACTION_DOWN, eventX, eventY - view.getTop(), event.getMetaState()));
-      }
-    } else if (section != -1) {
-      View view = menu.getChildAt(this.selectedSection);
-      view.dispatchTouchEvent(MotionEvent.obtain(this.downTime, event.getEventTime(), MotionEvent.ACTION_MOVE, eventX, eventY - view.getTop(), event.getMetaState()));
-    }
-  }
-
-  private @Nullable BubbleLayout menu;
+  private @Nullable ChatFilterMenu menu;
+  private ChatGlassDrawable menuGlass;
+  private final ViewCoordinateMapper menuCoordinates = new ViewCoordinateMapper();
+  private final android.graphics.RectF menuAnchorBounds = new android.graphics.RectF();
+  private final android.graphics.RectF menuSurfaceBounds = new android.graphics.RectF();
+  private long menuPagerItemId = INVALID_PAGER_ITEM_ID;
   private boolean menuNeedArchive;
   private View menuAnchor;
 
@@ -877,71 +829,96 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   }
 
   private void layoutMenu (@NonNull View view) {
-    if (menu == null || headerCell == null)
-      return;
+    if (menu == null || headerCell == null || mainWrap == null) return;
     menuAnchor = view;
-    int menuWidth = menu.getMeasuredWidth();
-    if (menuWidth == 0)
-      return;
-    float x = getX(view, headerCell.getView());
-    boolean displayTabsAtBottom = displayTabsAtBottom();
-    int viewWidth = headerCell.getTopView().getItemWidth(view);
-    float translationX = x - menuWidth / 2 + viewWidth / 2;
-    int dx = displayTabsAtBottom ? 0 : Screen.dp(7f);
-    menu.setTranslationX(MathUtils.clamp(translationX, dx, Screen.currentWidth() - menuWidth - dx));
-    int cornerCenterX = menuWidth / 2 + Math.round(translationX - menu.getTranslationX());
-    menu.setCornerCenterX(MathUtils.clamp(cornerCenterX, Screen.dp(18f), menuWidth - Screen.dp(18f)));
+    int width = menu.getMeasuredWidth(), height = menu.getMeasuredHeight();
+    if (width == 0 || height == 0 || mainWrap.getWidth() == 0) return;
+    boolean below = !displayTabsAtBottom();
+    if (!locateMenuAnchor(view, below)) return;
+    int margin = Screen.dp(8f);
+    float left = AnchoredMenuGeometry.left(menuAnchorBounds.centerX(), width, mainWrap.getWidth(), margin);
+    float top = AnchoredMenuGeometry.top(menuAnchorBounds.top, menuAnchorBounds.bottom, height,
+      mainWrap.getHeight() - extraBottomInsetWithoutIme, margin, below);
+    menu.setX(left);
+    menu.setY(top);
+    menu.setPivotX(MathUtils.clamp(menuAnchorBounds.centerX() - left, Screen.dp(18f), width - Screen.dp(18f)));
+    boolean placedBelow = top >= menuAnchorBounds.bottom;
+    boolean placedAbove = top + height <= menuAnchorBounds.top;
+    menu.setPivotY(placedBelow ? 0f : placedAbove ? height : below ? 0f : height);
   }
 
-  private static float getX (View view, View parent) {
-    float x = view.getX();
-    View currentView = view;
-    do {
-      currentView = (View) currentView.getParent();
-      if (currentView == null)
-        break;
-      x += currentView.getX();
-    } while (currentView != parent);
-    return x;
+  private boolean locateMenuAnchor (View view, boolean below) {
+    if (headerCell == null || mainWrap == null) return false;
+    menuAnchorBounds.set(0, 0, headerCell.getTopView().getItemWidth(view), view.getHeight());
+    if (!menuCoordinates.mapRect(view, mainWrap, menuAnchorBounds)) return false;
+    if (below && hasFloatingHeader() && mainGlassView != null) {
+      menuSurfaceBounds.set(0, 0, mainGlassView.getWidth(), mainGlassView.getHeight());
+      if (menuCoordinates.mapRect(mainGlassView, mainWrap, menuSurfaceBounds)) {
+        menuAnchorBounds.bottom = Math.max(menuAnchorBounds.bottom, menuSurfaceBounds.bottom);
+      }
+      if (mainPlayerView != null && mainPlayerView.getVisibility() == View.VISIBLE && mainPlayerView.getAlpha() > 0f) {
+        menuSurfaceBounds.set(0, 0, mainPlayerView.getWidth(), mainPlayerView.getHeight());
+        if (menuCoordinates.mapRect(mainPlayerView, mainWrap, menuSurfaceBounds)) {
+          menuAnchorBounds.bottom = Math.max(menuAnchorBounds.bottom, menuSurfaceBounds.bottom);
+        }
+      }
+    }
+    return true;
   }
 
   private void setMenuVisible (View anchorView, long pagerItemId, boolean visible) {
     if (!visible && menu == null)
       return;
-    View parent = null;
     if (menu == null) {
-      boolean top = !displayTabsAtBottom();
-      menu = new BubbleLayout(context, this, top) {
+      menu = new ChatFilterMenu(context) {
         @Override
         protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
-          super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-          if (menuAnchor != null) {
-            layoutMenu(menuAnchor);
+          if (menuAnchor != null && locateMenuAnchor(menuAnchor, !displayTabsAtBottom())) {
+            int extent = View.MeasureSpec.getSize(heightMeasureSpec);
+            int margins = Screen.dp(16f);
+            float above = menuAnchorBounds.top - margins;
+            float below = extent - menuAnchorBounds.bottom - margins;
+            float available = displayTabsAtBottom() ? above : below;
+            if (available < Screen.dp(96f)) available = Math.max(above, below);
+            // The surface reserves the same outer margins in its own measure.
+            int capped = Math.min(extent, Math.max(0, (int) available) + margins);
+            heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(capped, View.MeasureSpec.AT_MOST);
           }
+          super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+          if (menuAnchor != null) layoutMenu(menuAnchor);
         }
       };
-      int gravity = (top ? Gravity.TOP : Gravity.BOTTOM) | Gravity.LEFT;
-      int marginBottom = top ? 0 : getHeaderHeight();
-      menu.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, gravity, 0, 0, 0, marginBottom));
+      menu.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT, 0, 0, 0, extraBottomInsetWithoutIme));
+      menuGlass = createComposeGlass(menu);
+      menuGlass.setRadius(Screen.dp(26f));
+      menu.setGlassSurface(menuGlass);
 
-      menu.setPadding(menu.getPaddingLeft(), menu.getPaddingTop() + Screen.dp(14f), menu.getPaddingRight(), menu.getPaddingBottom() + Screen.dp(13f));
       for (int filter : FILTERS) {
         int filterName = getFilterName(filter);
         int filterIcon = getFilterIcon(filter, false);
 
         TextView sectionView = new AppCompatTextView(context);
 
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(48f));
         params.gravity = Gravity.CENTER_HORIZONTAL;
 
         sectionView.setId(R.id.btn_filter);
         sectionView.setLayoutParams(params);
         sectionView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f);
         sectionView.setGravity(Lang.gravity(Gravity.CENTER_VERTICAL));
-        sectionView.setPadding(Screen.dp(Lang.rtl()  ? 24f : 16f), Screen.dp(11.5f), Screen.dp(Lang.rtl() ? 16f : 24f), Screen.dp(11.5f));
+        sectionView.setPadding(Screen.dp(Lang.rtl() ? 20f : 16f), 0, Screen.dp(Lang.rtl() ? 16f : 20f), 0);
+        sectionView.setSingleLine(true);
+        sectionView.setEllipsize(TextUtils.TruncateAt.END);
         sectionView.setTypeface(Fonts.getRobotoMedium());
         sectionView.setTag(R.id.btn_filter, filter);
-        sectionView.setOnClickListener(v -> { });
+        sectionView.setOnClickListener(v -> {
+          if (menu != null && menu.isBubbleVisible() && menuPagerItemId != INVALID_PAGER_ITEM_ID) {
+            long itemId = menuPagerItemId;
+            requestChatsFilter((int) v.getTag(R.id.btn_filter), itemId);
+            setMenuVisible(menuAnchor, itemId, false);
+          }
+        });
         sectionView.setCompoundDrawablePadding(Screen.dp(16));
         if (!Lang.rtl()) {
           sectionView.setCompoundDrawablesWithIntrinsicBounds(filterIcon, ResourcesCompat.ID_NULL, ResourcesCompat.ID_NULL, ResourcesCompat.ID_NULL);
@@ -949,17 +926,16 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
           sectionView.setCompoundDrawablesWithIntrinsicBounds(ResourcesCompat.ID_NULL, ResourcesCompat.ID_NULL, filterIcon, ResourcesCompat.ID_NULL);
         }
         Views.setMediumText(sectionView, Lang.getString(bindLocaleChanger(filterName, sectionView, false, true)));
-        RippleSupport.setTransparentBlackSelector(sectionView);
-        menu.addView(sectionView);
+        menu.addItem(sectionView);
       }
-      pagerWrap.addView(menu, 1);
-      parent = pagerWrap;
+      mainWrap.addView(menu);
     }
+    menuPagerItemId = visible ? pagerItemId : INVALID_PAGER_ITEM_ID;
     if (visible) {
       int selectedFilter = getSelectedFilter(pagerItemId);
 
       boolean needArchive = pagerItemId == MAIN_PAGER_ITEM_ID && (menuNeedArchive || (!tdlib.settings().isChatListEnabled(ChatPosition.CHAT_LIST_ARCHIVE) && tdlib.hasArchivedChats()));
-      menu.getChildAt(FILTER_ARCHIVE).setVisibility(needArchive ? View.VISIBLE : View.GONE);
+      menu.getItemAt(FILTER_ARCHIVE).setVisibility(needArchive ? View.VISIBLE : View.GONE);
 
       TdApi.ChatList chatList;
       if (pagerItemId == MAIN_PAGER_ITEM_ID) {
@@ -971,10 +947,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
       boolean hasUnreadChats = chatList != null && tdlib.hasUnreadChats(chatList);
       boolean needUnread = selectedFilter == FILTER_UNREAD || hasUnreadChats;
-      menu.getChildAt(FILTER_UNREAD).setVisibility(needUnread ? View.VISIBLE : View.GONE);
+      menu.getItemAt(FILTER_UNREAD).setVisibility(needUnread ? View.VISIBLE : View.GONE);
 
-      for (int index = 0; index < menu.getChildCount(); index++) {
-        TextView sectionView = (TextView) menu.getChildAt(index);
+      for (int index = 0; index < menu.getItemCount(); index++) {
+        TextView sectionView = (TextView) menu.getItemAt(index);
         if (sectionView.getVisibility() != View.VISIBLE)
           continue;
         int filter = (int) sectionView.getTag(R.id.btn_filter);
@@ -986,20 +962,25 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
         } else {
           isSelected = selectedFilter == filter;
         }
-        int textColorId = isSelected ? ColorId.textNeutral : ColorId.textLight;
+        sectionView.setSelected(isSelected);
+        sectionView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(Screen.dp(16f),
+          isSelected ? ColorUtils.alphaColor(.12f, Theme.getColor(ColorId.text)) : Color.TRANSPARENT,
+          ColorUtils.alphaColor(.18f, Theme.getColor(ColorId.text)), Color.WHITE));
+        int textColorId = ColorId.text;
         sectionView.setTextColor(Theme.getColor(textColorId));
-        int iconColorId = isSelected ? ColorId.iconActive : ColorId.iconLight;
+        int iconColorId = isSelected ? ColorId.text : MessagesController.getGlassIconColorId();
         TextViewCompat.setCompoundDrawableTintList(sectionView, ColorStateList.valueOf(Theme.getColor(iconColorId)));
         addThemeTextColorListener(sectionView, textColorId);
         addThemeCompoundDrawableColorListener(sectionView, iconColorId);
       }
       layoutMenu(anchorView);
     } else {
-      for (int index = 0; index < menu.getChildCount(); index++) {
-        removeThemeListenerByTarget(menu.getChildAt(index));
+      for (int index = 0; index < menu.getItemCount(); index++) {
+        removeThemeListenerByTarget(menu.getItemAt(index));
       }
     }
-    menu.setBubbleVisible(visible, parent);
+    menuGlass.setEnabled(visible);
+    menu.setBubbleVisible(visible);
   }
 
   // Language
@@ -3097,18 +3078,9 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   private void checkMenu () {
     if (menu != null) {
-      FrameLayoutFix.LayoutParams layoutParams = (FrameLayoutFix.LayoutParams) menu.getLayoutParams();
-      boolean displayTabsAtBottom = displayTabsAtBottom();
-      int gravity = (displayTabsAtBottom ? Gravity.BOTTOM : Gravity.TOP) | Gravity.LEFT;
-      int bottomMargin = displayTabsAtBottom ? getHeaderHeight() : 0;
-      if (menu.setTop(!displayTabsAtBottom)) {
-        menu.setDefaultPadding();
-        menu.setPadding(menu.getPaddingLeft(), menu.getPaddingTop() + Screen.dp(14f), menu.getPaddingRight(), menu.getPaddingBottom() + Screen.dp(13f));
-      }
-      if (gravity != layoutParams.gravity || bottomMargin != layoutParams.bottomMargin) {
-        layoutParams.gravity = gravity;
-        layoutParams.bottomMargin = bottomMargin;
-      }
+      Views.setBottomMargin(menu, extraBottomInsetWithoutIme);
+      menu.requestLayout();
+      if (menuAnchor != null && menu.isBubbleVisible()) layoutMenu(menuAnchor);
     }
   }
 
@@ -3427,7 +3399,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       if (chatList instanceof TdApi.ChatListArchive && availabilityChanged) {
         runOnUiThreadOptional(() -> {
           if (menu != null) {
-            menu.getChildAt(FILTER_ARCHIVE).setVisibility(tdlib.hasArchivedChats() ? View.VISIBLE : View.GONE);
+            menu.getItemAt(FILTER_ARCHIVE).setVisibility(tdlib.hasArchivedChats() ? View.VISIBLE : View.GONE);
           }
         });
       }*/

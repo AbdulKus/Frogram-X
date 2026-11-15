@@ -20836,8 +20836,8 @@ HPLorg/thunderdog/challegram/ui/ChatsController;->openChatImpl(Lorg/drinkless/td
 HPLorg/thunderdog/challegram/navigation/NavigationController;->animateNavigateImpl(Lorg/thunderdog/challegram/navigation/ViewController;IZIZ)V
 HPLorg/thunderdog/challegram/navigation/GlassNavigationTransition;->onPreDraw()Z
 HPLorg/thunderdog/challegram/navigation/GlassNavigationTransition;->onDraw(Landroid/graphics/Canvas;)V
-HPLorg/thunderdog/challegram/navigation/GlassContentSnapshot;->capture(Landroid/view/View;I)Z
-HPLorg/thunderdog/challegram/navigation/GlassContentSnapshot;->captureContents(Landroid/view/View;I)Z
+HPLorg/thunderdog/challegram/navigation/GlassContentSnapshot;->capture(Landroid/view/View;IZ)Z
+HPLorg/thunderdog/challegram/navigation/GlassContentSnapshot;->captureContents(Landroid/view/View;IZ)Z
 HPLorg/thunderdog/challegram/widget/ChatGlassDrawable;->prepareBackdrop()Z
 HPLorg/thunderdog/challegram/widget/ChatGlassDrawable;->prepareBackdropContents()Z
 HPLorg/thunderdog/challegram/util/AlphaBlur;->blur([III)V

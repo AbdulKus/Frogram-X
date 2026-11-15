@@ -8979,6 +8979,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private TdApi.ReplyMarkupShowKeyboard commandsKeyboard;
   private ScrollView keyboardWrapper;
   private CommandKeyboardLayout keyboardLayout;
+  private ChatGlassDrawable keyboardGlass;
 
   private void setCommandsShown (boolean commandsShown) {
     if (this.commandsShown != commandsShown) {
@@ -9041,26 +9042,43 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   private void updateCommandKeyboardHeight () {
     if (keyboardWrapper != null && keyboardLayout != null) {
-      Views.setLayoutHeight(keyboardWrapper, Math.min(Keyboard.getSize(), keyboardLayout.getSize()) + extraBottomInsetWithoutIme);
-      Views.applyBottomInset(keyboardWrapper, extraBottomInsetWithoutIme);
+      int bottomInset = extraBottomInsetWithoutIme + Screen.dp(6f);
+      Views.setLayoutHeight(keyboardWrapper, Math.min(Keyboard.getSize(), keyboardLayout.getSize()) + bottomInset);
+      Views.applyBottomInset(keyboardWrapper, bottomInset);
+      if (keyboardGlass != null) {
+        keyboardWrapper.setBackground(new android.graphics.drawable.InsetDrawable(keyboardGlass, 0, 0, 0, bottomInset));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) keyboardWrapper.invalidateOutline();
+      }
     }
   }
 
   private void openCommandsKeyboard (long messageId, TdApi.ReplyMarkupShowKeyboard keyboard, boolean force, boolean byUserEvent) {
     if (keyboardLayout == null) {
       keyboardWrapper = new ScrollView(context());
-      ViewSupport.setThemedBackground(keyboardWrapper, ColorId.chatKeyboard, this);
+      keyboardGlass = createGlassSurface(keyboardWrapper, ColorId.filling);
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        keyboardWrapper.setOutlineProvider(new android.view.ViewOutlineProvider() {
+          @Override public void getOutline (View view, android.graphics.Outline outline) {
+            int bottom = Math.max(0, view.getHeight() - extraBottomInsetWithoutIme - Screen.dp(6f));
+            outline.setRoundRect(0, 0, view.getWidth(), bottom, Screen.dp(26f));
+          }
+        });
+        keyboardWrapper.setClipToOutline(true);
+      }
 
       keyboardLayout = new CommandKeyboardLayout(context());
       keyboardLayout.setThemeProvider(this);
       keyboardLayout.setCallback(this);
+      addDestroyListener(keyboardLayout);
 
       keyboardWrapper.addView(keyboardLayout);
-      keyboardWrapper.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.min(Keyboard.getSize(), keyboardLayout.getSize()) + extraBottomInsetWithoutIme));
-      Views.applyBottomInset(keyboardWrapper, extraBottomInsetWithoutIme);
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0);
+      params.leftMargin = params.rightMargin = Screen.dp(8f);
+      params.topMargin = Screen.dp(6f);
+      keyboardWrapper.setLayoutParams(params);
+      updateCommandKeyboardHeight();
 
       bottomWrap.addView(keyboardWrapper);
-      contentView.getViewTreeObserver().addOnPreDrawListener(keyboardLayout);
       keyboardWrapper.setVisibility(View.GONE);
     }
 

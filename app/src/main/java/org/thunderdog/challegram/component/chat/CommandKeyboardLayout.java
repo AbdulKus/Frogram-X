@@ -40,13 +40,13 @@ import org.thunderdog.challegram.tool.Keyboard;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.v.EditText;
-import org.thunderdog.challegram.widget.EmojiTextView;
 import org.thunderdog.challegram.widget.CustomEmojiTextView;
 import org.thunderdog.challegram.widget.TextView;
 
 import me.vkryl.android.ViewUtils;
+import me.vkryl.core.lambda.Destroyable;
 
-public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver.OnPreDrawListener, View.OnClickListener {
+public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver.OnPreDrawListener, View.OnAttachStateChangeListener, View.OnClickListener, Destroyable {
   private boolean oneTime;
   private int rowsCount;
   private int[] columnCount;
@@ -58,14 +58,47 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
   private boolean blockLayout;
 
   private Callback callback;
+  private ViewTreeObserver observer;
+  private boolean destroyed;
 
   public CommandKeyboardLayout (Context context) {
     super(context);
-    spacingBig = Screen.dp(15f);
-    spacing = Screen.dp(10f);
+    spacingBig = Screen.dp(10f);
+    spacing = Screen.dp(6f);
     minSize = Screen.dp(42f);
     size = Keyboard.getSize();
     setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, size));
+    addOnAttachStateChangeListener(this);
+  }
+
+  @Override public void onViewAttachedToWindow (View view) {
+    if (destroyed) return;
+    removePreDrawListener();
+    observer = getViewTreeObserver();
+    observer.addOnPreDrawListener(this);
+  }
+
+  private void removePreDrawListener () {
+    if (observer != null && observer.isAlive()) observer.removeOnPreDrawListener(this);
+    observer = null;
+  }
+
+  @Override public void onViewDetachedFromWindow (View view) {
+    removePreDrawListener();
+    keyboardState = 0;
+    framesDropped = 0;
+  }
+
+  @Override public void performDestroy () {
+    if (destroyed) return;
+    destroyed = true;
+    removePreDrawListener();
+    removeOnAttachStateChangeListener(this);
+    for (int i = 0; i < getChildCount(); i++) {
+      View child = getChildAt(i);
+      if (child instanceof Destroyable) ((Destroyable) child).performDestroy();
+    }
+    callback = null;
   }
 
   public void setThemeProvider (@Nullable ViewController<?> themeProvider) {
@@ -84,7 +117,9 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
     oneTime = keyboard.oneTime;
     fillLayout(keyboard.rows);
     resizeKeyboard(keyboard.resizeKeyboard);
-    layoutChildren(Screen.currentWidth(), false, 0);
+    // The floating keyboard is narrower than the screen. Reuse its actual
+    // width when a bot replaces the rows without resizing the parent.
+    layoutChildren(getMeasuredWidth() > 0 ? getMeasuredWidth() : Screen.currentWidth(), false, 0);
     requestLayout();
     if (getParent() != null) {
       ((ScrollView) getParent()).scrollTo(0, 0);
@@ -127,6 +162,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
           if (themeProvider != null) {
             themeProvider.removeThemeListenerByTarget(view);
           }
+          if (view instanceof Destroyable) ((Destroyable) view).performDestroy();
           removeViewAt(i);
         } else {
           view.setVisibility(View.GONE);
@@ -146,11 +182,12 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
   private TextView genButton () {
     TextView text = new CustomEmojiTextView(getContext(), themeProvider != null ? themeProvider.tdlib() : null);
     text.setScrollDisabled(true);
-    ViewUtils.setBackground(text, Theme.rectSelector(4f, 0f, ColorId.chatKeyboardButton));
+    ViewUtils.setBackground(text, Theme.rectSelector(18f, 0f, ColorId.chatKeyboardButton));
     if (themeProvider != null) {
       themeProvider.addThemeInvalidateListener(text);
     }
     text.setGravity(Gravity.CENTER);
+    text.setPadding(Screen.dp(10f), Screen.dp(4f), Screen.dp(10f), Screen.dp(4f));
     text.setTextColor(Theme.textAccentColor());
     if (themeProvider != null) {
       themeProvider.addThemeTextAccentColorListener(text);
@@ -177,7 +214,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
   private void applyButtonStyle (TextView text, TdApi.ButtonStyle style) {
     int color = buttonStyleColor(style);
     if (color == 0) {
-      ViewUtils.setBackground(text, Theme.rectSelector(4f, 0f, ColorId.chatKeyboardButton));
+      ViewUtils.setBackground(text, Theme.rectSelector(18f, 0f, ColorId.chatKeyboardButton));
       text.setTextColor(Theme.textAccentColor());
     } else {
       ViewUtils.setBackground(text, coloredButtonBackground(color));
@@ -198,7 +235,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
   private static GradientDrawable coloredButton (int color) {
     GradientDrawable drawable = new GradientDrawable();
     drawable.setColor(color);
-    drawable.setCornerRadius(Screen.dp(4f));
+    drawable.setCornerRadius(Screen.dp(18f));
     return drawable;
   }
 
@@ -303,20 +340,21 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
     }
 
     if (changed) {
-      layoutChildren(width, true, t);
+      layoutChildren(width, true, 0);
     } else {
       for (int i = 0; i < getChildCount(); i++) {
         View v = getChildAt(i);
         if (v.getVisibility() == View.GONE) continue;
         MarginLayoutParams mp = (MarginLayoutParams) v.getLayoutParams();
         v.measure(MeasureSpec.makeMeasureSpec(mp.width, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(mp.height, MeasureSpec.EXACTLY));
-        v.layout(mp.leftMargin, t + mp.topMargin, mp.leftMargin + mp.width, t + mp.topMargin + mp.height);
+        v.layout(mp.leftMargin, mp.topMargin, mp.leftMargin + mp.width, mp.topMargin + mp.height);
       }
     }
   }
 
   private void layoutChildren (int currentWidth, boolean layout, int top) {
     int count = getChildCount();
+    if (rowsCount == 0 || count == 0) return;
 
     float frameWidth = currentWidth - spacingBig * 2 - spacing * (columnCount[0] - 1);
     float frameHeight = Math.max(getParentSize(), size) - spacingBig * 2 - spacing * (rowsCount - 1);
