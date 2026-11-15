@@ -354,3 +354,25 @@ verification pass. Final local x64 artifact SHA-256:
 `a4352e90acdef9d796a84bb0c26b26bd9b4aefa7444c008c48471b05f85b02c6`.
 The installed test artifact is `Frogram-X-0.29.2.1972-x64.apk`; this follow-up does
 not change the navigation/sampling algorithms measured above.
+
+
+### Stock hold-to-select dismissal (build 1973)
+
+Build 1972 incorrectly kept the filter open after lifting over the tab. The menu
+now always closes on release or cancellation, matching the requested stock
+interaction. Holding still opens it before any movement; dragging to a row and
+releasing selects that final row and closes the menu. Lifting over the tab or
+outside the menu closes it without selection. This supersedes the persistent
+popup behavior described for build 1972; content-sized width and transformed
+anchor centering are unchanged.
+
+The source-extracted regression now executes MainController's actual finish
+handler for release over the tab, selected-row release, cancellation, hidden menu
+and missing menu, including cleanup of the gesture target.
+
+
+The Android UI check passed on build 1973: stationary hold opened the menu;
+lifting over the tab closed it and preserved the filter; dragged selection used
+the final release point and closed it; cancellation and outside release closed
+without selection. The original filter was restored. All nine performance
+regressions and the debug APK build pass.

@@ -14,11 +14,13 @@ class FilterHoldTest(unittest.TestCase):
     def test_hold_precedes_folder_options_and_rows_define_width(self):
         tabs = (ROOT / 'navigation/ViewPagerTopView.java').read_text()
         menu = (ROOT / 'widget/ChatFilterMenu.java').read_text()
+        controller = (ROOT / 'ui/MainController.java').read_text()
         code = FIXTURE.replace('LONG_CLICK', method(tabs, 'public boolean onLongClick ('))
         code = code.replace('HOLD_METHODS', '\n'.join(method(tabs, signature) for signature in [
             'public boolean startSlideOffOnHold (', 'public void cancelSlideOff (', 'public void finishSlideOff (',
         ]))
         code = code.replace('MEASURE_METHOD', method(menu, 'protected void onMeasure ('))
+        code = code.replace('MENU_FINISH', method(controller, 'public void onSlideOffFinish ('))
         with tempfile.TemporaryDirectory(prefix='frogram-filter-hold-') as folder:
             target = Path(folder) / 'FilterHoldRegression.java'
             target.write_text(code)
@@ -34,7 +36,7 @@ public class FilterHoldRegression {
   @interface Nullable {}
   static class SystemClock {static long uptimeMillis(){return 1000;}}
   static class MotionEvent {
-    static final int ACTION_MOVE=2,ACTION_CANCEL=3;static MotionEvent last;boolean recycled;
+    static final int ACTION_MOVE=2,ACTION_CANCEL=3;static MotionEvent last;boolean recycled;float x=42,y=20;float getX(){return x;}float getY(){return y;}
     static MotionEvent obtain(long down,long time,int action,float x,float y,int meta){return last=new MotionEvent();}
     void recycle(){recycled=true;}
   }
@@ -42,6 +44,7 @@ public class FilterHoldRegression {
   static class LayoutParams {int height=48;}
   static class View {
     static final int VISIBLE=0,GONE=8;ViewParent parent=new ViewParent();boolean pressed=true;int naturalWidth,visibility,measuredWidth;
+    int clicks;boolean performClick(){clicks++;return true;}int getWidth(){return 100;}int getHeight(){return 48;}
     LayoutParams params=new LayoutParams();ViewParent getParent(){return parent;}void setPressed(boolean p){pressed=p;}
     int getVisibility(){return visibility;}LayoutParams getLayoutParams(){return params;}int getMeasuredWidth(){return measuredWidth;}
     void measure(int width,int height){int mode=MeasureSpec.getMode(width);measuredWidth=mode==MeasureSpec.EXACTLY?MeasureSpec.getSize(width):mode==MeasureSpec.AT_MOST?Math.min(naturalWidth,MeasureSpec.getSize(width)):naturalWidth;}
@@ -76,7 +79,36 @@ public class FilterHoldRegression {
     protected void onMeasure(int w,int h){widthSpec=w;heightSpec=h;}
   }
   static class Menu extends Frame {Items items;Menu(Items items){this.items=items;}MEASURE_METHOD}
+  static class TrackingMenu {
+    boolean shown=true;int selected=-1,tracks,stops;View row=new View();
+    boolean isBubbleVisible(){return shown;}
+    int trackPointer(View view,float x,float y){tracks++;return selected;}
+    void stopTracking(){stops++;}View getItemAt(int index){return row;}
+  }
+  static class MenuCallback {
+    static final long INVALID_PAGER_ITEM_ID=-1;long selectedPagerItemId=123,closedItem;
+    // Also model the former keep-open branch so this release assertion catches it.
+    boolean openedByHold=true;TrackingMenu menu=new TrackingMenu();int closes;
+    void setMenuVisible(View anchor,long id,boolean show){check(!show,"finish reopened menu");closes++;closedItem=id;if(menu!=null)menu.shown=show;}
+    MENU_FINISH
+  }
   public static void main(String[] args){
+    MenuCallback release=new MenuCallback();
+    release.onSlideOffFinish(new View(),new MotionEvent(),0,true);
+    check(!release.menu.shown&&release.closes==1&&release.menu.row.clicks==0,"release over held tab kept filters open");
+    check(release.menu.stops==1&&release.closedItem==123&&release.selectedPagerItemId==-1,"release did not clean up the menu target");
+    MenuCallback choose=new MenuCallback();choose.menu.selected=3;
+    choose.onSlideOffFinish(new View(),new MotionEvent(),0,true);
+    check(choose.menu.row.clicks==1&&!choose.menu.shown,"release over row must select once and close");
+    MenuCallback cancel=new MenuCallback();cancel.menu.selected=3;
+    cancel.onSlideOffFinish(new View(),new MotionEvent(),0,false);
+    check(cancel.menu.row.clicks==0&&cancel.menu.tracks==0&&!cancel.menu.shown,"cancel selected a row or retained filters");
+    MenuCallback hiddenMenu=new MenuCallback();hiddenMenu.menu.shown=false;hiddenMenu.menu.selected=3;
+    hiddenMenu.onSlideOffFinish(new View(),new MotionEvent(),0,true);
+    check(hiddenMenu.menu.row.clicks==0,"hidden menu selected a filter");
+    MenuCallback absent=new MenuCallback();absent.menu=null;
+    absent.onSlideOffFinish(new View(),new MotionEvent(),0,true);
+    check(absent.closes==1&&absent.selectedPagerItemId==-1,"missing menu broke gesture cleanup");
     Top top=new Top();BackgroundView tab=new BackgroundView(top);
     check(top.onLongClick(tab),"stationary hold not consumed");
     check(top.onSlideOffListener.opens==1&&top.options==0,"folder options took priority over filters");

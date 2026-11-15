@@ -558,12 +558,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       headerCell.getTopView().setOnSlideOffListener(new ViewPagerTopView.OnSlideOffListener() {
 
         private long selectedPagerItemId = INVALID_PAGER_ITEM_ID;
-        private boolean openedByHold;
 
         @Override
         public boolean onSlideOffLongPress (View view, MotionEvent event, int index) {
           onSlideOffStart(view, event, index);
-          openedByHold = true;
           return true;
         }
 
@@ -577,7 +575,6 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
         @Override
         public void onSlideOffStart (View view, MotionEvent event, int index) {
-          openedByHold = false;
           selectedPagerItemId = getPagerItemId(index);
           setMenuVisible(view, selectedPagerItemId, true);
           if (composeWrap != null && displayTabsAtBottom()) {
@@ -588,14 +585,11 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
         @Override
         public void onSlideOffFinish (View view, MotionEvent event, int index, boolean apply) {
           int selected = menu != null && apply && menu.isBubbleVisible() ? menu.trackPointer(view, event.getX(), event.getY()) : -1;
-          boolean keepOpen = apply && openedByHold && selected == -1 &&
-            event.getX() >= 0 && event.getX() < view.getWidth() && event.getY() >= 0 && event.getY() < view.getHeight();
-          openedByHold = false;
           if (menu != null) {
             menu.stopTracking();
             if (selected != -1) menu.getItemAt(selected).performClick();
           }
-          if (!keepOpen) setMenuVisible(view, selectedPagerItemId, false);
+          setMenuVisible(view, selectedPagerItemId, false);
           selectedPagerItemId = INVALID_PAGER_ITEM_ID;
         }
 
