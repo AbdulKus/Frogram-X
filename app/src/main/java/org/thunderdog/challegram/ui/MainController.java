@@ -212,19 +212,19 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     return hasFloatingHeader() ? MessagesController.getGlassIconColorId() : super.getHeaderIconColorId();
   }
   @Override protected int getHeaderTextColorId () {
-    return hasFloatingHeader() ? ColorId.text : super.getHeaderTextColorId();
+    return hasFloatingHeader() ? ColorId.glassText : super.getHeaderTextColorId();
   }
   @Override protected int getSearchHeaderIconColorId () {
     return hasFloatingHeader() ? MessagesController.getGlassIconColorId() : super.getSearchHeaderIconColorId();
   }
   @Override protected int getSearchTextColorId () {
-    return hasFloatingHeader() ? ColorId.text : super.getSearchTextColorId();
+    return hasFloatingHeader() ? ColorId.glassText : super.getSearchTextColorId();
   }
   @Override protected int getSelectHeaderIconColorId () {
     return hasFloatingHeader() ? MessagesController.getGlassIconColorId() : super.getSelectHeaderIconColorId();
   }
   @Override protected int getSelectTextColorId () {
-    return hasFloatingHeader() ? ColorId.text : super.getSelectTextColorId();
+    return hasFloatingHeader() ? ColorId.glassText : super.getSelectTextColorId();
   }
   @Override public boolean drawHeaderBackground (Canvas canvas, HeaderView header, int width, int height, int color) {
     return hasFloatingHeader() && mainGlassView != null;
@@ -364,10 +364,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     cell.setClipChildren(!floatingTabs);
     cell.setContentInsetY(floatingTabs ? getHeaderControlsInset() : 0);
     headerCell.getTopView().setGlassSelection(hasFloatingHeader());
-    if (!displayTabsAtBottom()) {
-      headerCell.getTopView().setTextFromToColorId(floatingTabs ? ColorId.text : ColorId.headerTabInactiveText,
-        floatingTabs ? ColorId.text : ColorId.headerTabActiveText);
-      headerCell.getTopView().setSelectionColorId(floatingTabs ? ColorId.textLink : ColorId.headerTabActive);
+    if (hasFloatingHeader() || !displayTabsAtBottom()) {
+      headerCell.getTopView().setTextFromToColorId(hasFloatingHeader() ? ColorId.glassIcon : ColorId.headerTabInactiveText,
+        hasFloatingHeader() ? ColorId.glassActive : ColorId.headerTabActiveText);
+      headerCell.getTopView().setSelectionColorId(hasFloatingHeader() ? ColorId.glassActive : ColorId.headerTabActive);
     }
     if (toggleHeaderView != null) {
       toggleHeaderView.setTextTop(17f + (hasFloatingHeader() ? 4.5f : 0f));
@@ -646,6 +646,11 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
             @Override
             public int titleColor () {
               return getHeaderTextColor();
+            }
+
+            @Override
+            public int subtitleColor () {
+              return Theme.getColor(hasFloatingHeader() ? ColorId.glassTextSecondary : ColorId.textLight);
             }
 
             @SuppressLint("WrongConstant")
@@ -980,11 +985,11 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
         }
         sectionView.setSelected(isSelected);
         sectionView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(Screen.dp(16f),
-          isSelected ? ColorUtils.alphaColor(.12f, Theme.getColor(ColorId.text)) : Color.TRANSPARENT,
-          ColorUtils.alphaColor(.18f, Theme.getColor(ColorId.text)), Color.WHITE));
-        int textColorId = ColorId.text;
+          isSelected ? ColorUtils.alphaColor(.12f, Theme.getColor(ColorId.glassActive)) : Color.TRANSPARENT,
+          ColorUtils.alphaColor(.14f, Theme.getColor(ColorId.glassActive)), Color.WHITE));
+        int textColorId = isSelected ? ColorId.glassActive : ColorId.glassIcon;
         sectionView.setTextColor(Theme.getColor(textColorId));
-        int iconColorId = isSelected ? ColorId.text : MessagesController.getGlassIconColorId();
+        int iconColorId = isSelected ? ColorId.glassActive : ColorId.glassIcon;
         TextViewCompat.setCompoundDrawableTintList(sectionView, ColorStateList.valueOf(Theme.getColor(iconColorId)));
         addThemeTextColorListener(sectionView, textColorId);
         addThemeCompoundDrawableColorListener(sectionView, iconColorId);
@@ -3331,7 +3336,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
     private static UnreadCounterColorSet create(MainController parent) {
       UnreadCounterColorSet colors = new UnreadCounterColorSet(parent::displayTabsAtBottom);
-      colors.floatingHeader = () -> parent.hasFloatingHeader() && !parent.displayTabsAtBottom();
+      colors.floatingHeader = parent::hasFloatingHeader;
       return colors;
     }
 
@@ -3364,7 +3369,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
     @ColorInt
     private int backgroundColor() {
-      return Theme.getColor(floatingHeader.getBoolValue() ? ColorId.text : displayTabsAtBottom.getBoolValue() ? ColorId.headerLightText : ColorId.headerText);
+      return Theme.getColor(floatingHeader.getBoolValue() ? ColorId.glassIcon : displayTabsAtBottom.getBoolValue() ? ColorId.headerLightText : ColorId.headerText);
     }
   }
 

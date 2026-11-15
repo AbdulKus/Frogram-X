@@ -606,7 +606,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     return hasFloatingPlayer() ? FloatingPlayerGeometry.inset(floatingPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0;
   }
   private int floatingOverlayTop, glassControlsColor;
-  public static int getGlassIconColorId () { return Theme.isDark() ? ColorId.icon : ColorId.text; }
+  public static int getGlassIconColorId () { return ColorId.glassIcon; }
 
   public boolean isGlassPreviewMode () {
     return inPreviewMode && (isEventLog() || arePinnedMessages());
@@ -797,6 +797,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       inputGlass.setVideoLayer(this::drawVideoForGlass);
     }
     newChatInput = true;
+    if (inputView != null) inputView.setFloatingSurface(true);
     if (recordButton != null) recordButton.setGlassMode(true);
     if (messageSenderButton != null) messageSenderButton.setGlassMode(true);
     if (composerGlassView != null && inputGlass != null) composerGlassView.setBackground(inputGlass);
@@ -919,11 +920,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
     if (headerView != null) floatingPlayerOffset = headerView.getFilling().getPlayerOffset();
     if (pagerHeaderView != null) {
-      pagerHeaderView.getTopView().setTextFromToColorId(floatingHeader ? getGlassIconColorId() : ColorId.headerText, floatingHeader ? ColorId.text : ColorId.headerText);
-      pagerHeaderView.getTopView().setSelectionColorId(floatingHeader ? ColorId.textLink : ColorId.headerText);
+      pagerHeaderView.getTopView().setTextFromToColorId(floatingHeader ? getGlassIconColorId() : ColorId.headerText, floatingHeader ? ColorId.glassActive : ColorId.headerText);
+      pagerHeaderView.getTopView().setSelectionColorId(floatingHeader ? ColorId.glassActive : ColorId.headerText);
       pagerHeaderView.getTopView().setGlassSelection(floatingHeader);
       pagerHeaderView.setContentInsetY(getHeaderControlsInset());
     }
+    headerCell.setGlassTextColors(floatingHeader);
     headerCell.setContentInsetY(getHeaderControlsInset());
     headerCell.setTextColor(Theme.getColor(getHeaderTextColorId()));
     if (headerView != null) headerView.resetColors(this, null);
@@ -1440,13 +1442,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
       };
       inputView.setNoPersonalizedLearning(Settings.instance().needsIncognitoMode(chat));
       inputView.setId(R.id.msg_input);
-      inputView.setTextColor(Theme.textAccentColor());
-      addThemePaintColorListener(inputView.getPlaceholderPaint(), ColorId.textPlaceholder);
-      addThemeTextColorListener(inputView, ColorId.text);
-      inputView.setHintTextColor(Theme.textPlaceholderColor());
-      addThemeHintTextColorListener(inputView, ColorId.textPlaceholder);
-      inputView.setLinkTextColor(Theme.textLinkColor());
-      addThemeLinkTextColorListener(inputView, ColorId.textLink);
+      inputView.setTextColor(Theme.getColor(isInForceTouchMode() ? ColorId.text : ColorId.glassText));
+      addThemePaintColorListener(inputView.getPlaceholderPaint(), isInForceTouchMode() ? ColorId.textPlaceholder : ColorId.glassPlaceholder);
+      addThemeTextColorListener(inputView, isInForceTouchMode() ? ColorId.text : ColorId.glassText);
+      inputView.setHintTextColor(Theme.getColor(isInForceTouchMode() ? ColorId.textPlaceholder : ColorId.glassPlaceholder));
+      inputView.getPlaceholderPaint().setColor(Theme.getColor(isInForceTouchMode() ? ColorId.textPlaceholder : ColorId.glassPlaceholder));
+      addThemeHintTextColorListener(inputView, isInForceTouchMode() ? ColorId.textPlaceholder : ColorId.glassPlaceholder);
+      inputView.setLinkTextColor(Theme.getColor(isInForceTouchMode() ? ColorId.textLink : ColorId.glassActive));
+      addThemeLinkTextColorListener(inputView, isInForceTouchMode() ? ColorId.textLink : ColorId.glassActive);
       ViewSupport.setThemedBackground(inputView, ColorId.filling, this);
       inputView.setHighlightColor(Theme.fillingTextSelectionColor());
       addThemeHighlightColorListener(inputView, ColorId.textSelectionHighlight);
@@ -2204,8 +2207,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       }
       pagerHeaderView.getTopView().setItems(items);
       if (useFloatingChatHeader()) {
-        pagerHeaderView.getTopView().setTextFromToColorId(getGlassIconColorId(), ColorId.text);
-        pagerHeaderView.getTopView().setSelectionColorId(ColorId.textLink);
+        pagerHeaderView.getTopView().setTextFromToColorId(getGlassIconColorId(), ColorId.glassActive);
+        pagerHeaderView.getTopView().setSelectionColorId(ColorId.glassActive);
         pagerHeaderView.getTopView().setGlassSelection(true);
         pagerHeaderView.setContentInsetY(getHeaderControlsInset());
       }
@@ -7498,9 +7501,10 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private void updateActionButton (CharSequence text, int mode, boolean isActive) {
     actionMode = mode;
     actionButton.setEnabled(isActive);
-    actionButton.setTextColor(isActive ? Theme.textLinkColor() : Theme.textAccentColor());
+    int actionColorId = (newChatInput || useFloatingChatHeader()) ? (isActive ? ColorId.glassActive : ColorId.glassIcon) : (isActive ? ColorId.textLink : ColorId.text);
+    actionButton.setTextColor(Theme.getColor(actionColorId));
     removeThemeListenerByTarget(actionButton);
-    addThemeTextColorListener(actionButton, isActive ? ColorId.textLink : ColorId.text);
+    addThemeTextColorListener(actionButton, actionColorId);
     Views.setMediumText(actionButton, text);
     if (actionButtonWrap != null) {
       ImageView helpView = actionButtonWrap.findViewById(R.id.btn_help);
@@ -13296,7 +13300,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   protected int getHeaderTextColorId () {
-    return useFloatingChatHeader() ? ColorId.text : super.getHeaderTextColorId();
+    return useFloatingChatHeader() ? ColorId.glassText : super.getHeaderTextColorId();
   }
 
   @Override
@@ -13311,7 +13315,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   protected int getSearchTextColorId () {
-    return useFloatingChatHeader() ? ColorId.text : super.getSearchTextColorId();
+    return useFloatingChatHeader() ? ColorId.glassText : super.getSearchTextColorId();
   }
 
   @Override
@@ -13321,7 +13325,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
 
   @Override
   protected int getSelectTextColorId () {
-    return useFloatingChatHeader() ? ColorId.text : super.getSelectTextColorId();
+    return useFloatingChatHeader() ? ColorId.glassText : super.getSelectTextColorId();
   }
 
   @Override

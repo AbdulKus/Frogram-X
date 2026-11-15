@@ -203,6 +203,13 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     linkInput.setGlassStyle(parent, false);
     linkInput.textView.setHint(Lang.getString(R.string.FrogramFormattingPasteLink));
     langSelector.setGlassStyle(parent, false);
+    for (TextView text : new TextView[] {linkInput.textView, langSelector.textView}) {
+      parent.removeThemeListenerByTarget(text);
+      text.setTextColor(Theme.getColor(ColorId.glassText));
+      text.setHintTextColor(Theme.getColor(ColorId.glassPlaceholder));
+      parent.addThemeTextColorListener(text, ColorId.glassText);
+      parent.addThemeHintTextColorListener(text, ColorId.glassPlaceholder);
+    }
     updateLanguageLabel(languageToTranslate);
   }
 
@@ -588,7 +595,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     private final BoolAnimator isEnabled;
     private boolean needDrawWithoutRepainting;
     protected Drawable drawable;
-    private boolean glassStyle;
+    protected boolean glassStyle;
     private boolean primary;
 
     public Button (Context context) {
@@ -619,9 +626,9 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     @Override
     protected void onDraw (Canvas canvas) {
       if (glassStyle && getId() != R.id.btn_pasteUrl) {
-        int accent = primary ? Theme.textLinkColor() : ColorUtils.fromToArgb(Theme.textAccentColor(), Theme.textLinkColor(), isActive.getFloatValue());
+        int accent = Theme.getColor(ColorId.glassActive);
         float radius = Screen.dp(10);
-        float opacity = primary ? .24f : MathUtils.fromTo(.10f, .24f, isActive.getFloatValue());
+        float opacity = primary ? .14f : MathUtils.fromTo(.06f, .14f, isActive.getFloatValue());
         canvas.drawRoundRect(0, 0, getWidth(), getHeight(), radius, radius,
           Paints.fillingPaint(ColorUtils.alphaColor(opacity, accent)));
       }
@@ -658,7 +665,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     protected void drawDrawable (Canvas canvas, float cx, float cy, float alpha) {
       if (drawable != null) {
         int color = glassStyle ?
-          ColorUtils.fromToArgb(Theme.textAccentColor(), Theme.textLinkColor(), isActive.getFloatValue()) :
+          ColorUtils.fromToArgb(Theme.getColor(ColorId.glassIcon), Theme.getColor(ColorId.glassActive), primary ? 1f : isActive.getFloatValue()) :
           ColorUtils.fromToArgb(Theme.iconColor(), Theme.getColor(ColorId.iconActive), isActive.getFloatValue());
         color = ColorUtils.alphaColor(alpha, color);
         Drawables.drawCentered(canvas, drawable, cx, cy, needDrawWithoutRepainting ? null : Paints.getPorterDuffPaint(color));
@@ -751,7 +758,7 @@ public class TextFormattingLayout extends FrameLayout implements TranslationsMan
     @Override
     protected void dispatchDraw (Canvas canvas) {
       super.dispatchDraw(canvas);
-      Drawables.draw(canvas, arrowDrawable, getMeasuredWidth() - Screen.dp(26), (getHeight() - arrowDrawable.getIntrinsicHeight()) / 2f, Paints.getPorterDuffPaint(Theme.iconColor()));
+      Drawables.draw(canvas, arrowDrawable, getMeasuredWidth() - Screen.dp(26), (getHeight() - arrowDrawable.getIntrinsicHeight()) / 2f, Paints.getPorterDuffPaint(Theme.getColor(glassStyle ? ColorId.glassIcon : ColorId.icon)));
     }
   }
 

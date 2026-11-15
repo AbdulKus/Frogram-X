@@ -115,6 +115,11 @@ public class ComplexMediaItemCustomEmoji implements ComplexMediaItem {
 
   @Override
   public void draw (Canvas c, Rect rect, int alpha, ComplexReceiver mediaReceiver, long displayMediaKey, boolean translate) {
+    drawWithTint(c, rect, alpha, mediaReceiver, displayMediaKey, translate, ColorId.text, true);
+  }
+
+  /** Repaintable emoji in a TextView inherit that view's current text colour. */
+  public void drawWithTint (Canvas c, Rect rect, int alpha, ComplexReceiver mediaReceiver, long displayMediaKey, boolean translate, int color, boolean colorIsId) {
     if (translate && (rect.left == 0 && rect.top == 0)) {
       translate = false;
     }
@@ -144,7 +149,7 @@ public class ComplexMediaItemCustomEmoji implements ComplexMediaItem {
     if (receiver.needPlaceholder()) {
       DoubleImageReceiver preview = mediaReceiver.getPreviewReceiver(displayMediaKey);
       if (needThemedColorFilter) {
-        preview.setThemedPorterDuffColorId(ColorId.text);
+        preview.setPorterDuffColorFilter(color, 1f, colorIsId);
       } else {
         preview.disablePorterDuffColorFilter();
       }
@@ -158,7 +163,7 @@ public class ComplexMediaItemCustomEmoji implements ComplexMediaItem {
       }
     }
     if (needThemedColorFilter) {
-      receiver.setThemedPorterDuffColorId(ColorId.text);
+      receiver.setPorterDuffColorFilter(color, 1f, colorIsId);
     } else {
       receiver.disablePorterDuffColorFilter();
     }

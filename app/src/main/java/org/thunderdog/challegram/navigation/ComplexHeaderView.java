@@ -766,6 +766,15 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     return ColorUtils.alphaColor(Theme.getSubtitleAlpha(), headerColor);
   }
 
+  private boolean glassTextColors;
+
+  public void setGlassTextColors (boolean enabled) {
+    if (glassTextColors != enabled) {
+      glassTextColors = enabled;
+      invalidate();
+    }
+  }
+
   private int titleColor = Color.WHITE, subtitleColor = ColorUtils.alphaColor(Theme.getSubtitleAlpha(), Color.WHITE);
 
   @Override
@@ -847,11 +856,11 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
   }
 
   private int getTitleColor () {
-    return ColorUtils.fromToArgb(this.titleColor, Color.WHITE, getAvatarExpandFactor());
+    return ColorUtils.fromToArgb(glassTextColors ? Theme.getColor(ColorId.glassText) : this.titleColor, Color.WHITE, getAvatarExpandFactor());
   }
 
   private int getSubtitleColor () {
-    return ColorUtils.fromToArgb(this.subtitleColor, ColorUtils.alphaColor(Theme.getSubtitleAlpha(), Color.WHITE), getAvatarExpandFactor());
+    return ColorUtils.fromToArgb(glassTextColors ? Theme.getColor(ColorId.glassTextSecondary) : this.subtitleColor, ColorUtils.alphaColor(Theme.getSubtitleAlpha(), Color.WHITE), getAvatarExpandFactor());
   }
 
   @Override
@@ -976,7 +985,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
         if (showMute) {
           float muteAlpha = (1f - this.muteFadeFactor) * iconAlpha;
           Drawable drawable = getSparseDrawable(R.drawable.deproko_baseline_notifications_off_24, 0);
-          Drawables.draw(c, drawable, baseIconLeft + iconsAdded, trimmedTitle.getHeight() / 2f - drawable.getMinimumHeight() / 2f, PorterDuffPaint.get(ColorId.headerText, muteAlpha * .4f));
+          Drawables.draw(c, drawable, baseIconLeft + iconsAdded, trimmedTitle.getHeight() / 2f - drawable.getMinimumHeight() / 2f, PorterDuffPaint.get(glassTextColors ? ColorId.glassIcon : ColorId.headerText, muteAlpha * (glassTextColors ? 1f : .4f)));
           iconLeft += drawable.getMinimumWidth();
         }
 

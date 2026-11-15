@@ -487,16 +487,16 @@ public class MediaBottomBar extends FrameLayoutFix implements GestureDetector.On
             int left = Math.max(edge, cx + padding);
             int right = Math.min(barWidth - edge, cx + itemWidth - padding);
             float radius = Screen.dp(16);
-            int selectedColor = ColorUtils.alphaColor(.12f * item.factor * (1f - overlayFactor), Theme.textAccentColor());
+            int selectedColor = ColorUtils.alphaColor(.12f * item.factor * (1f - overlayFactor), Theme.getColor(ColorId.glassActive));
             c.drawRoundRect(left, Screen.dp(6), right, MediaBottomBar.this.barHeight - Screen.dp(6),
               radius, radius, Paints.fillingPaint(selectedColor));
           }
 
           int iconCenterY = item.factor == 0f ? centerY : centerY - (int) ((float) (iconActivePadding - item.paddingTop) * item.factor);
           int iconAlpha = item.factor == 1f ? 255 : 255 - (int) ((255f * .25f) * (1f - item.factor));
-          int color = floatingStyle ? ColorUtils.fromToArgb(Theme.iconColor(), Theme.textAccentColor(), item.factor) :
+          int color = floatingStyle ? ColorUtils.fromToArgb(Theme.getColor(ColorId.glassIcon), Theme.getColor(ColorId.glassActive), item.factor) :
             Theme.getColor(ColorId.attachText);
-          if (floatingStyle) iconAlpha = Math.round(iconAlpha * (1f - overlayFactor));
+          if (floatingStyle) iconAlpha = Math.round(255 * (1f - overlayFactor));
           Paint bitmapPaint = iconPaint != null && iconColor == color ? iconPaint : (iconPaint = Paints.createPorterDuffPaint(iconPaint, iconColor = color));
           bitmapPaint.setAlpha(iconAlpha);
           if (item.icon != null) {

@@ -180,7 +180,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   }
 
   private int getSpeedCounterColor () {
-    return ColorUtils.fromToArgb(Theme.getColor(ColorId.icon), Theme.getColor(ColorId.iconActive), speedIsActive.getFloatValue());
+    return ColorUtils.fromToArgb(Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon), Theme.getColor(drawingFloatingPlayer ? ColorId.glassActive : ColorId.iconActive), speedIsActive.getFloatValue());
   }
 
   @Override
@@ -700,9 +700,9 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     }
 
     TdApi.File file = TD.getFile(playingMessage);
-    DrawAlgorithms.drawPlayPause(c, getRightButtonCenter(width, 0), playerBottom - Size.getHeaderPlayerSize() / 2, Screen.dp(12f), playPausePath, playPauseDrawFactor, playPauseDrawFactor = playPauseFactor, file != null ? TD.getFileProgress(file) : 1f, ColorUtils.alphaColor(dropShadowAlpha, Theme.iconColor()));
+    DrawAlgorithms.drawPlayPause(c, getRightButtonCenter(width, 0), playerBottom - Size.getHeaderPlayerSize() / 2, Screen.dp(12f), playPausePath, playPauseDrawFactor, playPauseDrawFactor = playPauseFactor, file != null ? TD.getFileProgress(file) : 1f, ColorUtils.alphaColor(dropShadowAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon)));
 
-    Drawables.draw(c, forwardIcon, getRightButtonLeft(width, 1), playerBottom - Size.getHeaderPlayerSize() / 2 - forwardIcon.getMinimumHeight() / 2, dropShadowAlpha == 1f ? Paints.getIconGrayPorterDuffPaint() : Paints.getPorterDuffPaint(ColorUtils.alphaColor(dropShadowAlpha, Theme.iconColor())));
+    Drawables.draw(c, forwardIcon, getRightButtonLeft(width, 1), playerBottom - Size.getHeaderPlayerSize() / 2 - forwardIcon.getMinimumHeight() / 2, !drawingFloatingPlayer && dropShadowAlpha == 1f ? Paints.getIconGrayPorterDuffPaint() : Paints.getPorterDuffPaint(ColorUtils.alphaColor(dropShadowAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon))));
     drawCloseIcon(c, playerTop, width, playerBottom, false);
 
     drawOngoingText(c, playerTop, rectWidth, playerBottom, Screen.dp(67f), null, 1f, 1f);
@@ -710,7 +710,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   private void drawCloseIcon (Canvas c, int playerTop, float rectWidth, int playerBottom, boolean alignRight) {
     float cx = alignRight ? rectWidth - Screen.dp(50f) / 2 : Screen.dp(28f);
-    DrawAlgorithms.drawMark(c, cx, playerTop + (playerBottom - playerTop) / 2, 1f, Screen.dp(9f), Paints.getProgressPaint(ColorUtils.alphaColor(dropShadowAlpha, Theme.iconColor()),  Screen.dp(2f)));
+    DrawAlgorithms.drawMark(c, cx, playerTop + (playerBottom - playerTop) / 2, 1f, Screen.dp(9f), Paints.getProgressPaint(ColorUtils.alphaColor(dropShadowAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon)),  Screen.dp(2f)));
   }
 
   // Ongoing bar text
@@ -762,10 +762,10 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   private void drawOngoingText (Canvas c, int playerTop, float rectWidth, int playerBottom, int textLeft, TextColorSet theme, float titleAlpha, float textAlpha) {
     int textTop = Screen.dp(9f);
     if (trimmedTitle != null) {
-      trimmedTitle.draw(c, textLeft, playerTop + textTop, theme, titleAlpha * dropShadowAlpha);
+      trimmedTitle.draw(c, textLeft, playerTop + textTop, theme != null ? theme : drawingFloatingPlayer ? TextColorSets.GLASS_TEXT : null, titleAlpha * dropShadowAlpha);
     }
     if (trimmedSubtitle != null) {
-      trimmedSubtitle.draw(c, textLeft + getTitleWidth(), playerTop + textTop, theme, textAlpha * dropShadowAlpha);
+      trimmedSubtitle.draw(c, textLeft + getTitleWidth(), playerTop + textTop, theme != null ? theme : drawingFloatingPlayer ? TextColorSets.GLASS_SECONDARY : null, textAlpha * dropShadowAlpha);
     }
   }
 

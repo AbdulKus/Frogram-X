@@ -522,6 +522,11 @@ public class MessagePreviewView extends BaseView implements AttachDelegate, Dest
 
   private static final float CORNER_PADDING = 3f;
 
+  private boolean floatingSurface;
+  public void setFloatingSurface (boolean enabled) {
+    if (floatingSurface != enabled) { floatingSurface = enabled; invalidate(); }
+  }
+
   private void buildTitleText (int availWidth, boolean animated) {
     if (data == null) {
       throw new IllegalStateException();
@@ -681,7 +686,7 @@ public class MessagePreviewView extends BaseView implements AttachDelegate, Dest
     for (ListAnimator.Entry<TextEntry> entry : titleText) {
       int titleY = Screen.dp(7f);
       if (entry.item.content != null) {
-        entry.item.content.draw(c, textX, titleY, null, entry.getVisibility());
+        entry.item.content.draw(c, textX, titleY, floatingSurface ? TextColorSets.GLASS_ACTIVE : null, entry.getVisibility());
       }
       if (entry.item.drawable != null) {
         float textCenterY = titleY + (entry.item.content != null ? entry.item.content.getLineHeight(false) : Screen.dp(TEXT_SIZE)) / 2f;
@@ -689,15 +694,15 @@ public class MessagePreviewView extends BaseView implements AttachDelegate, Dest
           (entry.item.content != null ? entry.item.content.getWidth() + Screen.dp(CORNER_PADDING) : 0),
           contentText.getMetadata().getTotalWidth() - entry.item.drawable.getMinimumWidth()
         );
-        Drawables.draw(c, entry.item.drawable, iconX, textCenterY - entry.item.drawable.getMinimumHeight() / 2f, PorterDuffPaint.get(entry.item.getNameColorId(ColorId.messageAuthor), entry.getVisibility()));
+        Drawables.draw(c, entry.item.drawable, iconX, textCenterY - entry.item.drawable.getMinimumHeight() / 2f, PorterDuffPaint.get(floatingSurface ? ColorId.glassActive : entry.item.getNameColorId(ColorId.messageAuthor), entry.getVisibility()));
       }
     }
     for (ListAnimator.Entry<TextEntry> entry : contentText) {
       if (entry.item.drawable != null) {
-        Drawables.draw(c, entry.item.drawable, textX, contextTextY + (entry.item.content != null ? entry.item.content.getLineHeight(false) : Screen.dp(TEXT_SIZE)) / 2f - entry.item.drawable.getMinimumHeight() / 2f, PorterDuffPaint.get(ColorId.icon, entry.getVisibility()));
+        Drawables.draw(c, entry.item.drawable, textX, contextTextY + (entry.item.content != null ? entry.item.content.getLineHeight(false) : Screen.dp(TEXT_SIZE)) / 2f - entry.item.drawable.getMinimumHeight() / 2f, PorterDuffPaint.get(floatingSurface ? ColorId.glassIcon : ColorId.icon, entry.getVisibility()));
       }
       if (entry.item.content != null) {
-        entry.item.content.draw(c, textX, contextTextY, null, entry.getVisibility(), entry.item.receiver);
+        entry.item.content.draw(c, textX, contextTextY, floatingSurface ? TextColorSets.GLASS_SECONDARY : null, entry.getVisibility(), entry.item.receiver);
       }
     }
   }

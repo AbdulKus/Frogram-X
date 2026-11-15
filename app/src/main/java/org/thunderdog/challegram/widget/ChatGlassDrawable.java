@@ -261,7 +261,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     canvas.clipPath(navigationClip);
     paint.setShader(null);
     paint.setColor(color);
-    paint.setAlpha(Math.round(opacity * 255f * (sampled ? (Theme.isDark() ? .54f : .58f) : .82f)));
+    paint.setAlpha(Math.round(opacity * 255f * (sampled ? (Theme.isDark() ? .54f : org.thunderdog.challegram.util.GlassPalette.LIGHT_VEIL) : .82f)));
     canvas.drawRect(bounds, paint);
     navigationSheenMatrix.setScale(1f, bounds.height());
     navigationSheenMatrix.postTranslate(0, bounds.top);
@@ -336,7 +336,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     }
     // Keep theme foreground colours legible even over a high-contrast photo.
     paint.setColor(surfaceColor(colorId));
-    paint.setAlpha(Math.round(alpha * (sample != null ? (Theme.isDark() ? .54f : .58f) : .82f)));
+    paint.setAlpha(Math.round(alpha * (sample != null ? (Theme.isDark() ? .54f : org.thunderdog.challegram.util.GlassPalette.LIGHT_VEIL) : .82f)));
     canvas.drawRect(panel, paint);
     paint.setShader(sheen);
     paint.setAlpha(alpha);

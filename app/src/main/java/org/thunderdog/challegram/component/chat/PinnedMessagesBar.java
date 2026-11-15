@@ -79,7 +79,7 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
 
     @Override
     protected void onDraw (Canvas c) {
-      DrawAlgorithms.drawCollapse(c, getPaddingLeft() + (getMeasuredWidth() - getPaddingLeft() - getPaddingRight()) / 2f, getMeasuredHeight() / 2f, Theme.iconColor(), isExpanded.getFloatValue(), 1f - canExpand.getFloatValue());
+      DrawAlgorithms.drawCollapse(c, getPaddingLeft() + (getMeasuredWidth() - getPaddingLeft() - getPaddingRight()) / 2f, getMeasuredHeight() / 2f, Theme.getColor(floatingSurface ? ColorId.glassIcon : ColorId.icon), isExpanded.getFloatValue(), 1f - canExpand.getFloatValue());
     }
   }
 
@@ -254,6 +254,10 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
   public void setFloatingSurface (boolean enabled) {
     if (floatingSurface == enabled) return;
     floatingSurface = enabled;
+    for (int i = 0; i < recyclerView.getChildCount(); i++) {
+      View child = recyclerView.getChildAt(i);
+      if (child instanceof MessagePreviewView) ((MessagePreviewView) child).setFloatingSurface(enabled);
+    }
     if (enabled) {
       setBackground(null);
       recyclerView.setBackground(null);
@@ -445,6 +449,7 @@ public class PinnedMessagesBar extends ViewGroup implements Destroyable, Message
 
       @Override
       protected void setMessagePreview (ListItem item, int position, MessagePreviewView previewView) {
+        previewView.setFloatingSurface(floatingSurface);
         Entry data = (Entry) item.getData();
         if (data.isLinkPreview()) {
           LinkPreview linkPreview = data.linkPreviewContext.getLinkPreview(data.linkPreviewUrl);

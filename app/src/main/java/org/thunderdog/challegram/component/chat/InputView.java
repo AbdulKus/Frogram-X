@@ -976,6 +976,12 @@ public class InputView extends NoClipEditText implements InlineSearchContext.Cal
     this.inputListener = inputListener;
   }
 
+  private boolean floatingSurface;
+
+  public void setFloatingSurface (boolean enabled) {
+    if (floatingSurface != enabled) { floatingSurface = enabled; invalidate(); }
+  }
+
   public Paint getPlaceholderPaint () {
     return paint;
   }
@@ -1368,16 +1374,16 @@ public class InputView extends NoClipEditText implements InlineSearchContext.Cal
         final int titleHeight = placeholderTitle.getHeight();
         final int titleBaseline = (int)(titleHeight * 0.75f);
         final int y = baseline - titleBaseline - offset;
-        placeholderTitle.draw(c, x, y, null, alpha);
+        placeholderTitle.draw(c, x, y, floatingSurface ? TextColorSets.GLASS_PLACEHOLDER : null, alpha);
       }
       for (ListAnimator.Entry<Text> entry : subtitleReplaceAnimator) {
         final int offset2 = (int) ((!entry.isAffectingList() ?
           ((entry.getVisibility() - 1f) * (getTextSize() / 18f * 14f)):
           ((1f - entry.getVisibility()) * (getTextSize() / 18f * 14f))));
-        entry.item.draw(c, x, baseline - offset / 2 + offset2, null, Math.min(alpha, entry.getVisibility()));
+        entry.item.draw(c, x, baseline - offset / 2 + offset2, floatingSurface ? TextColorSets.GLASS_PLACEHOLDER : null, Math.min(alpha, entry.getVisibility()));
       }
       if (placeholderIcon != null) {
-        Drawables.draw(c, placeholderIcon, getPaddingLeft(), (getMeasuredHeight() - placeholderIcon.getMinimumHeight()) / 2f, PorterDuffPaint.get(ColorId.iconLight) /*Paints.getPorterDuffPaint(ColorId.textPlaceholder)*/);
+        Drawables.draw(c, placeholderIcon, getPaddingLeft(), (getMeasuredHeight() - placeholderIcon.getMinimumHeight()) / 2f, PorterDuffPaint.get(floatingSurface ? ColorId.glassIcon : ColorId.iconLight));
       }
     }
 

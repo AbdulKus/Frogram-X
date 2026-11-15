@@ -193,14 +193,18 @@ public class Theme {
 
   @ColorInt
   public static int getColor (final @ColorId int colorId) {
-    return ThemeManager.instance().currentTheme().getColor(colorId);
+    return resolveColor(ThemeManager.instance().currentTheme(), colorId);
+  }
+
+  public static int resolveColor (ThemeDelegate theme, int colorId) {
+    return GlassTheme.isColor(colorId) ? GlassTheme.getColor(theme, colorId) : theme.getColor(colorId);
   }
 
   public static int getColorFast (final @ColorId int colorId) {
     ThemeDelegate currentTheme = ThemeManager.currentThemeFast();
     if (currentTheme != null)
-      return currentTheme.getColor(colorId);
-    return ThemeSet.getColor(ThemeId.BLUE, colorId);
+      return resolveColor(currentTheme, colorId);
+    return resolveColor(ThemeSet.getBuiltinTheme(ThemeId.BLUE), colorId);
   }
 
   public static float getProperty (final @PropertyId int propertyId, final @ThemeId int themeId) {
@@ -221,8 +225,8 @@ public class Theme {
   public static int getColor (final @ColorId int colorId, final @ThemeId int themeId) {
     ThemeDelegate currentTheme = ThemeManager.currentThemeFast();
     if (currentTheme != null && themeId == currentTheme.getId())
-      return currentTheme.getColor(colorId);
-    return ThemeSet.getColor(themeId, colorId);
+      return resolveColor(currentTheme, colorId);
+    return GlassTheme.isColor(colorId) ? GlassTheme.getColor(ThemeSet.getOrLoadTheme(themeId, true), colorId) : ThemeSet.getColor(themeId, colorId);
   }
 
   //

@@ -190,7 +190,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
     text.setPadding(Screen.dp(10f), Screen.dp(4f), Screen.dp(10f), Screen.dp(4f));
     text.setTextColor(Theme.textAccentColor());
     if (themeProvider != null) {
-      themeProvider.addThemeTextAccentColorListener(text);
+      themeProvider.addThemeTextColorListener(text, glassColors() ? ColorId.glassIcon : ColorId.text);
     }
     text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16f);
     text.setOnClickListener(this);
@@ -211,11 +211,22 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
     }));
   }
 
+  private boolean glassColors () {
+    return themeProvider instanceof org.thunderdog.challegram.ui.MessagesController &&
+      ((org.thunderdog.challegram.ui.MessagesController) themeProvider).useFloatingInput();
+  }
+
   private void applyButtonStyle (TextView text, TdApi.ButtonStyle style) {
     int color = buttonStyleColor(style);
+    int contentColorId = color != 0 ? ColorId.white : glassColors() ? ColorId.glassIcon : ColorId.text;
+    if (themeProvider != null) {
+      themeProvider.removeThemeListenerByTarget(text);
+      themeProvider.addThemeInvalidateListener(text);
+      themeProvider.addThemeTextColorListener(text, contentColorId);
+    }
     if (color == 0) {
       ViewUtils.setBackground(text, Theme.rectSelector(18f, 0f, ColorId.chatKeyboardButton));
-      text.setTextColor(Theme.textAccentColor());
+      text.setTextColor(Theme.getColor(contentColorId));
     } else {
       ViewUtils.setBackground(text, coloredButtonBackground(color));
       text.setTextColor(Color.WHITE);

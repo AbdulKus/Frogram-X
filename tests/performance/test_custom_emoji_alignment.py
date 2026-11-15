@@ -42,9 +42,9 @@ public class EmojiAlignmentRegression {
   static class Size {int getSize(){return 20;}}
   static class Span {
     Entry customEmoji=new Entry();boolean isDestroyed,fail;Size size=new Size();
-    int customEmojiSize=20,draws,x,y;Rect drawRect=new Rect();
+    View lastHost;int customEmojiSize=20,draws,x,y;Rect drawRect=new Rect();
     void prepareCustomEmoji(int size){customEmojiSize=size;}
-    void drawCustomEmoji(Canvas c){draws++;x=drawRect.left;y=drawRect.top;if(fail)throw new IllegalStateException();}
+    void drawCustomEmoji(Canvas c,View host){lastHost=host;draws++;x=drawRect.left;y=drawRect.top;if(fail)throw new IllegalStateException();}
     PRODUCTION_METHOD
   }
   public static void main(String[] args){
@@ -53,6 +53,7 @@ public class EmojiAlignmentRegression {
       Span s=new Span();TextView view=new TextView(offset);
       for(int i=0;i<3;i++){
         s.onOverlayDraw(c,view,layout);
+        check(s.lastHost==view,"overlay must forward its TextView for tinting");
         check(s.x==33&&s.y==30+offset,"icon must follow compound padding and vertical gravity");
         check(s.drawRect.left==20&&s.drawRect.top==30,"overlay draws must not accumulate offsets");
       }

@@ -18,6 +18,7 @@ import androidx.annotation.Nullable;
 
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.ThemeDelegate;
+import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.theme.ThemeManager;
 
 public interface TextColorSetThemed extends TextColorSet {
@@ -61,26 +62,26 @@ public interface TextColorSetThemed extends TextColorSet {
   @ColorInt
   default int defaultTextColor () {
     int colorId = defaultTextColorId();
-    return colorId != 0 ? colorTheme().getColor(colorId) : 0;
+    return colorId != 0 ? Theme.resolveColor(colorTheme(), colorId) : 0;
   }
   @Override
   default int iconColor () {
     int colorId = iconColorId();
-    return colorId != 0 ? colorTheme().getColor(colorId) : 0;
+    return colorId != 0 ? Theme.resolveColor(colorTheme(), colorId) : 0;
   }
   @ColorInt
   default int clickableTextColor (boolean isPressed) {
     int colorId = clickableTextColorId(isPressed);
-    return colorId != 0 ? colorTheme().getColor(colorId) : 0;
+    return colorId != 0 ? Theme.resolveColor(colorTheme(), colorId) : 0;
   }
   @ColorInt
   default int backgroundColor (boolean isPressed) {
     int colorId = backgroundColorId(isPressed);
-    return colorId != 0 ? colorTheme().getColor(colorId) : 0;
+    return colorId != 0 ? Theme.resolveColor(colorTheme(), colorId) : 0;
   }
   @ColorInt
   default int outlineColor (boolean isPressed) {
     int colorId = outlineColorId(isPressed);
-    return colorId != 0 ? colorTheme().getColor(colorId) : 0;
+    return colorId != 0 ? Theme.resolveColor(colorTheme(), colorId) : 0;
   }
 }

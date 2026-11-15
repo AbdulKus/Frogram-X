@@ -293,6 +293,8 @@ public class ThemeManager implements FactorAnimator.Target, GlobalAccountListene
   }
 
   public boolean hasColorChanged (@ColorId int colorId) {
+    // Derived roles depend on several base colours, including live accent edits.
+    if (GlassTheme.isColor(colorId)) return true;
     ThemeDelegate currentTheme = currentThemeImpl(false);
     int themeId = currentTheme.getId();
     if (themeId == ThemeId.TEMPORARY) {

@@ -168,8 +168,8 @@ public class OverlayButtonWrap extends FrameLayoutFix implements View.OnClickLis
         return !(e.getAction() == MotionEvent.ACTION_DOWN && getAlpha() == 0f) && super.onTouchEvent(e);
       }
     };
-    text.setTextColor(glassMode ? Theme.textAccentColor() : Theme.textDecentColor());
-    if (glassMode) parent.addThemeTextColorListener(text, ColorId.text);
+    text.setTextColor(glassMode ? Theme.getColor(ColorId.glassIcon) : Theme.textDecentColor());
+    if (glassMode) parent.addThemeTextColorListener(text, ColorId.glassIcon);
     else parent.addThemeTextDecentColorListener(text);
     if (glassMode) applyGlass(parent, text);
     else RippleSupport.setRectBackground(text, 3f, 4f, ColorId.filling);

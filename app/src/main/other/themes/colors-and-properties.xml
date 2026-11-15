@@ -569,5 +569,13 @@
     <item name="bubbleIn_blockQuoteLine" porterDuff="true" fallback="bubbleIn_time"/>
     <item name="bubbleOut_blockQuoteText" porterDuff="true" fallback="bubbleOut_time"/>
     <item name="bubbleOut_blockQuoteLine" porterDuff="true" fallback="bubbleOut_time"/>
+
+    <!-- Foreground roles derived at runtime for the floating glass interface. -->
+    <item name="glassText" fallback="text" porterDuff="true" />
+    <item name="glassTextSecondary" fallback="textLight" porterDuff="true" />
+    <item name="glassIcon" fallback="icon" porterDuff="true" />
+    <item name="glassActive" fallback="textLink" porterDuff="true" />
+    <item name="glassPlaceholder" fallback="textPlaceholder" porterDuff="true" />
+
   </colors>
 </xml>

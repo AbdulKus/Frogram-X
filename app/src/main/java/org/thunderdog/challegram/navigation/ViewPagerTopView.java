@@ -1061,7 +1061,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
       mask.setColor(android.graphics.Color.WHITE);
       mask.setCornerRadius(Screen.dp(20f));
       view.setBackground(new android.graphics.drawable.RippleDrawable(
-        android.content.res.ColorStateList.valueOf(ColorUtils.alphaColor(.22f, getGlassTabTint())), null,
+        android.content.res.ColorStateList.valueOf(ColorUtils.alphaColor(Theme.isDark() ? .22f : .04f, getGlassTabTint())), null,
         new android.graphics.drawable.InsetDrawable(mask, Screen.dp(4f), Screen.dp(8f), Screen.dp(4f), Screen.dp(8f))));
     } else if (isDark) {
       RippleSupport.setTransparentBlackSelector(view);
@@ -1075,7 +1075,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
   }
 
   private void updateGlassTabRippleColors () {
-    int color = ColorUtils.alphaColor(.22f, getGlassTabTint());
+    int color = ColorUtils.alphaColor(Theme.isDark() ? .22f : .04f, getGlassTabTint());
     if (glassTabRippleColor == color) return;
     glassTabRippleColor = color;
     android.content.res.ColorStateList colors = android.content.res.ColorStateList.valueOf(color);
@@ -1123,7 +1123,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     int tint = getGlassTabTint();
     float alpha = 1f - disabledFactor;
     glassTabPaint.setShader(null);
-    glassTabPaint.setColor(ColorUtils.alphaColor((Theme.isDark() ? .30f : .32f) * alpha, tint));
+    glassTabPaint.setColor(ColorUtils.alphaColor((Theme.isDark() ? .30f : .10f) * alpha, tint));
     canvas.drawRoundRect(glassTabBounds, radius, radius, glassTabPaint);
     if (glassTabSheen == null || glassTabHeight != height) {
       glassTabHeight = height;

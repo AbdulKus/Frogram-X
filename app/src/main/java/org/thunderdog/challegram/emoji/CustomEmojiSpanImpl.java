@@ -114,7 +114,7 @@ public class CustomEmojiSpanImpl extends EmojiSpanImpl implements TdlibEmojiMana
     }
   }
 
-  private void drawCustomEmoji (Canvas c) {
+  private void drawCustomEmoji (Canvas c, View host) {
     if (customEmoji == null || customEmoji.isNotFound()) {
       return;
     }
@@ -132,13 +132,12 @@ public class CustomEmojiSpanImpl extends EmojiSpanImpl implements TdlibEmojiMana
     }
     ComplexReceiver receiver = surfaceProvider.provideComplexReceiverForSpan(this);
     boolean haveDuplicateMedia = surfaceProvider.getDuplicateMediaItemCount(this, mediaItem) > 1;
-    mediaItem.draw(c,
-      drawRect,
-      emojiAlpha,
-      receiver,
-      attachedToMediaKey,
-      haveDuplicateMedia
-    );
+    if (mediaItem instanceof ComplexMediaItemCustomEmoji && host instanceof android.widget.TextView) {
+      ((ComplexMediaItemCustomEmoji) mediaItem).drawWithTint(c, drawRect, emojiAlpha, receiver,
+        attachedToMediaKey, haveDuplicateMedia, ((android.widget.TextView) host).getCurrentTextColor(), false);
+    } else {
+      mediaItem.draw(c, drawRect, emojiAlpha, receiver, attachedToMediaKey, haveDuplicateMedia);
+    }
     if (needScale) {
       Views.restore(c, restoreToCount);
     }
@@ -167,7 +166,7 @@ public class CustomEmojiSpanImpl extends EmojiSpanImpl implements TdlibEmojiMana
       drawRect.offset(paddingLeft, paddingTop);
     }
     try {
-      drawCustomEmoji(c);
+      drawCustomEmoji(c, view);
     } finally {
       if (translate) {
         drawRect.offset(-paddingLeft, -paddingTop);

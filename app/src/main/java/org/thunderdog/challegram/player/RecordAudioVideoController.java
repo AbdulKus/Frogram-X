@@ -230,10 +230,10 @@ public class RecordAudioVideoController implements
 
     if (inputGlass == null) this.inputOverlayView.setBackgroundColor(Theme.fillingColor());
     else inputGlass.invalidateBackdrop();
-    this.slideHintView.setTextColor(Theme.textDecentColor());
-    this.cancelView.setTextColor(Theme.getColor(ColorId.textNeutral));
+    this.slideHintView.setTextColor(Theme.getColor(inputGlass != null ? ColorId.glassTextSecondary : ColorId.textLight));
+    this.cancelView.setTextColor(Theme.getColor(inputGlass != null ? ColorId.glassActive : ColorId.textNeutral));
     this.videoPlaceholderView.setBackgroundColor(Theme.fillingColor());
-    this.deleteButton.setColorFilter(Theme.iconColor());
+    this.deleteButton.setColorFilter(Theme.getColor(inputGlass != null ? ColorId.glassIcon : ColorId.icon));
     this.videoBackgroundView.setBackgroundColor(Theme.getColor(ColorId.previewBackground));
 
     this.cornerView.invalidate();
@@ -358,7 +358,7 @@ public class RecordAudioVideoController implements
       this.cornerView = new View(context) {
         @Override
         protected void onDraw (Canvas c) {
-          DrawAlgorithms.drawDirection(c, 0, getMeasuredHeight() / 2, Theme.textDecentColor(), Gravity.LEFT);
+          DrawAlgorithms.drawDirection(c, 0, getMeasuredHeight() / 2, Theme.getColor(inputGlass != null ? ColorId.glassTextSecondary : ColorId.textLight), Gravity.LEFT);
         }
       };
       this.cornerView.setLayoutParams(FrameLayoutFix.newParams(Screen.dp(12f), Screen.dp(16f), Gravity.CENTER));

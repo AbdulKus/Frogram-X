@@ -219,7 +219,7 @@ public class ChatBottomBarView extends BaseView {
         drawingText.draw(c, (int) (cx - drawingText.getWidth() / 2f), (int) (cy - drawingText.getHeight() / 2f), null, factor * (1f - collapseFactor));
       }
       if (collapseFactor > 0f && drawable != null) {
-        Paint paint = PorterDuffPaint.get(((ChatBottomBarView) view).glass != null ? ColorId.text : ColorId.circleButtonChatIcon, factor * collapseFactor);
+        Paint paint = PorterDuffPaint.get(((ChatBottomBarView) view).glass != null ? ColorId.glassIcon : ColorId.circleButtonChatIcon, factor * collapseFactor);
         Drawables.drawCentered(c, drawable, cx, cy, paint);
       }
       if (needScale) {

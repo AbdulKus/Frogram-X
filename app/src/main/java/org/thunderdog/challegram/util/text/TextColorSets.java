@@ -20,6 +20,10 @@ import org.thunderdog.challegram.tool.Screen;
 import me.vkryl.core.ColorUtils;
 
 public final class TextColorSets {
+  public static final TextColorSet GLASS_PLACEHOLDER = () -> Theme.getColor(ColorId.glassPlaceholder);
+  public static final TextColorSet GLASS_TEXT = () -> Theme.getColor(ColorId.glassText);
+  public static final TextColorSet GLASS_SECONDARY = () -> Theme.getColor(ColorId.glassTextSecondary);
+  public static final TextColorSet GLASS_ACTIVE = () -> Theme.getColor(ColorId.glassActive);
   public static final TextColorSetThemed WHITE = () -> ColorId.white;
   public static final TextColorSetThemed PLACEHOLDER = () -> ColorId.textPlaceholder;
 

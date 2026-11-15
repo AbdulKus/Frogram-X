@@ -192,7 +192,7 @@ public class ReplyBarView extends FrameLayoutFix implements View.OnClickListener
 
   @Override protected void dispatchDraw (android.graphics.Canvas canvas) {
     if (floatingSurface) {
-      int color = Theme.isDark() ? Theme.iconColor() : Theme.textAccentColor();
+      int color = Theme.getColor(ColorId.glassIcon);
       if (floatingIconColor != color) {
         floatingIconColor = color;
         closeView.setColorFilter(color); replaceMediaView.setColorFilter(color); editMediaView.setColorFilter(color);
