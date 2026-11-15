@@ -503,6 +503,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
       if (backgroundView.inSlideOff()) {
         return false;
       }
+      if (backgroundView.startSlideOffOnHold()) return true;
       backgroundView.cancelSlideOff();
       return listener.onPagerItemLongClick(backgroundView.index);
     }
@@ -1499,6 +1500,8 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
   }
 
   public interface OnSlideOffListener {
+    // Opt in before the pager's regular long-click action takes ownership.
+    default boolean onSlideOffLongPress (View view, MotionEvent event, int index) { return false; }
     boolean onSlideOffPrepare (View view, MotionEvent event, int index);
     void onSlideOffStart (View view, MotionEvent event, int index);
     void onSlideOffMovement (View view, MotionEvent event, int index);
@@ -1540,6 +1543,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     private float touchX;
     private float touchY;
     private boolean inSlideOff;
+    private boolean startedByHold;
     private ViewParent lockedParent;
 
     @Override
@@ -1555,6 +1559,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
           touchY = e.getY();
           touchDownY = e.getY();
           touchDownTime = e.getDownTime();
+          startedByHold = false;
           break;
         case MotionEvent.ACTION_MOVE: {
           if (touchDownTime < 0L) {
@@ -1562,6 +1567,10 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
           }
           touchX = e.getX();
           touchY = e.getY();
+          if (startedByHold) {
+            slideOffListener.onSlideOffMovement(this, e, index);
+            break;
+          }
           if (lockedParent == null) {
             if (Math.abs(touchY - touchDownY) > Screen.getTouchSlop()) {
               boolean needSlideOff = slideOffListener.onSlideOffPrepare(this, e, index);
@@ -1599,6 +1608,23 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
       return true;
     }
 
+    public boolean startSlideOffOnHold () {
+      OnSlideOffListener listener = topView != null ? topView.onSlideOffListener : null;
+      if (listener == null || touchDownTime < 0L) return false;
+      MotionEvent event = MotionEvent.obtain(touchDownTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, touchX, touchY, 0);
+      try {
+        if (!listener.onSlideOffPrepare(this, event, index) || !listener.onSlideOffLongPress(this, event, index)) return false;
+        startedByHold = true;
+        inSlideOff = true;
+        lockedParent = getParent();
+        if (lockedParent != null) lockedParent.requestDisallowInterceptTouchEvent(true);
+        setPressed(false);
+        return true;
+      } finally {
+        event.recycle();
+      }
+    }
+
     public boolean inSlideOff () {
       return inSlideOff;
     }
@@ -1606,11 +1632,16 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     public void cancelSlideOff () {
       MotionEvent e = MotionEvent.obtain(touchDownTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_CANCEL, touchX, touchY, /* metaState */ 0);
       OnSlideOffListener slideOffListener = topView != null ? topView.onSlideOffListener : null;
-      finishSlideOff(e, slideOffListener, /* apply */ false);
+      try {
+        finishSlideOff(e, slideOffListener, /* apply */ false);
+      } finally {
+        e.recycle();
+      }
     }
 
     public void finishSlideOff (MotionEvent e, @Nullable OnSlideOffListener slideOffListener, boolean apply) {
       touchDownTime = Long.MIN_VALUE;
+      startedByHold = false;
       if (inSlideOff) {
         inSlideOff = false;
         if (slideOffListener != null) {

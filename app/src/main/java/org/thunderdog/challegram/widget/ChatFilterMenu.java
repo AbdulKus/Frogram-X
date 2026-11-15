@@ -25,6 +25,7 @@ public class ChatFilterMenu extends FrameLayoutFix implements FactorAnimator.Tar
   private final float[] rootPoint = new float[2], localPoint = new float[2];
   private ChatGlassDrawable surface;
   private boolean freezeOnDraw;
+  private Runnable dismissListener;
   private int highlighted = -1;
   private boolean tracking;
   private final Runnable autoScroll = this::scrollTowardsPointer;
@@ -54,6 +55,8 @@ public class ChatFilterMenu extends FrameLayoutFix implements FactorAnimator.Tar
     setBackground(surface);
   }
 
+  public void setDismissListener (Runnable listener) { dismissListener = listener; }
+
   public void addItem (View item) { items.addView(item); }
   public int getItemCount () { return items.getChildCount(); }
   public View getItemAt (int index) { return items.getChildAt(index); }
@@ -79,7 +82,10 @@ public class ChatFilterMenu extends FrameLayoutFix implements FactorAnimator.Tar
   @Override public void onFactorChangeFinished (int id, float factor, FactorAnimator animator) {
     freezeOnDraw = false;
     if (surface != null) surface.freezeForNavigation(false);
-    if (!visible.getValue()) setVisibility(INVISIBLE);
+    if (!visible.getValue()) {
+      setVisibility(INVISIBLE);
+      if (dismissListener != null) dismissListener.run();
+    }
   }
 
   @Override protected void dispatchDraw (Canvas canvas) {
@@ -102,8 +108,21 @@ public class ChatFilterMenu extends FrameLayoutFix implements FactorAnimator.Tar
     int margin = Screen.dp(16f);
     int maxWidth = Math.max(0, MeasureSpec.getSize(widthSpec) - margin);
     int maxHeight = Math.max(0, MeasureSpec.getSize(heightSpec) - margin);
-    setMinimumWidth(Math.min(Screen.dp(208f), maxWidth));
-    super.onMeasure(MeasureSpec.makeMeasureSpec(Math.min(Screen.dp(268f), maxWidth), MeasureSpec.AT_MOST),
+    int horizontalPadding = getPaddingLeft() + getPaddingRight();
+    int contentLimit = Math.max(0, Math.min(Screen.dp(268f), maxWidth) - horizontalPadding);
+    int contentWidth = 0;
+    for (int i = 0; i < items.getChildCount(); i++) {
+      View item = items.getChildAt(i);
+      if (item.getVisibility() == GONE) continue;
+      int height = item.getLayoutParams().height;
+      item.measure(MeasureSpec.makeMeasureSpec(contentLimit, MeasureSpec.AT_MOST),
+        MeasureSpec.makeMeasureSpec(Math.max(0, height), height >= 0 ? MeasureSpec.EXACTLY : MeasureSpec.UNSPECIFIED));
+      contentWidth = Math.max(contentWidth, item.getMeasuredWidth());
+    }
+    // An exact outer width also stretches the single ScrollView/content child;
+    // a minimum width alone leaves a blank strip beside MATCH_PARENT rows.
+    int width = Math.min(maxWidth, contentWidth + horizontalPadding);
+    super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
       MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST));
   }
 

@@ -558,6 +558,14 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       headerCell.getTopView().setOnSlideOffListener(new ViewPagerTopView.OnSlideOffListener() {
 
         private long selectedPagerItemId = INVALID_PAGER_ITEM_ID;
+        private boolean openedByHold;
+
+        @Override
+        public boolean onSlideOffLongPress (View view, MotionEvent event, int index) {
+          onSlideOffStart(view, event, index);
+          openedByHold = true;
+          return true;
+        }
 
         @Override
         public boolean onSlideOffPrepare (View view, MotionEvent event, int index) {
@@ -569,6 +577,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
         @Override
         public void onSlideOffStart (View view, MotionEvent event, int index) {
+          openedByHold = false;
           selectedPagerItemId = getPagerItemId(index);
           setMenuVisible(view, selectedPagerItemId, true);
           if (composeWrap != null && displayTabsAtBottom()) {
@@ -578,14 +587,16 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
         @Override
         public void onSlideOffFinish (View view, MotionEvent event, int index, boolean apply) {
+          int selected = menu != null && apply && menu.isBubbleVisible() ? menu.trackPointer(view, event.getX(), event.getY()) : -1;
+          boolean keepOpen = apply && openedByHold && selected == -1 &&
+            event.getX() >= 0 && event.getX() < view.getWidth() && event.getY() >= 0 && event.getY() < view.getHeight();
+          openedByHold = false;
           if (menu != null) {
-            int selected = apply && menu.isBubbleVisible() ? menu.trackPointer(view, event.getX(), event.getY()) : -1;
             menu.stopTracking();
             if (selected != -1) menu.getItemAt(selected).performClick();
           }
-          setMenuVisible(view, selectedPagerItemId, false);
+          if (!keepOpen) setMenuVisible(view, selectedPagerItemId, false);
           selectedPagerItemId = INVALID_PAGER_ITEM_ID;
-          if (composeWrap != null && displayTabsAtBottom()) showComposeWrap(null);
         }
 
         @Override
@@ -668,6 +679,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   // Menu
 
   private @Nullable ChatFilterMenu menu;
+  private FrameLayoutFix menuLayer;
   private ChatGlassDrawable menuGlass;
   private final ViewCoordinateMapper menuCoordinates = new ViewCoordinateMapper();
   private final android.graphics.RectF menuAnchorBounds = new android.graphics.RectF();
@@ -870,6 +882,15 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     if (!visible && menu == null)
       return;
     if (menu == null) {
+      menuLayer = new FrameLayoutFix(context);
+      menuLayer.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+      menuLayer.setClipChildren(false);
+      menuLayer.setVisibility(View.INVISIBLE);
+      menuLayer.setOnTouchListener((v, event) -> {
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) dismissFilterMenu();
+        return true;
+      });
+      mainWrap.addView(menuLayer);
       menu = new ChatFilterMenu(context) {
         @Override
         protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
@@ -928,7 +949,8 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
         Views.setMediumText(sectionView, Lang.getString(bindLocaleChanger(filterName, sectionView, false, true)));
         menu.addItem(sectionView);
       }
-      mainWrap.addView(menu);
+      menu.setDismissListener(() -> menuLayer.setVisibility(View.INVISIBLE));
+      menuLayer.addView(menu);
     }
     menuPagerItemId = visible ? pagerItemId : INVALID_PAGER_ITEM_ID;
     if (visible) {
@@ -980,7 +1002,22 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       }
     }
     menuGlass.setEnabled(visible);
+    if (visible) menuLayer.setVisibility(View.VISIBLE);
     menu.setBubbleVisible(visible);
+    context.notifyBackPressAvailabilityChanged();
+    if (!visible && composeWrap != null && displayTabsAtBottom()) showComposeWrap(null);
+  }
+
+  private boolean dismissFilterMenu () {
+    if (menu == null || !menu.isBubbleVisible()) return false;
+    setMenuVisible(menuAnchor, menuPagerItemId, false);
+    return true;
+  }
+
+  @Override
+  public void onPagerItemClick (int index) {
+    dismissFilterMenu();
+    super.onPagerItemClick(index);
   }
 
   // Language
@@ -1043,6 +1080,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   @Override
   protected void onEnterSearchMode () {
+    dismissFilterMenu();
     super.onEnterSearchMode();
     composeWrap.forceHide();
   }
@@ -2112,6 +2150,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   @Override
   public void onMenuItemPressed (int id, View view) {
+    dismissFilterMenu();
     if (id == R.id.menu_btn_search) {
       tdlib.checkDeadlocks(() -> runOnUiThreadOptional(() -> {
         if (isFocused()) {
@@ -2134,6 +2173,10 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   @Override
   public boolean performOnBackPressed (boolean fromTop, boolean commit) {
+    if (menu != null && menu.isBubbleVisible()) {
+      if (commit) dismissFilterMenu();
+      return true;
+    }
     if (composeWrap != null && composeWrap.isShowing()) {
       if (commit) {
         composeWrap.close();
@@ -3378,6 +3421,9 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
         applyGlobalFilter(FILTER_NONE);
       }
       updatePagerSections(false);
+      checkTabs();
+      checkMenu();
+      checkMargins();
     }
   }
 

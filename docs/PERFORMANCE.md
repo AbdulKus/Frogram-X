@@ -306,3 +306,51 @@ of the original filter. Release signing, vital lint and the compiled ART profile
 checks pass. Final artifact SHA-256:
 `05e0a0d4ba050fad38d31cc492ae5f08255757cce0e54e9f8f8706514b02d8cf`.
 The installed test artifact is `Frogram-X-0.29.2.1971-x64.apk`.
+
+
+### Stationary filter holds and content width (build 1972)
+
+The folder tabs still routed a stationary long press to the older folder actions;
+only crossing the tab edge opened the filter. Tabs now offer the hold to their
+slide-off handler before falling back to ordinary long-click actions. An accepted
+hold owns the gesture until release/cancellation, including movement inside the
+tab. Releasing over the source tab leaves the filter open for a normal row tap;
+dragging into the menu still selects the row at the final release position.
+
+The persistent popup consumes outside touches and closes before Back, tab
+switches and search. Its visibility updates Android's Back callback availability.
+Folder appearance changes immediately refresh tab placement, content insets and
+the menu anchor, including a switch between top and bottom tabs.
+
+The width now comes from the widest visible row plus the surface padding, capped
+by the viewport and the existing maximum. An exact measured surface width also
+fills the single ScrollView and its rows; the old minimum-only measurement left
+an empty strip beside the row backgrounds. Placement still uses the transformed
+tab center with edge clamping. The source-extracted JVM regression exercises hold
+priority/fallback, gesture ownership, cleanup, event recycling and measurement
+at four densities, including hidden rows, long translations and narrow screens.
+
+A theme callback during folder onboarding also exposed an unrelated null preview
+before that page was created. It now skips the missing preview; its normal
+construction applies the current theme when ready.
+
+
+The final debug APK passed Android gesture checks with icon-only folder tabs:
+a stationary hold opens before any move, release over the tab keeps it open,
+a subsequent tap selects the visible row, outside tap consumes the touch, Back
+closes the menu first, release into another row uses that final position, and
+cancellation preserves the filter. Every visible row fills the surface and the
+popup center follows its tab (subject to edge clamping). The same hold/tap checks
+passed with bottom tabs, with the popup above the tab. The test also dispatched a
+theme callback to a folder-onboarding page before its preview existed.
+
+
+Both debug and R8 release APKs also passed the earlier drag-menu regression. In
+the R8 release, standard UI controls (without controller reflection) verified
+stationary hold, full row width, tap after release, Back dismissal and original
+filter restoration. All nine performance regressions, eight update tests and
+11 message tests pass. Release vital lint, APK signature and compiled ART profile
+verification pass. Final local x64 artifact SHA-256:
+`a4352e90acdef9d796a84bb0c26b26bd9b4aefa7444c008c48471b05f85b02c6`.
+The installed test artifact is `Frogram-X-0.29.2.1972-x64.apk`; this follow-up does
+not change the navigation/sampling algorithms measured above.

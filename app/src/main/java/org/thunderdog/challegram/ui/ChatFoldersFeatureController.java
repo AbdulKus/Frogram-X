@@ -409,6 +409,7 @@ public class ChatFoldersFeatureController extends SinglePageBottomSheetViewContr
     private static final int BORDER = 0, FILLING = 1, FADE = 2;
 
     private void updatePreviewBackground () {
+      if (previewView == null) return;
       LayerDrawable background = (LayerDrawable) previewView.getBackground();
       background.invalidateSelf();
 
