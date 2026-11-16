@@ -140,6 +140,10 @@ public class SettingHolder extends RecyclerView.ViewHolder {
 
   public static int measureHeightForType (int viewType) {
     switch (viewType) {
+      case ListItem.TYPE_EMPTY_OFFSET_NO_HEAD: {
+        // PageBlockSimple measures this spacer while building rich message previews.
+        return Screen.dp(12f);
+      }
       case ListItem.TYPE_EMPTY_OFFSET: { // 0 OK
         return Screen.dp(12f) + Size.getMaximumHeaderSizeDifference();
       }
