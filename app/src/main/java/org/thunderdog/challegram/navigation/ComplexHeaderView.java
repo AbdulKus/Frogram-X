@@ -638,8 +638,12 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     return Math.min(getBaseTextMaxWidth(), getScaledTextMaxWidth());
   }
 
+  private int expandedTextStart () {
+    return Screen.dp(floatingCard ? org.thunderdog.challegram.widget.GlassStyle.EXPANDED_TEXT_START_DP : 11f);
+  }
+
   private int getExpandedMaxTextWidth () {
-    return (int) ((float) (getMeasuredWidth() - Screen.dp(11f) * 2) / avatarTextScale) - (BitwiseUtils.hasFlag(flags, FLAG_SHOW_VERIFY) ? Screen.dp(20f) : 0);
+    return (int) ((float) (getMeasuredWidth() - expandedTextStart() * 2) / avatarTextScale) - (BitwiseUtils.hasFlag(flags, FLAG_SHOW_VERIFY) ? Screen.dp(20f) : 0);
   }
 
   /*private int calculateTextMaxWidth (boolean allowScale) {
@@ -850,7 +854,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
       int side = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP);
       int edge = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
       location.setClip(Math.max(side - receiver.getLeft(), 0), Math.max(currentHeaderOffset + edge - receiver.getTop(), 0),
-        Math.max(receiver.getRight() - getMeasuredWidth() + side, 0), Math.max(receiver.getBottom() - calculateHeaderHeight() + edge, 0));
+        Math.max(receiver.getRight() - getMeasuredWidth() + side, 0), Math.max(receiver.getBottom() - calculateHeaderHeight() - Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP), 0));
     } else {
       location.setClip(0, Math.max(-receiver.getTop(), 0), 0, Math.max(0, receiver.getBottom() - calculateHeaderHeight()));
     }
@@ -894,11 +898,11 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
 
     final int saveCount = Views.save(c);
     try {
-      c.clipRect(0, 0, getMeasuredWidth(), calculateHeaderHeight());
+      c.clipRect(0, 0, getMeasuredWidth(), calculateHeaderHeight() + (floatingCard ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP) : 0));
       if (floatingCard) {
         floatingCardClip.reset();
         floatingCardClip.addRoundRect(Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP), currentHeaderOffset + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP),
-          getMeasuredWidth() - Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP), calculateHeaderHeight() - Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP),
+          getMeasuredWidth() - Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP), calculateHeaderHeight() + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP),
           Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RADIUS_DP), Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RADIUS_DP), android.graphics.Path.Direction.CW);
         c.clipPath(floatingCardClip);
       }
@@ -936,7 +940,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
         getTopShadow().draw(c);
 
         c.save();
-        int headerHeight = calculateHeaderHeight();
+        int headerHeight = calculateHeaderHeight() + (floatingCard ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP) : 0);
         int shadowTop = headerHeight - getBottomShadowSize();
         // c.clipRect(0, Math.max(shadowTop, getTopShadow().getBounds().bottom), getMeasuredWidth(), headerHeight);
         c.translate(0, Math.max(shadowTop, getTopShadow().getBounds().bottom - Screen.dp(28f)));
@@ -954,7 +958,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
         baseSubtitleTop += Screen.dp(68f) * scaleFactor;
       }
       if (avatarExpandFactor != 0f) {
-        baseTextLeft += (Screen.dp(11f) - baseTextLeft) * avatarExpandFactor;
+        baseTextLeft += (expandedTextStart() - baseTextLeft) * avatarExpandFactor;
 
 
         // baseTitleTop += ((calculateHeaderHeight() - Screen.dp(28f) - (trimmedTitleExpanded != null ? trimmedTitleExpanded.getHeight() + trimmedTitleExpanded.getLineHeight(false) : trimmedTitle != null ? trimmedTitle.getHeight() + trimmedTitle.getLineHeight(false) : 0) * avatarTextScale) + (trimmedSubtitleExpanded != null ? trimmedSubtitleExpanded.getHeight() : trimmedTitle != null ? trimmedTitle.getHeight() : 0) - baseTitleTop) * avatarExpandFactor;

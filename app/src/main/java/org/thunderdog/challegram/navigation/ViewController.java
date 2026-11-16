@@ -1283,13 +1283,21 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
   public boolean hasFloatingHeader () { return usesGlassPageHeader() && !isInForceTouchMode(); }
 
-  public int getHeaderControlsInset () { return usesGlassPageHeader() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RESERVED_CONTROL_INSET_DP) : 0; }
+  public int getHeaderControlsInset () { return usesGlassPageHeader() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_CONTROL_INSET_DP) : 0; }
 
   public boolean hasFloatingPlayer () { return false; }
 
   public void invalidateFloatingPlayer () { }
 
-  public @Nullable GlassNavigationTransition.Scene createGlassNavigationScene () { return null; }
+  public @Nullable GlassNavigationTransition.Scene createGlassNavigationScene () {
+    if (!usesGlassPageHeader() || !hasFloatingHeader() || headerView == null) return null;
+    if (glassPageHeader == null) glassPageHeader = new org.thunderdog.challegram.widget.GlassPageHeader(getValue(), headerView);
+    int bottom = headerView.getEffectiveTopOffset() + getHeaderHeight();
+    GlassNavigationTransition.Scene scene = GlassNavigationTransition.Scene.header(getValue(), headerView,
+      glassPageHeader.layout(headerView.getWidth(), bottom, headerView.getEffectiveTopOffset()));
+    headerView.getFilling().preparePagePlayerScene(scene, glassPageHeader, headerView.getWidth(), bottom);
+    return scene;
+  }
 
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
     if (!usesGlassPageHeader() || !hasFloatingHeader()) return false;
@@ -1303,7 +1311,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   public int getFloatingMenuAnchorBottom () {
-    if (glassPageHeader == null || headerView == null) return 0;
+    if (headerView == null) return 0;
+    int buttonBottom = headerView.getMoreButtonBottom();
+    if (buttonBottom != 0) return buttonBottom;
+    if (glassPageHeader == null) return 0;
     int[] location = new int[2];
     headerView.getLocationOnScreen(location);
     return location[1] + glassPageHeader.bottom();

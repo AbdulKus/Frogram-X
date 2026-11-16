@@ -23,12 +23,14 @@ This is the reference for new and existing floating UI. Shared implementation:
 
 ## Spacing and colour
 
-- Floating header cards have 8dp side margins and 3dp vertical edge clearance.
-  Controls are centred in the visible card: chat/list shells include their 4.5dp
-  overflow inset; reserved settings/profile headers keep a zero inset. Do not
-  carry the overflow offset into a header that reserves space above its rows.
-- Menus have an 8dp gap from the actual visible header/player and 8dp screen
-  clearance. Anchor to rendered geometry, not a second sum of status-bar offsets.
+- Floating header cards share one geometry on chat/list/settings/profile pages:
+  8dp side margins, top at status inset + 3dp, bottom at the logical header
+  bottom + 6dp, and controls shifted down by 4.5dp to centre them in that shell.
+  Ordinary settings rows begin with 12dp clearance from the logical header.
+- Menus have an 8dp gap and 8dp screen clearance. Chat menus follow the visible
+  header/player; settings/profile overflow menus follow the actual overflow
+  button bottom, including when the photograph is expanded. Never anchor those
+  menus below the entire expanded photograph.
 - Use `glassText`, `glassTextSecondary`, `glassIcon`, `glassActive`,
   `glassPlaceholder`. Do not choose unrelated black/grey/accent values per widget.
 - Light themes use the accent-derived contrast-adjusted palette. Night Blue keeps
@@ -44,19 +46,30 @@ This is the reference for new and existing floating UI. Shared implementation:
   same shell; each retains its own actions, scrolling and editable content.
 - The expanded profile/settings avatar stays inside the rounded main block.
   Keep the stock continuous avatar-to-compact-header motion, image viewer origin,
-  title positioning, search/media transitions and hit targets.
+  search/media transitions and hit targets. Expanded name/status begin 26dp
+  from the start edge, aligned with the back-arrow glyph. Compact avatar/text
+  keep their usual layout.
 - Use white text/icons only over the expanded photograph, blending continuously
   from glass roles as the photograph expands. A missing avatar must remain legible.
 - Without a photo, keep the round placeholder and centre its information group
   below the controls. Keep the reserved layout height so setting/removing a photo
   does not move the following rows abruptly.
-- A player enters below the main card. Clip it below that card during expansion
+- A player enters below the main card, with its reserved page row offset by
+  12dp; translate its input coordinates by the same amount. Clip it below that card during expansion
   so it cannot cut off the avatar or cover the title. Fade its controls in only
   over the final 20% of its reveal, avoiding a thin fragment of a card/controls
   while the photograph still occupies the header. Hidden controls reject touches.
 - Avoid replaying the entire settings list just to shade a reserved header area.
   Reuse the neutral glass surface and invalidate on actual geometry/theme changes.
   Disable sampling for inactive pages and release closed-menu backdrops.
+- Horizontal page navigation uses the same stationary glass-shell morph as
+  main-to-chat. Cross-fade the header contents inside the changing rounded shell;
+  the page content keeps its normal slide. Each foreground keeps its own
+  endpoint expansion during the dissolve; applying the interpolated shell
+  height to both foregrounds displaces folder tabs and avatar text. Expanded
+  photos must be clipped to the shell on intermediate frames and endpoints.
+  Reserved pages also paint their status-area background while sliding, so
+  the outgoing page cannot expose black window strips beneath the status fade.
 
 ## Required visual checks
 

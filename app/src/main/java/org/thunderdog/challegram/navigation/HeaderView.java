@@ -107,10 +107,29 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   private float glassOutgoingAlpha = 1f, glassIncomingAlpha;
   private final java.util.IdentityHashMap<View, GlassContentSnapshot> glassNavigationSnapshots = new java.util.IdentityHashMap<>();
 
+  private final android.graphics.RectF glassNavigationBounds = new android.graphics.RectF();
+  private final android.graphics.Path glassNavigationClip = new android.graphics.Path();
+
+  void setGlassNavigationBounds (android.graphics.RectF bounds, View root) {
+    root.getLocationInWindow(surfaceLocation);
+    getLocationInWindow(headerLocation);
+    glassNavigationBounds.set(bounds);
+    glassNavigationBounds.offset(surfaceLocation[0] - headerLocation[0], surfaceLocation[1] - headerLocation[1]);
+  }
+
+  public int getMoreButtonBottom () {
+    View button = menu != null ? menu.findViewById(R.id.menu_btn_more) : null;
+    if (button == null || !button.isShown() || button.getAlpha() == 0f) return 0;
+    int[] location = new int[2];
+    button.getLocationOnScreen(location);
+    return location[1] + button.getHeight();
+  }
+
   void setGlassNavigationActive (boolean active) {
     if (glassNavigationActive == active) return;
     glassNavigationActive = active;
     glassNavigationSnapshots.clear();
+    glassNavigationBounds.setEmpty();
     if (active) {
       glassOutgoingAlpha = 1f;
       glassIncomingAlpha = 0f;
@@ -157,16 +176,29 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         glassNavigationSnapshots.put(child, snapshot);
       }
       if (snapshot != null) {
+        int save = canvas.save();
+        clipGlassNavigationForeground(canvas, child);
         snapshot.draw(canvas, child.getLeft(), child.getTop(), visibility);
+        canvas.restoreToCount(save);
         return true;
       }
       int save = canvas.saveLayerAlpha(child.getX(), child.getY(), child.getX() + child.getWidth(),
         child.getY() + child.getHeight(), Math.round(255f * visibility));
+      clipGlassNavigationForeground(canvas, child);
       boolean result = super.drawChild(canvas, child, drawingTime);
       canvas.restoreToCount(save);
       return result;
     }
     return super.drawChild(canvas, child, drawingTime);
+  }
+
+  private void clipGlassNavigationForeground (Canvas canvas, View child) {
+    if ((child == title || child == preview) && !glassNavigationBounds.isEmpty()) {
+      glassNavigationClip.reset();
+      float radius = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RADIUS_DP);
+      glassNavigationClip.addRoundRect(glassNavigationBounds, radius, radius, android.graphics.Path.Direction.CW);
+      canvas.clipPath(glassNavigationClip);
+    }
   }
 
   private TextView textTitle;
@@ -1643,12 +1675,14 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
 
       filling.layout((int) height, heightFactor);
 
+      // The shared shell morphs independently. Stretching its captured contents
+      // too would slide compact folder tabs below the shell and crop them.
       if (preview instanceof StretchyHeaderView) {
-        ((StretchyHeaderView) preview).setScaleFactor(heightFactor, baseHeightFactor, previewHeightFactor, false);
+        ((StretchyHeaderView) preview).setScaleFactor(glassNavigationActive ? previewHeightFactor : heightFactor, baseHeightFactor, previewHeightFactor, false);
       }
 
       if (title instanceof StretchyHeaderView) {
-        ((StretchyHeaderView) title).setScaleFactor(heightFactor, previewHeightFactor, baseHeightFactor, false);
+        ((StretchyHeaderView) title).setScaleFactor(glassNavigationActive ? baseHeightFactor : heightFactor, previewHeightFactor, baseHeightFactor, false);
       }
 
       if (useFloatSwitch != 0) {
@@ -2651,11 +2685,11 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     }
 
     if (preview instanceof StretchyHeaderView) {
-      ((StretchyHeaderView) preview).setScaleFactor(heightFactor, baseHeightFactor, previewHeightFactor, false);
+      ((StretchyHeaderView) preview).setScaleFactor(glassNavigationActive ? previewHeightFactor : heightFactor, baseHeightFactor, previewHeightFactor, false);
     }
 
     if (title instanceof StretchyHeaderView) {
-      ((StretchyHeaderView) title).setScaleFactor(heightFactor, previewHeightFactor, baseHeightFactor, false);
+      ((StretchyHeaderView) title).setScaleFactor(glassNavigationActive ? baseHeightFactor : heightFactor, previewHeightFactor, baseHeightFactor, false);
     }
 
     int leftFloatingButtonId = right == null ? getFloatingButtonId(left) : left.inCustomMode() ? left.getCustomFloatingButtonId() : getFloatingButtonId(left);

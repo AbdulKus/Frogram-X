@@ -131,6 +131,7 @@ import org.thunderdog.challegram.widget.ChatFilterMenu;
 import org.thunderdog.challegram.util.AnchoredMenuGeometry;
 import org.thunderdog.challegram.util.ViewCoordinateMapper;
 import org.thunderdog.challegram.widget.ChatGlassDrawable;
+import org.thunderdog.challegram.widget.GlassStyle;
 import org.thunderdog.challegram.v.CustomRecyclerView;
 import org.thunderdog.challegram.widget.FillingSpace;
 import org.thunderdog.challegram.widget.PopupLayout;
@@ -203,7 +204,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
   @Override public boolean hasFloatingHeader () { return true; }
   @Override public boolean hasFloatingPlayer () { return hasFloatingHeader(); }
-  @Override public int getHeaderControlsInset () { return Screen.dp(4.5f); }
+  @Override public int getHeaderControlsInset () { return Screen.dp(GlassStyle.HEADER_CONTROL_INSET_DP); }
   @Override public boolean allowLayerTypeChanges () { return false; }
   @Override protected int getContentTopOverflow () {
     return hasFloatingHeader() ? getHeaderHeight() + context().getRootView().getTopInset() : 0;
@@ -370,8 +371,8 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       headerCell.getTopView().setSelectionColorId(hasFloatingHeader() ? ColorId.glassActive : ColorId.headerTabActive);
     }
     if (toggleHeaderView != null) {
-      toggleHeaderView.setTextTop(17f + (hasFloatingHeader() ? 4.5f : 0f));
-      toggleHeaderView.setTriangleTop(16f + (hasFloatingHeader() ? 4.5f : 0f));
+      toggleHeaderView.setTextTop(17f + (hasFloatingHeader() ? GlassStyle.HEADER_CONTROL_INSET_DP : 0f));
+      toggleHeaderView.setTriangleTop(16f + (hasFloatingHeader() ? GlassStyle.HEADER_CONTROL_INSET_DP : 0f));
       toggleHeaderView.invalidate();
     }
   }
@@ -631,8 +632,8 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       if (useGlobalFilter()) {
         if (toggleHeaderView == null) {
           toggleHeaderView = new ToggleHeaderView2(context);
-          toggleHeaderView.setTextTop(17f + (hasFloatingHeader() ? 4.5f : 0f));
-          toggleHeaderView.setTriangleTop(16f + (hasFloatingHeader() ? 4.5f : 0f));
+          toggleHeaderView.setTextTop(17f + (hasFloatingHeader() ? GlassStyle.HEADER_CONTROL_INSET_DP : 0f));
+          toggleHeaderView.setTriangleTop(16f + (hasFloatingHeader() ? GlassStyle.HEADER_CONTROL_INSET_DP : 0f));
           toggleHeaderView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(56f), Gravity.TOP, Screen.dp(56f), 0, Screen.dp(68f), 0));
           toggleHeaderView.setOnClickListener(v -> showGlobalFilter());
           toggleHeaderView.setOnLongClickListener(v -> applyGlobalFilter(FILTER_NONE));

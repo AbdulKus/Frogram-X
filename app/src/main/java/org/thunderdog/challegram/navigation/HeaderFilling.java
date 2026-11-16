@@ -400,11 +400,13 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
         surfaceOwner.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) {
       if (surfaceOwner.usesGlassPageHeader() && hasVisibleOngoingBar() && pagePlayerAlpha() > 0f) {
         int hide = (int) (HeaderView.getPlayerSize() * hideFactor);
-        int top = Math.max((int) fillingBottom, playerTop - hide), bottom = playerBottom - hide;
+        int offset = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP);
+        int top = Math.max((int) fillingBottom, playerTop - hide) + offset, bottom = playerBottom - hide + offset;
         if (bottom > top) {
           int save = c.saveLayerAlpha(0, top, width, bottom, Math.round(255f * pagePlayerAlpha()));
-          c.clipRect(0, fillingBottom, width, bottom);
+          c.clipRect(0, top, width, bottom);
           surfaceOwner.drawGlassPagePlayer(c, width, top, bottom);
+          c.translate(0, offset);
           drawingFloatingPlayer = true;
           try { drawOngoingBar(c); } finally { drawingFloatingPlayer = false; c.restoreToCount(save); }
         }
@@ -473,6 +475,20 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     float visible = (playerBottom - HeaderView.getPlayerSize() * hideFactor - fillingBottom) / HeaderView.getPlayerSize();
     float progress = MathUtils.clamp((visible - .8f) / .2f);
     return progress * progress * (3f - 2f * progress);
+  }
+
+  void preparePagePlayerScene (GlassNavigationTransition.Scene scene, org.thunderdog.challegram.widget.GlassPageHeader surface, int width, int headerBottom) {
+    if (!hasVisibleOngoingBar()) return;
+    int size = HeaderView.getPlayerSize();
+    int bottom = headerBottom + (int) (size * (showFactor - MathUtils.clamp((float) (headerBottom - HeaderView.getSize(true)) / Size.getHeaderSizeDifference(false))) * playerAllowance);
+    int hide = (int) (size * hideFactor);
+    float reveal = MathUtils.clamp(((bottom - hide - headerBottom) / (float) size - .8f) / .2f);
+    float alpha = reveal * reveal * (3f - 2f * reveal);
+    if (alpha <= 0f) return;
+    int offset = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP);
+    int top = Math.max(headerBottom, bottom - size - hide) + offset;
+    bottom += offset - hide;
+    scene.headerPlayer(surface.layoutPlayer(width, top, bottom), top, bottom, alpha);
   }
 
   private boolean drawingFloatingPlayer;
@@ -1308,6 +1324,11 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   public boolean onTouchEvent (MotionEvent e) {
     ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
     if (current != null && current.hasFloatingPlayer()) return false;
+    if (helper != null && current != null && current.usesGlassPageHeader()) {
+      MotionEvent translated = MotionEvent.obtain(e);
+      translated.offsetLocation(0, -Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP));
+      try { return helper.onTouchEvent(headerView, translated); } finally { translated.recycle(); }
+    }
     return helper != null && helper.onTouchEvent(headerView, e);
   }
 

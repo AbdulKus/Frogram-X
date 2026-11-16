@@ -36,14 +36,27 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     private final int[] position = new int[2];
     private ChatGlassDrawable playerGlass;
     private HiddenView player;
+    private final RectF headerPlayerContent = new RectF();
+    private float headerPlayerAlpha;
     private boolean prepared;
+    private final boolean sharedHeader;
 
     public Scene (View page, View surface, ChatGlassDrawable glass) {
+      this(page, surface, glass, false);
+    }
+
+    private Scene (View page, View surface, ChatGlassDrawable glass, boolean sharedHeader) {
       this.page = page;
       this.surface = surface;
       this.glass = glass;
-      hide(surface);
+      this.sharedHeader = sharedHeader;
+      if (!sharedHeader) hide(surface);
       freeze(glass);
+    }
+
+    /** Reserved headers live in HeaderView, outside the sliding page hierarchy. */
+    public static Scene header (View page, HeaderView header, ChatGlassDrawable glass) {
+      return new Scene(page, header, glass, true);
     }
 
     public Scene freeze (ChatGlassDrawable drawable) {
@@ -81,11 +94,23 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       return this;
     }
 
+    public Scene headerPlayer (ChatGlassDrawable drawable, int top, int bottom, float alpha) {
+      playerGlass = drawable;
+      headerPlayerContent.set(0, top, surface.getWidth(), bottom);
+      headerPlayerAlpha = alpha;
+      freeze(drawable);
+      return this;
+    }
+
+    private float playerAlpha () {
+      return player != null ? (player.view.getVisibility() == VISIBLE ? player.alpha : 0f) : headerPlayerAlpha;
+    }
+
     private void position (View view, View root, RectF rect, int height) {
       root.getLocationInWindow(position);
       int rootX = position[0], rootY = position[1];
       view.getLocationInWindow(position);
-      float x = position[0] - rootX - Math.round(page.getTranslationX()), y = position[1] - rootY - Math.round(page.getTranslationY());
+      float x = position[0] - rootX - (sharedHeader ? 0 : Math.round(page.getTranslationX())), y = position[1] - rootY - (sharedHeader ? 0 : Math.round(page.getTranslationY()));
       rect.set(x, y, x + view.getWidth(), y + height);
     }
 
@@ -93,7 +118,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       if (prepared) return true;
       if (surface.getWidth() == 0 || surface.getHeight() == 0) return false;
       // View backgrounds acquire their bounds during draw; prepare them before freezing.
-      if (surface.getBackground() != null) surface.getBackground().setBounds(0, 0, surface.getWidth(), surface.getHeight());
+      if (!sharedHeader && surface.getBackground() != null) surface.getBackground().setBounds(0, 0, surface.getWidth(), surface.getHeight());
       if (player != null && player.view.getBackground() != null) player.view.getBackground().setBounds(0, 0, player.view.getWidth(), player.view.getHeight());
       for (Surface entry : bottomSurfaces) entry.update(this, root);
       for (ChatGlassDrawable drawable : drawables) drawable.freezeForNavigation(true);
@@ -129,6 +154,11 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
         position(player.view, root, playerContentBounds, player.view.getHeight());
         playerGlass.getNavigationBounds(playerBounds);
         playerBounds.offset(playerContentBounds.left, playerContentBounds.top);
+      } else if (!headerPlayerContent.isEmpty() && playerGlass != null) {
+        playerContentBounds.set(headerPlayerContent);
+        playerContentBounds.offset(x, y);
+        playerGlass.getNavigationBounds(playerBounds);
+        playerBounds.offset(x, y);
       }
     }
 
@@ -153,7 +183,15 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
 
     private void refreshBackdrop () {
       glass.refreshNavigationBackdrop();
-      if (playerGlass != null && player.view.getVisibility() == VISIBLE && player.alpha > 0f) playerGlass.refreshNavigationBackdrop();
+      if (playerGlass != null && playerAlpha() > 0f) playerGlass.refreshNavigationBackdrop();
+    }
+
+    private void drawHeaderBacking (Canvas canvas, float bottom) {
+      if (!sharedHeader) return;
+      // Reserved page content starts below the header. While it slides in, its
+      // status area otherwise exposes the black window beyond the outgoing page.
+      canvas.drawRect(page.getTranslationX(), 0, page.getTranslationX() + page.getWidth(), bottom,
+        org.thunderdog.challegram.tool.Paints.fillingPaint(org.thunderdog.challegram.theme.Theme.getColor(ColorId.background)));
     }
 
     private void drawBackdrop (Canvas canvas, RectF area, boolean playerSurface) {
@@ -306,19 +344,28 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       finish();
       return true;
     }
+    updateShell();
+    header.setGlassNavigationBounds(shell, this);
     header.setGlassNavigationReveal(GlassNavigationMotion.outgoing(progress), geometry.incoming(progress));
     from.hideViews();
     to.hideViews();
     return true;
   }
 
-  @Override protected void onDraw (Canvas canvas) {
-    if (!prepared) return;
+  private void updateShell () {
     float factor = GlassNavigationMotion.geometry(progress);
     shell.set(from.bounds.left + (to.bounds.left - from.bounds.left) * factor,
       from.bounds.top + (to.bounds.top - from.bounds.top) * factor,
       from.bounds.right + (to.bounds.right - from.bounds.right) * factor,
       geometry.value(progress));
+  }
+
+  @Override protected void onDraw (Canvas canvas) {
+    if (!prepared) return;
+    updateShell();
+    float factor = GlassNavigationMotion.geometry(progress);
+    from.drawHeaderBacking(canvas, shell.top);
+    to.drawHeaderBacking(canvas, shell.top);
     int save = canvas.save();
     clip.reset();
     clip.addRoundRect(shell, Screen.dp(26f), Screen.dp(26f), Path.Direction.CW);
@@ -339,8 +386,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     from.drawBottom(canvas, GlassNavigationMotion.outgoing(progress));
     to.drawBottom(canvas, GlassNavigationMotion.incomingBottom(progress));
     Scene playerScene = !from.playerBounds.isEmpty() ? from : to;
-    float playerAlpha = Math.max(from.player != null && from.player.view.getVisibility() == VISIBLE ? from.player.alpha : 0f,
-      to.player != null && to.player.view.getVisibility() == VISIBLE ? to.player.alpha : 0f);
+    float playerAlpha = from.sharedHeader || to.sharedHeader ? blend(from.playerAlpha(), to.playerAlpha(), factor) : Math.max(from.playerAlpha(), to.playerAlpha());
     if (playerScene.playerGlass != null && playerAlpha > 0f) {
       Scene playerFrom = from.playerBounds.isEmpty() ? playerScene : from;
       Scene playerTo = to.playerBounds.isEmpty() ? playerScene : to;

@@ -32,8 +32,7 @@ public final class GlassPageHeader {
       if (player != null) player.invalidateBackdrop();
     }
     canvas.drawRect(0, 0, width, height, org.thunderdog.challegram.tool.Paints.fillingPaint(background));
-    int edge = Screen.dp(GlassStyle.HEADER_EDGE_DP), side = Screen.dp(GlassStyle.SIDE_DP);
-    glass.setBounds(side, inset + edge, Math.max(side, width - side), Math.max(inset + edge, height - edge));
+    layout(width, height, inset);
     glass.draw(canvas);
     int color = StatusBarScrim.backgroundColor();
     if (height != lastHeight || inset != lastInset || color != lastFade) {
@@ -43,6 +42,12 @@ public final class GlassPageHeader {
     canvas.drawRect(0, 0, width, StatusBarScrim.height(inset), fade);
   }
 
+  public ChatGlassDrawable layout (int width, int height, int inset) {
+    int edge = Screen.dp(GlassStyle.HEADER_EDGE_DP), side = Screen.dp(GlassStyle.SIDE_DP);
+    glass.setBounds(side, inset + edge, Math.max(side, width - side), Math.max(inset + edge, height + Screen.dp(GlassStyle.HEADER_OVERFLOW_DP)));
+    return glass;
+  }
+
   private ChatGlassDrawable createSurface () {
     return new ChatGlassDrawable(content, host, ColorId.filling,
       canvas -> canvas.drawColor(Theme.getColor(ColorId.background)));
@@ -50,11 +55,15 @@ public final class GlassPageHeader {
 
   public void drawPlayer (Canvas canvas, int width, int top, int bottom) {
     playerVisible = true;
+    canvas.drawRect(0, top, width, bottom, org.thunderdog.challegram.tool.Paints.fillingPaint(Theme.getColor(ColorId.background)));
+    layoutPlayer(width, top, bottom).draw(canvas);
+  }
+
+  public ChatGlassDrawable layoutPlayer (int width, int top, int bottom) {
     if (player == null) player = createSurface();
     int side = Screen.dp(GlassStyle.SIDE_DP), edge = Screen.dp(GlassStyle.HEADER_EDGE_DP);
-    canvas.drawRect(0, top, width, bottom, org.thunderdog.challegram.tool.Paints.fillingPaint(Theme.getColor(ColorId.background)));
     player.setBounds(side, top + edge, width - side, bottom - edge);
-    player.draw(canvas);
+    return player;
   }
 
   public int bottom () { return playerVisible && player != null ? Math.max(glass.getBounds().bottom, player.getBounds().bottom) : glass.getBounds().bottom; }

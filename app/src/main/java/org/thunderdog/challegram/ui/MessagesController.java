@@ -240,6 +240,7 @@ import org.thunderdog.challegram.v.MessagesLayoutManager;
 import org.thunderdog.challegram.v.MessagesRecyclerView;
 import org.thunderdog.challegram.voip.VoIPLogs;
 import org.thunderdog.challegram.widget.ChatGlassDrawable;
+import org.thunderdog.challegram.widget.GlassStyle;
 import org.thunderdog.challegram.widget.AvatarView;
 import org.thunderdog.challegram.widget.CheckBoxView;
 import org.thunderdog.challegram.widget.CircleButton;
@@ -583,7 +584,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   @Override public int getHeaderControlsInset () {
-    return hasFloatingHeader() ? Screen.dp(4.5f) : 0;
+    return hasFloatingHeader() ? Screen.dp(GlassStyle.HEADER_CONTROL_INSET_DP) : 0;
   }
 
   @Override public boolean allowLayerTypeChanges () {
