@@ -90,7 +90,12 @@ public class StickersTrendingController extends ViewController<Void> implements 
     adapter = new MediaStickersAdapter(this, this, !isEmoji, this);
     adapter.setIsBig();
 
-    GridLayoutManager manager = new GridLayoutManager(context, getSpanCount());
+    GridLayoutManager manager = new GridLayoutManager(context, getSpanCount()) {
+      @Override protected void calculateExtraLayoutSpace (@androidx.annotation.NonNull RecyclerView.State state, @androidx.annotation.NonNull int[] space) {
+        super.calculateExtraLayoutSpace(state, space);
+        space[0] = Math.max(space[0], org.thunderdog.challegram.navigation.GlassPageContent.extraLayoutSpace(recyclerView));
+      }
+    };
     manager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
       @Override
       public int getSpanSize (int position) {

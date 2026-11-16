@@ -1279,6 +1279,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
   protected boolean usesGlassPageHeader () { return false; }
 
+  protected void onGlassPageContentInvalidated () {
+    if (glassPageHeader != null) glassPageHeader.invalidateBackdrop();
+  }
+
   private org.thunderdog.challegram.widget.GlassPageHeader glassPageHeader;
 
   public boolean hasFloatingHeader () { return usesGlassPageHeader() && !isInForceTouchMode(); }
@@ -3231,6 +3235,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   public final View getValue () {
     if (contentView == null) {
       contentView = onCreateView(context());
+      if (usesGlassPageHeader() && !isInForceTouchMode()) {
+        contentView = new GlassPageContent(context(), contentView, this::onGlassPageContentInvalidated);
+        addThemeInvalidateListener(contentView);
+      }
       contentView.setTag(this);
       if (tdlib != null) {
         tdlib.incrementUiReferenceCount();

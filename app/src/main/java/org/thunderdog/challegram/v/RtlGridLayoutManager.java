@@ -16,6 +16,7 @@ package org.thunderdog.challegram.v;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.View;
 
 import androidx.recyclerview.widget.GridLayoutManager;
 
@@ -23,6 +24,13 @@ import org.thunderdog.challegram.core.Lang;
 
 public class RtlGridLayoutManager extends GridLayoutManager {
   private boolean alignOnly;
+
+  @Override protected void calculateExtraLayoutSpace (@androidx.annotation.NonNull androidx.recyclerview.widget.RecyclerView.State state, @androidx.annotation.NonNull int[] space) {
+    super.calculateExtraLayoutSpace(state, space);
+    View view = getChildCount() > 0 ? getChildAt(0) : null;
+    if (view != null) space[0] = Math.max(space[0], org.thunderdog.challegram.navigation.GlassPageContent.extraLayoutSpace(view));
+  }
+
 
   public RtlGridLayoutManager (Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
     super(context, attrs, defStyleAttr, defStyleRes);

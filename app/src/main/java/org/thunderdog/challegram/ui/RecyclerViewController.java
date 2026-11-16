@@ -172,7 +172,7 @@ public abstract class RecyclerViewController<T> extends TelegramViewController<T
   protected CustomRecyclerView onCreateRecyclerView () {
     CustomRecyclerView recyclerView = (CustomRecyclerView) Views.inflate(context(), R.layout.recycler_custom, null);
     recyclerView.setItemAnimator(new CustomItemAnimator(AnimatorUtils.DECELERATE_INTERPOLATOR, 180L));
-    recyclerView.setLayoutManager(new LinearLayoutManager(context, RecyclerView.VERTICAL, false) {
+    recyclerView.setLayoutManager(new org.thunderdog.challegram.navigation.GlassLayoutManager(context, recyclerView) {
       @Override
       public int scrollVerticallyBy(int dx, RecyclerView.Recycler recycler, RecyclerView.State state) {
         int nScroll = 0;

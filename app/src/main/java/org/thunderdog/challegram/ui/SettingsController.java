@@ -488,7 +488,7 @@ public class SettingsController extends ViewController<Void> implements
     this.contentView.setHeaderView(headerCell, this);
     this.contentView.setItemAnimator(null);
     ViewSupport.setThemedBackground(contentView, ColorId.background, this);
-    this.contentView.setLayoutManager(new LinearLayoutManager(context, RecyclerView.VERTICAL, false));
+    this.contentView.setLayoutManager(new org.thunderdog.challegram.navigation.GlassLayoutManager(context, contentView));
     this.contentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     this.adapter = new SettingsAdapter(this) {
       @Override

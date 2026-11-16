@@ -392,6 +392,11 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   @Override protected boolean usesGlassPageHeader () { return true; }
 
+  @Override protected void onGlassPageContentInvalidated () {
+    super.onGlassPageContentInvalidated();
+    if (topWrap != null) topWrap.invalidateBackdrop();
+  }
+
   public ProfileController (Context context, Tdlib tdlib) {
     super(context, tdlib);
     avatarPickerManager = new AvatarPickerManager(this);
@@ -1096,7 +1101,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private ViewPagerHeaderViewCompact topCellView;
-  private FrameLayoutFix topWrap;
+  private org.thunderdog.challegram.widget.GlassPanelLayout topWrap;
   private LickView lickView;
   private ShadowView lickShadow;
 
@@ -1182,6 +1187,9 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private void setExpandFactor (float factor) {
     this.expandFactor = factor;
+    // Once attachments take over, retained profile rows must not paint over
+    // the media that now scrolls behind both glass islands.
+    if (baseRecyclerView != null) baseRecyclerView.setAlpha(1f - factor);
 
     float toY = -getTopViewTopPadding();
     float fromY = actualTopWrapY;
@@ -1252,6 +1260,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   @Override
   protected void drawTransform (Canvas c, float transformFactor, int width, int bottom) {
+    if (usesGlassPageHeader()) return;
     float height = HeaderView.getSize(true);
     c.drawRect(0, height - height * transformFactor, width, bottom, Paints.fillingPaint(Theme.fillingColor()));
   }
@@ -1287,13 +1296,13 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   public void onThemeColorsChanged (boolean areTemp, ColorState state) {
     super.onThemeColorsChanged(areTemp, state);
     if (headerCell != null) {
-      headerCell.setTextColor(ColorUtils.fromToArgb(Theme.headerTextColor(), Theme.textAccentColor(), getTransformFactor()));
+      headerCell.setTextColor(Theme.getColor(ColorId.glassText));
     }
   }
 
   private void updateButtonsColor () {
     if (headerView != null) {
-      headerView.getBackButton().setColor(ColorUtils.fromToArgb(ColorUtils.fromToArgb(Theme.getColor(ColorId.glassIcon), Color.WHITE, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f), Theme.getColor(ColorId.icon), getTransformFactor()));
+      headerView.getBackButton().setColor(ColorUtils.fromToArgb(ColorUtils.fromToArgb(Theme.getColor(ColorId.glassIcon), Color.WHITE, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f), Theme.getColor(ColorId.glassIcon), getTransformFactor()));
       headerView.updateButtonsTransform(getMenuId(), this, getTransformFactor());
     }
   }
@@ -1304,7 +1313,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       float realFactor = distanceFactor(factor);
       updateButtonsColor();
       headerView.getFilling().setShadowAlpha(realFactor == 0f ? 1f : 0f);
-      final int textColor = ColorUtils.fromToArgb(Theme.headerTextColor(), Theme.textAccentColor(), realFactor);
+      final int textColor = Theme.getColor(ColorId.glassText);
       if (isEditing()) {
         headerView.updateTextTitleColor(getId(), textColor);
       } else {
@@ -1366,6 +1375,8 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private void setTopTranslationY (float y) {
+    // Keep the secondary island below the compact header with the shared 6dp gap.
+    y = Math.max(y, Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP));
     if (topWrap.getTranslationY() != y) {
       topWrap.setTranslationY(y);
       float headerHeight = HeaderView.getSize(true);
@@ -1653,7 +1664,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     baseRecyclerView.setHasFixedSize(true);
     baseRecyclerView.addItemDecoration(new BaseItemsDecoration());
     baseRecyclerView.setItemAnimator(null);
-    baseRecyclerView.setLayoutManager(new LinearLayoutManager(context, RecyclerView.VERTICAL, false));
+    baseRecyclerView.setLayoutManager(new org.thunderdog.challegram.navigation.GlassLayoutManager(context, baseRecyclerView));
     baseRecyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
     baseRecyclerView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     contentView.addView(baseRecyclerView);
@@ -1663,23 +1674,25 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     addThemeInvalidateListener(lickView);
     lickView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, HeaderView.getSize(true)));
 
-    topWrap = new FrameLayoutFix(context);
+    topWrap = new org.thunderdog.challegram.widget.GlassPanelLayout(context, contentView);
     topWrap.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, getPagerTopViewHeight() + getTopViewTopPadding() + Screen.dp(6f)));
 
     FrameLayoutFix.LayoutParams params;
     params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, getPagerTopViewHeight());
     params.topMargin = getTopViewTopPadding();
+    params.leftMargin = params.rightMargin = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP + 4f);
 
     topCellView = new ViewPagerHeaderViewCompact(context);
-    ViewSupport.setThemedBackground(topCellView, ColorId.filling, this);
+
     ViewPagerTopView topView = topCellView.getTopView();
-    topView.setUseDarkBackground();
+    topView.setUseDarkBackground(false);
+    topView.setGlassSelection(true);
     /*if (!UI.isTablet) {
       topView.setFitsParentWidth(true);
     }*/
     topView.setOnItemClickListener(this);
-    topView.setSelectionColorId(ColorId.profileSectionActive);
-    topView.setTextFromToColorId(ColorId.textLight, ColorId.profileSectionActiveContent);
+    topView.setSelectionColorId(ColorId.glassActive);
+    topView.setTextFromToColorId(ColorId.glassIcon, ColorId.glassActive);
     addThemeInvalidateListener(topView);
     topView.setShowLabelOnActiveOnly(!isEditing() && !Settings.instance().needReduceMotion());
     topView.setItems(getPagerTitles());
@@ -1696,7 +1709,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     addThemeInvalidateListener(shadowView);
     shadowView.setSimpleBottomTransparentShadow(false);
     shadowView.setLayoutParams(params);
-    topWrap.addView(shadowView);
+    shadowView.setVisibility(View.GONE);
 
     /**/
 
@@ -1709,8 +1722,8 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
     if (needTabs()) {
       contentView.addView(topWrap);
-      contentView.addView(lickView);
-      contentView.addView(lickShadow);
+      lickView.setVisibility(View.GONE);
+      lickShadow.setVisibility(View.GONE);
     }
 
     // Base adapter
@@ -2113,6 +2126,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     super.destroy();
     unsubscribeFromUpdates();
     pagerAdapter.performDestroy();
+    if (topWrap != null) topWrap.release();
     Views.destroyRecyclerView(baseRecyclerView);
   }
 
@@ -2148,7 +2162,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   private boolean inSelectMode;
   private FrameLayoutFix pseudoHeaderWrap;
   private CounterHeaderView counterView;
-  private ImageView counterDismiss;
+  private HeaderButton counterDismiss;
   private HeaderButton deleteButton, shareButton, copyButton, clearButton, viewButton;
 
   public void setInMediaSelectMode (boolean inSelectMode, @StringRes int suffixRes) {
@@ -2169,7 +2183,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
 
         counterView = new CounterHeaderView(context());
-        counterView.initDefault(16f, ColorId.text);
+        counterView.initDefault(16f, ColorId.glassText);
         int digitWidth = counterView.getMaxDigitWidth();
         counterView.setPadding(digitWidth, 0, digitWidth, 0);
         params.rightMargin = params.leftMargin = Screen.dp(48f + 18f) - digitWidth;
@@ -2179,11 +2193,10 @@ public class ProfileController extends ViewController<ProfileController.Args> im
         addThemeInvalidateListener(counterView);
 
         params = FrameLayoutFix.newParams(Screen.dp(56f), getPagerTopViewHeight(), Lang.rtl() ? Gravity.RIGHT : Gravity.LEFT);
-        counterDismiss = new ImageView(context());
+        counterDismiss = new HeaderButton(context());
         counterDismiss.setImageResource(R.drawable.baseline_close_24);
-        counterDismiss.setColorFilter(Theme.iconColor());
-        addThemeFilterListener(counterDismiss, ColorId.icon);
-        counterDismiss.setScaleType(ImageView.ScaleType.CENTER);
+        counterDismiss.setThemeColorId(ColorId.glassIcon);
+        addThemeFilterListener(counterDismiss, ColorId.glassIcon);
         counterDismiss.setLayoutParams(params);
         counterDismiss.setOnClickListener(v -> {
           ViewController<?> c = findCurrentCachedController();
@@ -2192,14 +2205,14 @@ public class ProfileController extends ViewController<ProfileController.Args> im
           }
         });
         Views.setClickable(counterDismiss);
-        RippleSupport.setTransparentSelector(counterDismiss);
+        counterDismiss.setGlassBackground(true);
 
         pseudoHeaderWrap.addView(counterView);
         pseudoHeaderWrap.addView(counterDismiss);
 
         for (int i = 0; i < 5; i++) {
           HeaderButton button = new HeaderButton(context());
-          button.setThemeColorId(ColorId.icon);
+          button.setThemeColorId(ColorId.glassIcon);
           button.setAlpha(0f);
           params = FrameLayoutFix.newParams(Screen.dp(48f), getPagerTopViewHeight(), Lang.rtl() ? Gravity.LEFT : Gravity.RIGHT);
           if (Lang.rtl()) {
@@ -2207,11 +2220,11 @@ public class ProfileController extends ViewController<ProfileController.Args> im
           } else {
             params.rightMargin = Screen.dp(12f);
           }
-          addThemeFilterListener(button, ColorId.icon);
+          addThemeFilterListener(button, ColorId.glassIcon);
           button.setLayoutParams(params);
           pseudoHeaderWrap.addView(button);
           button.setOnClickListener(this);
-          RippleSupport.setSimpleWhiteBackground(button);
+          button.setGlassBackground(true);
           switch (i) {
             case 0: {
               shareButton = button;
@@ -5192,6 +5205,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   @Override
   public void onFocus () {
     super.onFocus();
+    if (topWrap != null) topWrap.setGlassEnabled(true);
     if (!oneShot) {
       oneShot = true;
       pagerAdapter.notifyDataSetChanged();
@@ -5204,6 +5218,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   @Override
   public void onBlur () {
     super.onBlur();
+    if (topWrap != null) topWrap.setGlassEnabled(false);
     if (translationPopup != null) {
       translationPopup.hidePopupWindow(true);
     }

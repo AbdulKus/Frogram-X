@@ -127,7 +127,7 @@ public abstract class EditBaseController<T> extends ViewController<T> implements
     RecyclerView recyclerView = (RecyclerView) Views.inflate(context(), R.layout.recycler, contentView);
     recyclerView.setItemAnimator(itemAnimator = new CustomItemAnimator(AnimatorUtils.DECELERATE_INTERPOLATOR, 180l));
     recyclerView.setHasFixedSize(true);
-    recyclerView.setLayoutManager(new LinearLayoutManager(context, RecyclerView.VERTICAL, false));
+    recyclerView.setLayoutManager(new org.thunderdog.challegram.navigation.GlassLayoutManager(context, recyclerView));
     recyclerView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     return recyclerView;
   }

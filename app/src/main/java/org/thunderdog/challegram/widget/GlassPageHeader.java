@@ -9,7 +9,7 @@ import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.util.StatusBarScrim;
 
-/** Reserved page header: a glass card above settings, without replaying the list. */
+/** Floating settings/profile header with a clipped, low-resolution backdrop. */
 public final class GlassPageHeader {
   private final ChatGlassDrawable glass;
   private ChatGlassDrawable player;
@@ -31,7 +31,6 @@ public final class GlassPageHeader {
       glass.invalidateBackdrop();
       if (player != null) player.invalidateBackdrop();
     }
-    canvas.drawRect(0, 0, width, height, org.thunderdog.challegram.tool.Paints.fillingPaint(background));
     layout(width, height, inset);
     glass.draw(canvas);
     int color = StatusBarScrim.backgroundColor();
@@ -50,12 +49,14 @@ public final class GlassPageHeader {
 
   private ChatGlassDrawable createSurface () {
     return new ChatGlassDrawable(content, host, ColorId.filling,
-      canvas -> canvas.drawColor(Theme.getColor(ColorId.background)));
+      canvas -> {
+        if (content instanceof org.thunderdog.challegram.navigation.GlassPageContent) ((org.thunderdog.challegram.navigation.GlassPageContent) content).drawForGlass(canvas);
+        else canvas.drawColor(Theme.getColor(ColorId.background));
+      });
   }
 
   public void drawPlayer (Canvas canvas, int width, int top, int bottom) {
     playerVisible = true;
-    canvas.drawRect(0, top, width, bottom, org.thunderdog.challegram.tool.Paints.fillingPaint(Theme.getColor(ColorId.background)));
     layoutPlayer(width, top, bottom).draw(canvas);
   }
 
@@ -65,6 +66,8 @@ public final class GlassPageHeader {
     player.setBounds(side, top + edge, width - side, bottom - edge);
     return player;
   }
+
+  public void invalidateBackdrop () { glass.invalidateBackdrop(); if (player != null) player.invalidateBackdrop(); }
 
   public int bottom () { return playerVisible && player != null ? Math.max(glass.getBounds().bottom, player.getBounds().bottom) : glass.getBounds().bottom; }
 

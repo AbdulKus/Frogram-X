@@ -174,7 +174,7 @@ public abstract class ViewPagerController<T> extends TelegramViewController<T> i
     }
   }
 
-  protected int getContentTopOverflow () { return 0; }
+  protected int getContentTopOverflow () { return usesGlassPageHeader() && !isInForceTouchMode() ? Size.getHeaderPortraitSize() + context().getRootView().getTopInset() : 0; }
 
   @Override
   protected View onCreateView (Context context) {

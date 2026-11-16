@@ -59,9 +59,24 @@ This is the reference for new and existing floating UI. Shared implementation:
   so it cannot cut off the avatar or cover the title. Fade its controls in only
   over the final 20% of its reveal, avoiding a thin fragment of a card/controls
   while the photograph still occupies the header. Hidden controls reject touches.
-- Avoid replaying the entire settings list just to shade a reserved header area.
-  Reuse the neutral glass surface and invalidate on actual geometry/theme changes.
-  Disable sampling for inactive pages and release closed-menu backdrops.
+- Settings and profile rows scroll behind the floating header to the screen edge.
+  Extend the page's painting viewport without moving the original content or
+  changing its height, padding, scroll origin, avatar-collapse or media coordinates.
+  Keep the additional rows above the viewport attached only as far as the header.
+  Open clipping along the scrolling-container path, preserving row/icon clipping.
+  Every attached row keeps an explicit clip to its own bounds: allowing list
+  overflow must not let a row's background erase its neighbours. Restore its
+  original clip on detach/recycle.
+- Sample only rows intersecting the small glass capture. The page paints the
+  neutral background beneath these rows; the header must not paint an opaque
+  rectangle over them. Invalidate on descendant/scroll/theme changes, disable
+  sampling for inactive pages and release closed-menu backdrops.
+- Profile media tabs use a separate glass island, semantic glass colours and
+  capsule selection/press feedback. Pin it 6dp below the main header; media rows
+  continue behind both islands to the top edge. Preserve the existing media
+  search/selection actions, avatar collapse and nested-scroll coordinates.
+  Hide the old opaque merging bridge and shadow. Exclude glass panels from
+  backdrop sampling and ignore their own invalidations to avoid feedback loops.
 - Horizontal page navigation uses the same stationary glass-shell morph as
   main-to-chat. Cross-fade the header contents inside the changing rounded shell;
   the page content keeps its normal slide. Each foreground keeps its own

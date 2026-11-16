@@ -323,6 +323,7 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
     recyclerView.setLayoutManager(new LinearLayoutManager(context, RecyclerView.VERTICAL, false) {
       @Override protected void calculateExtraLayoutSpace (@NonNull RecyclerView.State state, @NonNull int[] space) {
         super.calculateExtraLayoutSpace(state, space);
+        space[0] = Math.max(space[0], org.thunderdog.challegram.navigation.GlassPageContent.extraLayoutSpace(recyclerView));
         if (savedHeaderOverflow > 0) space[0] += getPaddingTop() + Screen.dp(48f);
       }
     });
