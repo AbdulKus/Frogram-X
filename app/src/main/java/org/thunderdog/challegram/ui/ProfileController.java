@@ -1067,11 +1067,59 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     }
   }
 
+  private static boolean isProfileCardRow (int type) {
+    return type == ListItem.TYPE_SETTING || type == ListItem.TYPE_VALUED_SETTING ||
+      type == ListItem.TYPE_INFO_SETTING || type == ListItem.TYPE_INFO_MULTILINE ||
+      type == ListItem.TYPE_VALUED_SETTING_RED_STUPID;
+  }
+
+  private static boolean isProfileCardPart (int type) {
+    return isProfileCardRow(type) || type == ListItem.TYPE_SEPARATOR || type == ListItem.TYPE_SEPARATOR_FULL;
+  }
+
+  private boolean profileCardAt (int position) {
+    return baseAdapter != null && position >= 0 && position < baseAdapter.getItemCount() && isProfileCardPart(baseAdapter.getItemViewType(position));
+  }
+
+  private final android.graphics.Path profileRowClip = new android.graphics.Path();
+  private final android.graphics.RectF profileRowBounds = new android.graphics.RectF();
+  private final float[] profileRowRadii = new float[8];
+
+  private boolean clipProfileRow (Canvas canvas, View row) {
+    if (isEditing() || baseAdapter == null) return true;
+    int position = baseRecyclerView.getChildAdapterPosition(row);
+    if (position < 0 || position >= baseAdapter.getItemCount()) return true;
+    int type = baseAdapter.getItemViewType(position);
+    if (type == ListItem.TYPE_SHADOW_TOP || type == ListItem.TYPE_SHADOW_BOTTOM) return false;
+    if (!isProfileCardPart(type)) return true;
+    float left = row.getX(), top = row.getY();
+    profileRowBounds.set(left, top, left + row.getWidth(), top + row.getHeight());
+    float radius = Math.min(Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RADIUS_DP), row.getHeight() / 2f);
+    float first = profileCardAt(position - 1) ? 0f : radius;
+    float last = profileCardAt(position + 1) ? 0f : radius;
+    java.util.Arrays.fill(profileRowRadii, 0, 4, first);
+    java.util.Arrays.fill(profileRowRadii, 4, 8, last);
+    profileRowClip.reset();
+    profileRowClip.addRoundRect(profileRowBounds, profileRowRadii, android.graphics.Path.Direction.CW);
+    canvas.clipPath(profileRowClip);
+    if (row instanceof org.thunderdog.challegram.widget.SeparatorView) {
+      org.thunderdog.challegram.widget.SeparatorView separator = (org.thunderdog.challegram.widget.SeparatorView) row;
+      separator.forceFillingColor(org.thunderdog.challegram.widget.ProfileCardBackground.fillingColor());
+      separator.forceColor(ColorUtils.alphaColor(.10f, Theme.getColor(ColorId.glassText)));
+      separator.setOffsets(Screen.dp(type == ListItem.TYPE_SEPARATOR_FULL ? 16f : 73f), Screen.dp(16f));
+    }
+    return true;
+  }
+
   // base recycler view decorator
   public class BaseItemsDecoration extends RecyclerView.ItemDecoration {
     @Override
     public void getItemOffsets (@NonNull Rect outRect, @NonNull View view, RecyclerView parent, @NonNull RecyclerView.State state) {
       RecyclerView.ViewHolder holder = parent.getChildViewHolder(view);
+      outRect.setEmpty();
+      if (!isEditing() && holder != null && profileCardAt(holder.getBindingAdapterPosition())) {
+        outRect.left = outRect.right = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP);
+      }
       if (holder != null && holder.getBindingAdapterPosition() == baseAdapter.getItems().size() - 1) {
 
         final int parentHeight = parent.getMeasuredHeight();
@@ -1090,8 +1138,6 @@ public class ProfileController extends ViewController<ProfileController.Args> im
             outRect.bottom = originalBottom;
           }
         }
-      } else {
-        outRect.setEmpty();
       }
     }
   }
@@ -1376,7 +1422,11 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private void setTopTranslationY (float y) {
     // Keep the secondary island below the compact header with the shared 6dp gap.
-    y = Math.max(y, Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP));
+    float pinned = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
+    float distance = me.vkryl.core.MathUtils.clamp((y - pinned) / Screen.dp(48f));
+    float resting = distance * distance * (3f - 2f * distance);
+    topWrap.setSectionBacking(resting);
+    y = Math.max(y, pinned) + Screen.dp(8f) * resting;
     if (topWrap.getTranslationY() != y) {
       topWrap.setTranslationY(y);
       float headerHeight = HeaderView.getSize(true);
@@ -1598,6 +1648,12 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
     if (isEditing()) {
       baseRecyclerView = new CustomRecyclerView(context) {
+        @Override public boolean drawChild (Canvas canvas, View child, long time) {
+          int save = canvas.save();
+          boolean result = !clipProfileRow(canvas, child) || super.drawChild(canvas, child, time);
+          canvas.restoreToCount(save);
+          return result;
+        }
         @Override
         public void requestDisallowInterceptTouchEvent (boolean disallowIntercept) {
           super.requestDisallowInterceptTouchEvent(disallowIntercept);
@@ -1618,6 +1674,12 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       headerCell.setPhotoOpenCallback(this);
 
       baseRecyclerView = new ComplexRecyclerView(context, this) {
+        @Override public boolean drawChild (Canvas canvas, View child, long time) {
+          int save = canvas.save();
+          boolean result = !clipProfileRow(canvas, child) || super.drawChild(canvas, child, time);
+          canvas.restoreToCount(save);
+          return result;
+        }
         @Override
         public void requestDisallowInterceptTouchEvent (boolean disallowIntercept) {
           super.requestDisallowInterceptTouchEvent(disallowIntercept);
@@ -1728,6 +1790,19 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
     // Base adapter
     baseAdapter = new SettingsAdapter(this) {
+      @Override public void onBindViewHolder (SettingHolder holder, int position) {
+        super.onBindViewHolder(holder, position);
+        if (!isEditing() && isProfileCardRow(getItemViewType(position)) &&
+            !(holder.itemView.getBackground() instanceof org.thunderdog.challegram.widget.ProfileCardBackground)) {
+          holder.itemView.setBackground(new org.thunderdog.challegram.widget.ProfileCardBackground());
+        }
+      }
+
+      @Override public void modifySettingView (int type, SettingView view) {
+        super.modifySettingView(type, view);
+        if (!isEditing()) view.setIconColorId(ColorId.glassIcon);
+      }
+
       @Override
       protected void setChatData (ListItem item, int position, BetterChatView chatView) {
         chatView.setEnabled(false);
@@ -5456,6 +5531,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   private CharSequence lastUsernames;
 
   private int calculateHeight (int position, int width, ListItem item) {
+    if (!isEditing() && isProfileCardPart(item.getViewType())) width -= Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) * 2;
     final int itemId = item.getId();
     switch (item.getViewType()) {
       case ListItem.TYPE_INFO_MULTILINE: {

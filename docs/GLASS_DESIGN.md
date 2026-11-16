@@ -71,8 +71,18 @@ This is the reference for new and existing floating UI. Shared implementation:
   neutral background beneath these rows; the header must not paint an opaque
   rectangle over them. Invalidate on descendant/scroll/theme changes, disable
   sampling for inactive pages and release closed-menu backdrops.
+- Normal profile information/action rows form rounded groups with 8dp side
+  margins and 26dp outer corners. Use a quiet accent-derived filling, 14% accent
+  press feedback and inset separators at 10% glass text opacity. Keep row heights
+  and actions; measure multiline text at the inset row width. Leave settings and
+  profile editing screens unchanged. Clip group corners and press feedback together.
+  Software backdrop capture draws the row's stable filling without executing its
+  live RippleDrawable, preserving the RenderThread press animation.
 - Profile media tabs use a separate glass island, semantic glass colours and
-  capsule selection/press feedback. Pin it 6dp below the main header; media rows
+  capsule selection/press feedback. Before pinning, rest the panel 8dp lower and
+  cover the side gutters so switching pages cannot expose moving date labels.
+  Fade that section backing and extra offset smoothly over the final 48dp of
+  approach. Pin it 6dp below the main header; media rows
   continue behind both islands to the top edge. Preserve the existing media
   search/selection actions, avatar collapse and nested-scroll coordinates.
   Hide the old opaque merging bridge and shadow. Exclude glass panels from
