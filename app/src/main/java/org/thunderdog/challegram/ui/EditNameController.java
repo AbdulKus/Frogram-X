@@ -87,6 +87,8 @@ public class EditNameController extends EditBaseController<EditNameController.Ar
     }
   }
 
+  @Override protected boolean usesGlassPageHeader () { return true; }
+
   public EditNameController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

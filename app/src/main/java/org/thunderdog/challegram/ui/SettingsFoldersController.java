@@ -82,7 +82,7 @@ import me.vkryl.core.lambda.RunnableBool;
 import tgx.td.ChatPosition;
 import tgx.td.Td;
 
-public class SettingsFoldersController extends RecyclerViewController<Void> implements View.OnClickListener, View.OnLongClickListener, ChatFoldersListener, TdlibSettingsManager.ChatListPositionListener {
+public class SettingsFoldersController extends SettingsPageController<Void> implements View.OnClickListener, View.OnLongClickListener, ChatFoldersListener, TdlibSettingsManager.ChatListPositionListener {
   private static final long MAIN_CHAT_FOLDER_ID = Long.MIN_VALUE;
   private static final long ARCHIVE_CHAT_FOLDER_ID = Long.MIN_VALUE + 1;
 

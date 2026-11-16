@@ -48,7 +48,7 @@ import java.util.List;
 
 import me.vkryl.core.ArrayUtils;
 
-public class SettingsDataController extends RecyclerViewController<SettingsDataController.Args> implements View.OnClickListener, ViewController.SettingsIntDelegate,
+public class SettingsDataController extends SettingsPageController<SettingsDataController.Args> implements View.OnClickListener, ViewController.SettingsIntDelegate,
   GlobalConnectionListener, Client.ResultHandler, Settings.ProxyChangeListener {
   public static class Args {
     public int mode;

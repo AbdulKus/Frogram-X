@@ -28,7 +28,7 @@ import org.thunderdog.challegram.v.CustomRecyclerView;
 
 import java.util.ArrayList;
 
-public class SettingsNetworkStatsController extends RecyclerViewController<SettingsNetworkStatsController.Args> {
+public class SettingsNetworkStatsController extends SettingsPageController<SettingsNetworkStatsController.Args> {
   public static class Args {
     private final int type;
     private final TGNetworkStats stats;

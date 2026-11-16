@@ -33,7 +33,7 @@ import java.util.List;
 
 import tgx.td.ChatPosition;
 
-public class SettingsArchiveChatListController extends RecyclerViewController<Void> implements View.OnClickListener, NotificationSettingsListener {
+public class SettingsArchiveChatListController extends SettingsPageController<Void> implements View.OnClickListener, NotificationSettingsListener {
   public SettingsArchiveChatListController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

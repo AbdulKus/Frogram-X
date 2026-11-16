@@ -938,11 +938,11 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   protected @ColorId int getSearchHeaderIconColorId () {
-    return useGraySearchHeader() ? ColorId.icon : getHeaderIconColorId();
+    return usesGlassPageHeader() ? ColorId.glassIcon : useGraySearchHeader() ? ColorId.icon : getHeaderIconColorId();
   }
 
   protected int getSearchTextColorId () {
-    return useGraySearchHeader() ? ColorId.text : getHeaderTextColorId();
+    return usesGlassPageHeader() ? ColorId.glassText : useGraySearchHeader() ? ColorId.text : getHeaderTextColorId();
   }
 
   protected int getSearchBackButtonResource () {
@@ -1006,7 +1006,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   // FUTURE
 
   protected @ColorId int getHeaderIconColorId () {
-    return ColorId.headerIcon;
+    return usesGlassPageHeader() ? ColorId.glassIcon : ColorId.headerIcon;
   }
 
   protected @ColorId int getSelectHeaderIconColorId () {
@@ -1277,9 +1277,13 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
     return true;
   }
 
-  public boolean hasFloatingHeader () { return false; }
+  protected boolean usesGlassPageHeader () { return false; }
 
-  public int getHeaderControlsInset () { return 0; }
+  private org.thunderdog.challegram.widget.GlassPageHeader glassPageHeader;
+
+  public boolean hasFloatingHeader () { return usesGlassPageHeader() && !isInForceTouchMode(); }
+
+  public int getHeaderControlsInset () { return usesGlassPageHeader() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RESERVED_CONTROL_INSET_DP) : 0; }
 
   public boolean hasFloatingPlayer () { return false; }
 
@@ -1288,7 +1292,25 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   public @Nullable GlassNavigationTransition.Scene createGlassNavigationScene () { return null; }
 
   public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
-    return false;
+    if (!usesGlassPageHeader() || !hasFloatingHeader()) return false;
+    if (glassPageHeader == null) glassPageHeader = new org.thunderdog.challegram.widget.GlassPageHeader(getValue(), header);
+    glassPageHeader.draw(c, width, height, header.getEffectiveTopOffset());
+    return true;
+  }
+
+  public @Nullable org.thunderdog.challegram.widget.ChatGlassDrawable createMenuGlassSurface (View host) {
+    return usesGlassPageHeader() ? new org.thunderdog.challegram.widget.ChatGlassDrawable(getValue(), host, ColorId.filling, null) : null;
+  }
+
+  public int getFloatingMenuAnchorBottom () {
+    if (glassPageHeader == null || headerView == null) return 0;
+    int[] location = new int[2];
+    headerView.getLocationOnScreen(location);
+    return location[1] + glassPageHeader.bottom();
+  }
+
+  final void drawGlassPagePlayer (Canvas c, int width, int top, int bottom) {
+    if (glassPageHeader != null) glassPageHeader.drawPlayer(c, width, top, bottom);
   }
 
   public final void drawTransform (Canvas c, int width, int height) {
@@ -1389,7 +1411,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   protected int getHeaderTextColorId () {
-    return ColorId.headerText;
+    return usesGlassPageHeader() ? ColorId.glassText : ColorId.headerText;
   }
 
   protected final int getNewStatusBarColor () {
@@ -3506,6 +3528,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
   @CallSuper
   public void onFocus () {
+    if (glassPageHeader != null) glassPageHeader.setEnabled(true);
     int flags = this.flags;
     flags |= FLAG_FOCUSED;
     flags &= ~FLAG_PREVENT_LEAVING_SEARCH_MODE;
@@ -3531,6 +3554,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
   @CallSuper
   public void onBlur () {
+    if (glassPageHeader != null) glassPageHeader.setEnabled(false);
     int flags = this.flags;
     flags &= ~FLAG_FOCUSED;
     if (lockFocusView != null && lockFocusView.isEnabled() && ((flags & FLAG_IN_SEARCH_MODE) != 0 || (flags & FLAG_KEYBOARD_SHOWN) != 0 || (flags & FLAG_KEYBOARD_STATE) != 0)) {
@@ -3672,6 +3696,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
         tdlib.decrementUiReferenceCount();
       }
       unsubscribeFromControllerUpdates();
+      if (glassPageHeader != null) { glassPageHeader.release(); glassPageHeader = null; }
       View view = getCustomHeaderCell();
       if (view instanceof Destroyable) {
         ((Destroyable) view).performDestroy();

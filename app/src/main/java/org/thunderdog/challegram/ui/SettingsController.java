@@ -114,6 +114,8 @@ public class SettingsController extends ViewController<Void> implements
   private ComplexRecyclerView contentView;
   private SettingsAdapter adapter;
 
+  @Override protected boolean usesGlassPageHeader () { return true; }
+
   public SettingsController (Context context, Tdlib tdlib) {
     super(context, tdlib);
     avatarPickerManager = new AvatarPickerManager(this);
@@ -161,7 +163,7 @@ public class SettingsController extends ViewController<Void> implements
 
   @Override
   protected int getHeaderIconColorId () {
-    return headerCell != null && !headerCell.isCollapsed() ? ColorId.white : ColorId.headerIcon;
+    return headerCell != null && headerCell.getAvatarExpandFactor() == 1f ? ColorId.white : ColorId.glassIcon;
   }
 
   @Override
@@ -176,7 +178,7 @@ public class SettingsController extends ViewController<Void> implements
 
   @Override
   protected int getFloatingButtonId () {
-    return R.drawable.baseline_edit_24;
+    return 0;
   }
 
   @Override
@@ -187,13 +189,16 @@ public class SettingsController extends ViewController<Void> implements
   @Override
   public void fillMenuItems (int id, HeaderView header, LinearLayout menu) {
     if (id == R.id.menu_more_settings) {
+      header.addButton(menu, R.id.menu_btn_edit, R.drawable.baseline_edit_24, getHeaderIconColorId(), this, Screen.dp(49f)).setContentDescription(Lang.getString(R.string.EditName));
       header.addMoreButton(menu, this);
     }
   }
 
   @Override
   public void onMenuItemPressed (int id, View view) {
-    if (id == R.id.menu_btn_more) {
+    if (id == R.id.menu_btn_edit) {
+      onFloatingButtonPressed();
+    } else if (id == R.id.menu_btn_more) {
       showMore(new int[] {R.id.more_btn_logout}, new String[] {Lang.getString(R.string.LogOut)}, 0);
     }
   }
@@ -409,7 +414,7 @@ public class SettingsController extends ViewController<Void> implements
 
   private void updateButtonsColor () {
     if (headerView != null) {
-      headerView.getBackButton().setColor(ColorUtils.fromToArgb(Theme.headerBackColor(), Color.WHITE, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f));
+      headerView.getBackButton().setColor(ColorUtils.fromToArgb(Theme.getColor(ColorId.glassIcon), Color.WHITE, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f));
       headerView.updateButtonsTransform(getMenuId(), this, getTransformFactor());
     }
   }
@@ -420,7 +425,7 @@ public class SettingsController extends ViewController<Void> implements
     for (int i = 0; i < menu.getChildCount(); i++ ){
       View v = menu.getChildAt(i);
       if (v instanceof HeaderButton) {
-        ((HeaderButton) v).setThemeColorId(ColorId.headerIcon, ColorId.white, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f);
+        ((HeaderButton) v).setThemeColorId(ColorId.glassIcon, ColorId.white, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f);
       }
     }
   }
@@ -444,7 +449,10 @@ public class SettingsController extends ViewController<Void> implements
     this.headerCell.setAvatarExpandListener((headerView1, expandFactor, byCollapse, allowanceFactor, collapseFactor) -> updateButtonsColor());
     this.headerCell.setAllowEmptyClick();
     this.headerCell.initWithController(this, true);
-    this.headerCell.setInnerMargins(Screen.dp(56f), Screen.dp(49f));
+    this.headerCell.setFloatingCard(true);
+    this.headerCell.setGlassTextColors(true);
+    this.headerCell.setContentInsetY(getHeaderControlsInset());
+    this.headerCell.setInnerMargins(Screen.dp(56f), Screen.dp(98f));
     this.headerCell.setPhotoOpenCallback(this);
     this.headerCell.setOnEmojiStatusClickListener(v -> {
       EmojiStatusSelectorEmojiPage.Wrapper c = new EmojiStatusSelectorEmojiPage.Wrapper(context, tdlib, SettingsController.this, new EmojiStatusSelectorEmojiPage.AnimationsEmojiStatusSetDelegate() {
@@ -964,6 +972,7 @@ public class SettingsController extends ViewController<Void> implements
       headerCell.setEmojiStatus(user);
       headerCell.setAllowTitleClick(chatId);
       headerCell.invalidate();
+      if (isFocused()) updateButtonsColor();
     }
   }
 

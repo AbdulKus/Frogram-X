@@ -40,7 +40,7 @@ import org.thunderdog.challegram.v.CustomRecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SettingsStickersAndEmojiController extends RecyclerViewController<SettingsController> implements View.OnClickListener, StickersListener, SettingsController.StickerSetLoadListener, TGLegacyManager.EmojiLoadListener {
+public class SettingsStickersAndEmojiController extends SettingsPageController<SettingsController> implements View.OnClickListener, StickersListener, SettingsController.StickerSetLoadListener, TGLegacyManager.EmojiLoadListener {
   private SettingsAdapter adapter;
   private int stickerSetsCount = -1;
   private int emojiPacksCount = -1;

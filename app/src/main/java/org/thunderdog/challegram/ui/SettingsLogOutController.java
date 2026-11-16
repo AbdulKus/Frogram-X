@@ -35,7 +35,7 @@ import org.thunderdog.challegram.widget.BetterChatView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SettingsLogOutController extends RecyclerViewController<Integer> implements View.OnClickListener {
+public class SettingsLogOutController extends SettingsPageController<Integer> implements View.OnClickListener {
   @IntDef({
     Type.LOG_OUT, Type.DELETE_ACCOUNT
   })

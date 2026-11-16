@@ -45,7 +45,7 @@ import java.util.ArrayList;
 
 import me.vkryl.core.StringUtils;
 
-public class Settings2FAController extends RecyclerViewController<Settings2FAController.Args> implements SettingsPrivacyController.PasswordStateLoadListener, View.OnClickListener, Client.ResultHandler, DoneListener, SettingsAdapter.TextChangeListener {
+public class Settings2FAController extends SettingsPageController<Settings2FAController.Args> implements SettingsPrivacyController.PasswordStateLoadListener, View.OnClickListener, Client.ResultHandler, DoneListener, SettingsAdapter.TextChangeListener {
   public static class Args {
     public final @Nullable SettingsPrivacyController controller;
     public final TdApi.PasswordState state;

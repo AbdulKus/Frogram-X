@@ -1,0 +1,68 @@
+package org.thunderdog.challegram.widget;
+
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.view.View;
+
+import org.thunderdog.challegram.theme.ColorId;
+import org.thunderdog.challegram.theme.Theme;
+import org.thunderdog.challegram.tool.Screen;
+import org.thunderdog.challegram.util.StatusBarScrim;
+
+/** Reserved page header: a glass card above settings, without replaying the list. */
+public final class GlassPageHeader {
+  private final ChatGlassDrawable glass;
+  private ChatGlassDrawable player;
+  private final View content, host;
+  private boolean playerVisible;
+  private final Paint fade = new Paint();
+  private int lastBackground, lastHeight = -1, lastInset = -1, lastFade;
+
+  public GlassPageHeader (View content, View host) {
+    this.content = content; this.host = host;
+    glass = createSurface();
+  }
+
+  public void draw (Canvas canvas, int width, int height, int inset) {
+    playerVisible = false;
+    int background = Theme.getColor(ColorId.background);
+    if (background != lastBackground) {
+      lastBackground = background;
+      glass.invalidateBackdrop();
+      if (player != null) player.invalidateBackdrop();
+    }
+    canvas.drawRect(0, 0, width, height, org.thunderdog.challegram.tool.Paints.fillingPaint(background));
+    int edge = Screen.dp(GlassStyle.HEADER_EDGE_DP), side = Screen.dp(GlassStyle.SIDE_DP);
+    glass.setBounds(side, inset + edge, Math.max(side, width - side), Math.max(inset + edge, height - edge));
+    glass.draw(canvas);
+    int color = StatusBarScrim.backgroundColor();
+    if (height != lastHeight || inset != lastInset || color != lastFade) {
+      lastHeight = height; lastInset = inset; lastFade = color;
+      fade.setShader(StatusBarScrim.create(color, inset, StatusBarScrim.height(inset)));
+    }
+    canvas.drawRect(0, 0, width, StatusBarScrim.height(inset), fade);
+  }
+
+  private ChatGlassDrawable createSurface () {
+    return new ChatGlassDrawable(content, host, ColorId.filling,
+      canvas -> canvas.drawColor(Theme.getColor(ColorId.background)));
+  }
+
+  public void drawPlayer (Canvas canvas, int width, int top, int bottom) {
+    playerVisible = true;
+    if (player == null) player = createSurface();
+    int side = Screen.dp(GlassStyle.SIDE_DP), edge = Screen.dp(GlassStyle.HEADER_EDGE_DP);
+    canvas.drawRect(0, top, width, bottom, org.thunderdog.challegram.tool.Paints.fillingPaint(Theme.getColor(ColorId.background)));
+    player.setBounds(side, top + edge, width - side, bottom - edge);
+    player.draw(canvas);
+  }
+
+  public int bottom () { return playerVisible && player != null ? Math.max(glass.getBounds().bottom, player.getBounds().bottom) : glass.getBounds().bottom; }
+
+  public void setEnabled (boolean enabled) {
+    glass.setEnabled(enabled);
+    if (player != null) player.setEnabled(enabled);
+  }
+
+  public void release () { glass.release(); if (player != null) player.release(); }
+}

@@ -458,8 +458,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
     return glass;
   }
 
+  @Override public ChatGlassDrawable createMenuGlassSurface (View host) {
+    return createGlassSurface(host, ColorId.filling);
+  }
+
   /** Bottom of the visible floating header/player, in screen coordinates. */
-  public int getFloatingMenuAnchorBottom () {
+  @Override public int getFloatingMenuAnchorBottom () {
     int bottom = 0;
     int[] location = new int[2];
     for (View view : new View[] {topGlassView, floatingPlayerView}) {

@@ -28,7 +28,7 @@ import org.thunderdog.challegram.v.CustomRecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SettingsLanguageTranslateController extends RecyclerViewController<Void> implements View.OnClickListener {
+public class SettingsLanguageTranslateController extends SettingsPageController<Void> implements View.OnClickListener {
 
   public SettingsLanguageTranslateController(Context context, Tdlib tdlib) {
     super(context, tdlib);

@@ -105,8 +105,8 @@ is restricted to the main chat list; releasing or cancelling dismisses it.
 Android 16 verification repeated all four folder styles across Blue, Pink,
 Night Black, Black White and Night Blue, checking both selected states against
 resolved theme roles. Header press masks remained bounded and centred on the
-main list, archive and a media chat; returning from classic Settings restored
-the appropriate selector. Real stationary folder/main-list holds exercised both
+main list, archive and a media chat; selector restoration was also checked before Settings adopted the shared
+glass shell below. Real stationary folder/main-list holds exercised both
 routes. Eight neutral scrim inset/tone combinations faded monotonically to zero.
 The temporary QA folder was removed and theme/style preferences were restored.
 
@@ -119,3 +119,28 @@ row colours/size and back dismissal without invoking any menu action. Android
 16 checks also exercised capsule feedback on the second folder and all four
 folder styles; original theme/style preferences and notification settings were
 restored after the checks.
+
+Settings pages now opt into `SettingsPageController` and the shared reserved
+glass header, including their ordinary subpages. Settings/profile photographs
+stay clipped to the card through their original scroll-driven collapse; photo
+viewer origins use the same crop and corners. Missing-photo placeholders stay
+round and use the normal glass foreground roles. Edit-name and open-chat actions
+move into the header instead of overlapping it as legacy floating buttons.
+Menus use the same shared row feedback and spacing as filters, and release
+their backdrop when detached. Inactive reserved headers stop backdrop sampling.
+
+`test_glass_feedback.py` exercises the production mask methods while a tab
+reserves expanded width, testing expansion/contraction, RTL alignment, density
+changes and bounds reassignment. A native test also checks its mask through
+thirty actual selection-animation samples with the label-on-active-folder style.
+
+`test_page_player_reveal.py` checks the player reveal and input boundary: hidden
+fragments do not intercept touches, the fully visible strip remains interactive,
+and classic player input is unchanged. Android 11 and Android 16 verification
+covered Blue/Night Black/Night Blue settings/profile headers using real drag
+gestures, eight settings subpages, menu reuse/spacing, centred controls, missing
+photos, landscape, opening/closing the photo viewer and cancelling the name
+editor. The player strip was rendered with an owned synthetic UI fixture; no
+audio playback or account mutation was needed. Day/night/current theme IDs were
+verified against owned QA backups after the runs. Authenticated sessions remain
+intact. Private instrumentation and account screenshots are not shipped.

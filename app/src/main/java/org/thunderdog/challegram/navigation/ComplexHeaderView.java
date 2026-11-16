@@ -399,6 +399,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
   }
 
   public float getAvatarExpandFactor () {
+    if (floatingCard && receiver.getRequestedPlaceholder() != null) return 0f;
     return avatarAllowanceFactor * (1f - avatarCollapseFactor);
   }
 
@@ -541,10 +542,15 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     return (float) currentHeight / (float) startY;
   }
 
+  private float getPlaceholderOffset () {
+    return floatingCard && receiver.getRequestedPlaceholder() != null ?
+      Math.max(0, calculateHeaderHeight() - currentHeaderOffset - HeaderView.getSize(false)) * .25f : 0f;
+  }
+
   private void layoutReceiver () {
     float baseRadius = Screen.dp(getBaseAvatarRadiusDp());
     float baseCenterX = innerLeftMargin + Screen.dp(4f) + baseRadius;
-    float baseCenterY = currentHeaderOffset + HeaderView.getSize(false) / 2;
+    float baseCenterY = currentHeaderOffset + HeaderView.getSize(false) / 2 + getPlaceholderOffset();
 
     float scaleFactor = calculateRealScaleFactor();
 
@@ -766,6 +772,12 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     return ColorUtils.alphaColor(Theme.getSubtitleAlpha(), headerColor);
   }
 
+  private boolean floatingCard;
+  private final android.graphics.Paint floatingPhotoPaint = new android.graphics.Paint();
+  private int floatingPhotoTop = -1;
+  private final android.graphics.Path floatingCardClip = new android.graphics.Path();
+  public void setFloatingCard (boolean enabled) { floatingCard = enabled; invalidate(); }
+
   private boolean glassTextColors;
 
   public void setGlassTextColors (boolean enabled) {
@@ -834,9 +846,16 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
   public MediaViewThumbLocation getThumbLocation () {
     MediaViewThumbLocation location = new MediaViewThumbLocation();
     location.set(receiver.getLeft(), receiver.getTop(), receiver.getRight(), receiver.getBottom());
-    location.setClip(0, Math.max(-receiver.getTop(), 0), 0, Math.max(0, receiver.getBottom() - calculateHeaderHeight()));
-    float radius = receiver.getDisplayRadius();
-    location.setColorId(ColorId.headerBackground);
+    if (floatingCard) {
+      int side = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP);
+      int edge = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
+      location.setClip(Math.max(side - receiver.getLeft(), 0), Math.max(currentHeaderOffset + edge - receiver.getTop(), 0),
+        Math.max(receiver.getRight() - getMeasuredWidth() + side, 0), Math.max(receiver.getBottom() - calculateHeaderHeight() + edge, 0));
+    } else {
+      location.setClip(0, Math.max(-receiver.getTop(), 0), 0, Math.max(0, receiver.getBottom() - calculateHeaderHeight()));
+    }
+    float radius = floatingCard && getAvatarExpandFactor() == 1f ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RADIUS_DP) : receiver.getDisplayRadius();
+    location.setColorId(floatingCard ? ColorId.filling : ColorId.headerBackground);
     location.setRoundings(radius, radius, radius, radius);
     return location;
   }
@@ -876,6 +895,13 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
     final int saveCount = Views.save(c);
     try {
       c.clipRect(0, 0, getMeasuredWidth(), calculateHeaderHeight());
+      if (floatingCard) {
+        floatingCardClip.reset();
+        floatingCardClip.addRoundRect(Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP), currentHeaderOffset + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP),
+          getMeasuredWidth() - Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP), calculateHeaderHeight() - Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP),
+          Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RADIUS_DP), Screen.dp(org.thunderdog.challegram.widget.GlassStyle.RADIUS_DP), android.graphics.Path.Direction.CW);
+        c.clipPath(floatingCardClip);
+      }
       c.translate(0, contentInsetY * (1f - avatarExpandFactor));
 
       final boolean showLock = (flags & FLAG_SHOW_LOCK) != 0;
@@ -895,6 +921,16 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
         receiver.drawPlaceholderRounded(c, receiver.getDisplayRadius(), Theme.headerPlaceholderColor());
       }
       receiver.draw(c);
+      if (floatingCard && avatarExpandFactor > 0f) {
+        int top = currentHeaderOffset + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
+        if (floatingPhotoTop != top) {
+          floatingPhotoTop = top;
+          floatingPhotoPaint.setShader(new android.graphics.LinearGradient(0, top, 0, top + Screen.dp(96f),
+            new int[] {0x66000000, 0x2e000000, 0x00000000}, new float[] {0f, .5f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+        }
+        floatingPhotoPaint.setAlpha(Math.round(255 * avatarExpandFactor));
+        c.drawRect(0, top, getMeasuredWidth(), top + Screen.dp(96f), floatingPhotoPaint);
+      }
       if (avatarExpandFactor > 0f && receiver.getRequestedPlaceholder() == null) {
         getTopShadow().setAlpha((int) (255f * .8f * avatarExpandFactor));
         getTopShadow().draw(c);
@@ -910,8 +946,8 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
       }
 
       float baseTextLeft = innerLeftMargin + Screen.dp(4f) + Screen.dp(getBaseAvatarRadiusDp()) * 2 + Screen.dp(9f);
-      float baseTitleTop = currentHeaderOffset + Screen.dp(7f);
-      float baseSubtitleTop = currentHeaderOffset + Screen.dp(30f);
+      float baseTitleTop = currentHeaderOffset + Screen.dp(7f) + getPlaceholderOffset();
+      float baseSubtitleTop = currentHeaderOffset + Screen.dp(30f) + getPlaceholderOffset();
       if (scaleFactor != 0f) {
         baseTextLeft += -Screen.dp(11f) * scaleFactor;
         baseTitleTop += Screen.dp(62f) * scaleFactor;

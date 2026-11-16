@@ -47,7 +47,7 @@ import me.vkryl.core.ArrayUtils;
 import tgx.td.ChatId;
 import tgx.td.Td;
 
-public class SettingsBlockedController extends RecyclerViewController<TdApi.BlockList> implements View.OnClickListener, Menu, TdlibCache.UserDataChangeListener, TdlibCache.UserStatusChangeListener, SenderPickerDelegate, Client.ResultHandler, ChatListener {
+public class SettingsBlockedController extends SettingsPageController<TdApi.BlockList> implements View.OnClickListener, Menu, TdlibCache.UserDataChangeListener, TdlibCache.UserStatusChangeListener, SenderPickerDelegate, Client.ResultHandler, ChatListener {
   public SettingsBlockedController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

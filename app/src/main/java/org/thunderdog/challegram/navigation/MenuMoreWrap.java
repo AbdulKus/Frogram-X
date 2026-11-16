@@ -83,7 +83,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   private Drawable classicBackground;
   private final android.graphics.Rect classicPadding = new android.graphics.Rect();
   private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
-  private java.lang.ref.WeakReference<org.thunderdog.challegram.ui.MessagesController> glassController;
+  private java.lang.ref.WeakReference<ViewController<?>> glassController;
   private final int[] parentLocation = new int[2];
 
   private int glassIconColorId () {
@@ -91,14 +91,14 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   }
   private final android.graphics.Path surfaceClip = new android.graphics.Path();
 
-  public void setGlassSurface (org.thunderdog.challegram.ui.MessagesController controller) {
+  public void setGlassSurface (@Nullable ViewController<?> controller) {
     if (classicBackground == null) {
       classicBackground = getBackground();
       classicPadding.set(getPaddingLeft(), getPaddingTop(), getPaddingRight(), getPaddingBottom());
     }
     if (glass != null) glass.release();
-    glassController = controller != null ? new java.lang.ref.WeakReference<>(controller) : null;
-    glass = controller != null ? controller.createGlassSurface(this, ColorId.filling) : null;
+    glass = controller != null ? controller.createMenuGlassSurface(this) : null;
+    glassController = glass != null ? new java.lang.ref.WeakReference<>(controller) : null;
     setBackground(glass != null ? glass : classicBackground);
     if (glass != null) {
       int padding = Screen.dp(org.thunderdog.challegram.widget.GlassMenuStyle.PADDING_DP);
@@ -128,7 +128,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   }
 
   public void updateGlassPosition () {
-    org.thunderdog.challegram.ui.MessagesController controller = glassController != null ? glassController.get() : null;
+    ViewController<?> controller = glassController != null ? glassController.get() : null;
     if (controller == null || !(getParent() instanceof View)) return;
     int bottom = controller.getFloatingMenuAnchorBottom();
     if (bottom == 0) return;
@@ -620,11 +620,18 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   protected void onAttachedToWindow () {
     super.onAttachedToWindow();
     complexAvatarReceiver.attach();
+    ViewController<?> controller = glassController != null ? glassController.get() : null;
+    if (glass == null && controller != null) setGlassSurface(controller);
   }
 
   @Override
   protected void onDetachedFromWindow () {
     super.onDetachedFromWindow();
     complexAvatarReceiver.detach();
+    if (glass != null) {
+      glass.release();
+      glass = null;
+      setBackground(null);
+    }
   }
 }

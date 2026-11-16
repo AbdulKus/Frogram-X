@@ -57,7 +57,7 @@ import me.vkryl.core.collection.IntList;
 import me.vkryl.core.lambda.RunnableInt;
 import tgx.td.Td;
 
-public class SettingsSessionsController extends RecyclerViewController<Void> implements View.OnClickListener, OptionDelegate, CameraController.QrCodeListener, SessionListener {
+public class SettingsSessionsController extends SettingsPageController<Void> implements View.OnClickListener, OptionDelegate, CameraController.QrCodeListener, SessionListener {
   public SettingsSessionsController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

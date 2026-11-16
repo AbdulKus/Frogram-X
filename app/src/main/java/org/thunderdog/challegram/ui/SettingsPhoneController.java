@@ -25,7 +25,7 @@ import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.tool.Strings;
 import org.thunderdog.challegram.v.CustomRecyclerView;
 
-public class SettingsPhoneController extends RecyclerViewController<Void> implements View.OnClickListener {
+public class SettingsPhoneController extends SettingsPageController<Void> implements View.OnClickListener {
   public SettingsPhoneController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

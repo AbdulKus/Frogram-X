@@ -47,6 +47,8 @@ public class SettingsStickersController extends ViewPagerController<SettingsCont
 
   private final int type;
 
+  @Override protected boolean usesGlassPageHeader () { return true; }
+
   public SettingsStickersController (Context context, Tdlib tdlib, int type) {
     super(context, tdlib);
     this.type = type;

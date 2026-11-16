@@ -1707,6 +1707,9 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     public void draw (@NonNull Canvas canvas) {
       int itemWidth = topView.getItemWidth(index, topView.selectionFactor);
       lastItemWidth = itemWidth;
+      if (getBackground() instanceof org.thunderdog.challegram.widget.GlassRippleDrawable) {
+        ((org.thunderdog.challegram.widget.GlassRippleDrawable) getBackground()).setVisibleWidth(itemWidth, Lang.rtl());
+      }
       if (itemWidth == getWidth()) {
         super.draw(canvas);
         return;

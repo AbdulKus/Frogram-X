@@ -56,7 +56,7 @@ import me.vkryl.core.StringUtils;
 import me.vkryl.core.collection.IntList;
 import tgx.td.Td;
 
-public class SettingsLanguageController extends RecyclerViewController<Void> implements View.OnClickListener, LanguageController.Delegate, View.OnLongClickListener {
+public class SettingsLanguageController extends SettingsPageController<Void> implements View.OnClickListener, LanguageController.Delegate, View.OnLongClickListener {
   public SettingsLanguageController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

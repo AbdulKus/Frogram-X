@@ -85,7 +85,7 @@ import tgx.extension.TelegramXExtension;
 import tgx.td.ChatPosition;
 import tgx.td.Td;
 
-public class SettingsBugController extends RecyclerViewController<SettingsBugController.Args> implements
+public class SettingsBugController extends SettingsPageController<SettingsBugController.Args> implements
   View.OnClickListener,
   ViewController.SettingsIntDelegate,
   View.OnLongClickListener,

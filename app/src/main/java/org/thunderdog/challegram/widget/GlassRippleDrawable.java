@@ -13,6 +13,16 @@ public final class GlassRippleDrawable extends RippleDrawable {
   public static final float TAB_INSET_X_DP = 4f, TAB_INSET_Y_DP = 7f;
   private final GradientDrawable mask;
   private final boolean compact;
+  private int visibleWidth = -1;
+  private boolean alignRight;
+
+  /** The touch view reserves the expanded label; feedback follows the visible tab. */
+  public void setVisibleWidth (int width, boolean rtl) {
+    if (visibleWidth == width && alignRight == rtl) return;
+    visibleWidth = width;
+    alignRight = rtl;
+    updateMask(getBounds());
+  }
 
   public GlassRippleDrawable (int color, boolean compact) {
     this(color, compact, new GradientDrawable());
@@ -27,11 +37,17 @@ public final class GlassRippleDrawable extends RippleDrawable {
 
   @Override protected void onBoundsChange (Rect bounds) {
     super.onBoundsChange(bounds);
+    updateMask(bounds);
+  }
+
+  private void updateMask (Rect bounds) {
     // LayerDrawable may assign bounds during construction, before our fields exist.
     if (mask == null) return;
-    int width = compact ? Math.min(bounds.width(), Screen.dp(44f)) : Math.max(0, bounds.width() - Screen.dp(TAB_INSET_X_DP) * 2);
-    int height = compact ? Math.min(bounds.height(), Screen.dp(44f)) : Math.max(0, bounds.height() - Screen.dp(TAB_INSET_Y_DP) * 2);
-    int left = bounds.left + (bounds.width() - width) / 2, top = bounds.top + (bounds.height() - height) / 2;
+    int extent = visibleWidth >= 0 ? Math.min(bounds.width(), Math.max(0, visibleWidth)) : bounds.width();
+    int start = bounds.left + (alignRight ? bounds.width() - extent : 0);
+    int width = compact ? Math.min(bounds.width(), Screen.dp(GlassStyle.CONTROL_SIZE_DP)) : Math.max(0, extent - Screen.dp(TAB_INSET_X_DP) * 2);
+    int height = compact ? Math.min(bounds.height(), Screen.dp(GlassStyle.CONTROL_SIZE_DP)) : Math.max(0, bounds.height() - Screen.dp(TAB_INSET_Y_DP) * 2);
+    int left = start + (extent - width) / 2, top = bounds.top + (bounds.height() - height) / 2;
     mask.setCornerRadius(Math.min(width, height) / 2f);
     mask.setBounds(left, top, left + width, top + height);
     setHotspotBounds(left, top, left + width, top + height);

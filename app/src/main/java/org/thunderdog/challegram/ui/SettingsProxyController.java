@@ -54,7 +54,7 @@ import me.vkryl.core.StringUtils;
 import me.vkryl.core.collection.IntList;
 import me.vkryl.core.lambda.CancellableRunnable;
 
-public class SettingsProxyController extends RecyclerViewController<Void> implements View.OnLongClickListener, View.OnClickListener, Settings.ProxyChangeListener, ConnectionListener, MoreDelegate, GlobalProxyPingListener {
+public class SettingsProxyController extends SettingsPageController<Void> implements View.OnLongClickListener, View.OnClickListener, Settings.ProxyChangeListener, ConnectionListener, MoreDelegate, GlobalProxyPingListener {
   public SettingsProxyController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

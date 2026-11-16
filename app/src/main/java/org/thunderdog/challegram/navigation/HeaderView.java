@@ -1165,7 +1165,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         }
       };
     }
-    moreWrap.setGlassSurface(themeProvider instanceof org.thunderdog.challegram.ui.MessagesController ? (org.thunderdog.challegram.ui.MessagesController) themeProvider : null);
+    moreWrap.setGlassSurface(themeProvider != null && themeProvider.hasFloatingHeader() ? themeProvider : null);
     moreWrap.setAnchorMode(MenuMoreWrap.ANCHOR_MODE_RIGHT);
     moreWrap.setRightNumber(buttonIndex);
     moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset() + controlsInset(themeProvider));

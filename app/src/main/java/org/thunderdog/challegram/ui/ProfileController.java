@@ -390,6 +390,8 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private final AvatarPickerManager avatarPickerManager;
 
+  @Override protected boolean usesGlassPageHeader () { return true; }
+
   public ProfileController (Context context, Tdlib tdlib) {
     super(context, tdlib);
     avatarPickerManager = new AvatarPickerManager(this);
@@ -424,6 +426,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       HeaderButton callButton = null;
 
       int buttonColorId = getHeaderIconColorId();
+      if (!isEditing()) header.addButton(realMenu, R.id.btn_openChat, R.drawable.baseline_chat_bubble_24, buttonColorId, this, Screen.dp(49f)).setContentDescription(Lang.getString(R.string.OpenChat));
 
       if (mode == Mode.SECRET || mode == Mode.USER) {
         callButton = header.addButton(realMenu, R.id.menu_btn_call, R.drawable.baseline_phone_24, buttonColorId, this, Screen.dp(48f));
@@ -456,7 +459,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       transformedMenu.setAlpha(0f);
       transformedMenu.setTranslationY(HeaderView.getSize(false));
       if (Config.USE_SECRET_SEARCH || mode != Mode.SECRET) {
-        HeaderButton button = header.addSearchButton(transformedMenu, this, ColorId.icon).setThemeColorId(ColorId.icon);
+        HeaderButton button = header.addSearchButton(transformedMenu, this, ColorId.glassIcon).setThemeColorId(ColorId.glassIcon);
         List<SharedBaseController<?>> list = getControllers();
         button.setVisibility(!list.isEmpty() && list.get(0).canSearch() ? View.VISIBLE : View.INVISIBLE);
       }
@@ -478,7 +481,9 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   @Override
   public void onMenuItemPressed (int id, View view) {
-    if (id == R.id.menu_btn_more) {
+    if (id == R.id.btn_openChat) {
+      onFloatingButtonPressed();
+    } else if (id == R.id.menu_btn_more) {
       showMore();
     } else if (id == R.id.menu_btn_addContact) {
       addMember(view);
@@ -966,7 +971,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   @Override
   protected int getFloatingButtonId () {
-    return isEditing() ? 0 : R.drawable.baseline_chat_bubble_24;
+    return 0;
   }
 
   @Override
@@ -1015,7 +1020,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   @Override
   protected int getHeaderTextColorId () {
     if (isExpanded) {
-      return ColorId.text;//Theme.textAccentColor();
+      return usesGlassPageHeader() ? ColorId.glassText : ColorId.text;
     } else {
       return super.getHeaderTextColorId();
     }
@@ -1217,7 +1222,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   @Override
   protected int getHeaderIconColorId () {
-    return isTransformed() && isExpanded ? ColorId.icon : headerCell != null && !headerCell.isCollapsed() ? ColorId.white : ColorId.headerIcon;
+    return headerCell != null && headerCell.getAvatarExpandFactor() == 1f ? ColorId.white : usesGlassPageHeader() ? ColorId.glassIcon : ColorId.headerIcon;
   }
 
   /*@Override
@@ -1288,7 +1293,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private void updateButtonsColor () {
     if (headerView != null) {
-      headerView.getBackButton().setColor(ColorUtils.fromToArgb(ColorUtils.fromToArgb(Theme.headerBackColor(), Color.WHITE, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f), Theme.getColor(ColorId.icon), getTransformFactor()));
+      headerView.getBackButton().setColor(ColorUtils.fromToArgb(ColorUtils.fromToArgb(Theme.getColor(ColorId.glassIcon), Color.WHITE, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f), Theme.getColor(ColorId.icon), getTransformFactor()));
       headerView.updateButtonsTransform(getMenuId(), this, getTransformFactor());
     }
   }
@@ -1352,7 +1357,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     for (int i = 0; i < realMenu.getChildCount(); i++) {
       View childView = realMenu.getChildAt(i);
       if (childView instanceof HeaderButton) {
-        ((HeaderButton) childView).setThemeColorId(ColorId.headerIcon, ColorId.white, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f);
+        ((HeaderButton) childView).setThemeColorId(ColorId.glassIcon, ColorId.white, headerCell != null ? headerCell.getAvatarExpandFactor() : 0f);
       }
     }
 
@@ -1596,6 +1601,9 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       headerCell.setInnerMargins(Screen.dp(56f), calculateMenuWidth());
       headerCell.setAllowEmptyClick();
       headerCell.initWithController(this, false);
+      headerCell.setFloatingCard(true);
+      headerCell.setGlassTextColors(true);
+      headerCell.setContentInsetY(getHeaderControlsInset());
       headerCell.setPhotoOpenCallback(this);
 
       baseRecyclerView = new ComplexRecyclerView(context, this) {
@@ -2048,7 +2056,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private int calculateMenuWidth () {
-    int totalWidth = 0;
+    int totalWidth = isEditing() ? 0 : Screen.dp(49f);
     if (mode == Mode.SECRET || mode == Mode.USER) {
       totalWidth += Screen.dp(48f);
     }
@@ -5286,6 +5294,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
         setHeaderPhoto(true);
       }
       headerCell.invalidate();
+      if (isFocused()) updateButtonsColor();
     }
   }
 

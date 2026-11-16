@@ -33,7 +33,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
-public class SettingsLogFilesController extends RecyclerViewController<SettingsLogFilesController.Arguments> implements
+public class SettingsLogFilesController extends SettingsPageController<SettingsLogFilesController.Arguments> implements
   View.OnClickListener, Log.OutputListener {
   public static class Arguments {
     Log.LogFiles currentFiles;

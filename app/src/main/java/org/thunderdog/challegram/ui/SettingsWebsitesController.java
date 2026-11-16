@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 
 import me.vkryl.core.collection.LongSparseIntArray;
 
-public class SettingsWebsitesController extends RecyclerViewController<SettingsPrivacyController> implements View.OnClickListener, SettingsPrivacyController.WebsitesLoadListener {
+public class SettingsWebsitesController extends SettingsPageController<SettingsPrivacyController> implements View.OnClickListener, SettingsPrivacyController.WebsitesLoadListener {
   public SettingsWebsitesController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

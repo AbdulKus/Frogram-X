@@ -12,7 +12,7 @@ import org.thunderdog.challegram.tool.Strings;
 import org.thunderdog.challegram.util.AppUpdater;
 import org.thunderdog.challegram.v.CustomRecyclerView;
 
-public final class SettingsUpdatesController extends RecyclerViewController<Void> implements View.OnClickListener, AppUpdater.Listener {
+public final class SettingsUpdatesController extends SettingsPageController<Void> implements View.OnClickListener, AppUpdater.Listener {
   private SettingsAdapter adapter;
 
   public SettingsUpdatesController (Context context, Tdlib tdlib) { super(context, tdlib); }

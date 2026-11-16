@@ -25,7 +25,7 @@ import org.thunderdog.challegram.v.CustomRecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DoubleBottomSettingsController extends RecyclerViewController<Void> implements View.OnClickListener {
+public class DoubleBottomSettingsController extends SettingsPageController<Void> implements View.OnClickListener {
   private SettingsAdapter adapter;
   private CustomRecyclerView recyclerView;
   private boolean primarySetupOffered;

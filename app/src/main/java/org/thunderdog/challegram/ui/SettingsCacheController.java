@@ -55,7 +55,7 @@ import me.vkryl.core.ArrayUtils;
 import me.vkryl.core.FileUtils;
 import me.vkryl.core.collection.SparseLongArray;
 
-public class SettingsCacheController extends RecyclerViewController<SettingsDataController> implements View.OnClickListener, Client.ResultHandler, SettingsDataController.StorageStatsFastCallback, MoreDelegate, TGLegacyManager.EmojiLoadListener {
+public class SettingsCacheController extends SettingsPageController<SettingsDataController> implements View.OnClickListener, Client.ResultHandler, SettingsDataController.StorageStatsFastCallback, MoreDelegate, TGLegacyManager.EmojiLoadListener {
   public SettingsCacheController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }

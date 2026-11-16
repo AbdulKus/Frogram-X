@@ -99,7 +99,7 @@ import tgx.bridge.DeviceTokenRetriever;
 import tgx.td.ChatId;
 import tgx.td.Td;
 
-public class SettingsNotificationController extends RecyclerViewController<SettingsNotificationController.Args> implements
+public class SettingsNotificationController extends SettingsPageController<SettingsNotificationController.Args> implements
   View.OnClickListener, View.OnLongClickListener,
   ViewController.SettingsIntDelegate,
   ViewController.SettingsStringDelegate,

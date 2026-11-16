@@ -59,7 +59,7 @@ import me.vkryl.core.StringUtils;
 import me.vkryl.core.collection.LongList;
 import tgx.td.Td;
 
-public class SettingsPrivacyKeyController extends RecyclerViewController<SettingsPrivacyKeyController.Args> implements View.OnClickListener, UserPickerMultiDelegate, PrivacySettingsListener, ActivityResultHandler,
+public class SettingsPrivacyKeyController extends SettingsPageController<SettingsPrivacyKeyController.Args> implements View.OnClickListener, UserPickerMultiDelegate, PrivacySettingsListener, ActivityResultHandler,
   TdlibCache.UserDataChangeListener {
   @IntDef({
     Mode.USER_PRIVACY_SETTING,

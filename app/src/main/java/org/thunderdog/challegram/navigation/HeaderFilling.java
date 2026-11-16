@@ -397,7 +397,20 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     // In particular, returning from the expanded player must not restore a second bar.
     ViewController<?> surfaceOwner = navigationController != null ? navigationController.getCurrentStackItem() : null;
     if (surfaceOwner != null && surfaceOwner.hasFloatingHeader() &&
-        surfaceOwner.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) return;
+        surfaceOwner.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) {
+      if (surfaceOwner.usesGlassPageHeader() && hasVisibleOngoingBar() && pagePlayerAlpha() > 0f) {
+        int hide = (int) (HeaderView.getPlayerSize() * hideFactor);
+        int top = Math.max((int) fillingBottom, playerTop - hide), bottom = playerBottom - hide;
+        if (bottom > top) {
+          int save = c.saveLayerAlpha(0, top, width, bottom, Math.round(255f * pagePlayerAlpha()));
+          c.clipRect(0, fillingBottom, width, bottom);
+          surfaceOwner.drawGlassPagePlayer(c, width, top, bottom);
+          drawingFloatingPlayer = true;
+          try { drawOngoingBar(c); } finally { drawingFloatingPlayer = false; c.restoreToCount(save); }
+        }
+      }
+      return;
+    }
     if (restoreRect && restorePixels > 0) {
       if (Lang.rtl()) {
         c.drawRect(0, 0, restorePixels, fillingBottom, Paints.fillingPaint(restoreColor));
@@ -454,6 +467,12 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     // invalidateSelf();
     headerView.invalidate(0, playerTop, width, playerBottom);
     if (navigationController != null) navigationController.invalidateFloatingPlayers();
+  }
+
+  private float pagePlayerAlpha () {
+    float visible = (playerBottom - HeaderView.getPlayerSize() * hideFactor - fillingBottom) / HeaderView.getPlayerSize();
+    float progress = MathUtils.clamp((visible - .8f) / .2f);
+    return progress * progress * (3f - 2f * progress);
   }
 
   private boolean drawingFloatingPlayer;
@@ -1296,6 +1315,8 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   public boolean needClickAt (View view, float x, float y) {
     touchDownX = x;
     touchDownY = y;
+    ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
+    if (!handlingFloatingPlayerTouch && current != null && current.usesGlassPageHeader() && pagePlayerAlpha() == 0f) return false;
     return (navigationController == null || !navigationController.isAnimating()) && (showOngoingBar || showFactor != 0f) && dropShadowAlpha != 0f && hideFactor != 1f && !(y < playerTop) && !(y > playerBottom) && (handlingFloatingPlayerTouch || y > fillingBottom);
   }
 
