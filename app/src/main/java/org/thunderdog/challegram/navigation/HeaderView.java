@@ -320,6 +320,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       Views.setTopMargin(textPreview, Screen.dp(15f) + headerOffset);
       if (moreWrap != null) {
         moreWrap.setTranslationY(getTranslationY() + getCurrentHeaderOffset() + controlsInset(stack != null ? stack.getCurrent() : null));
+        moreWrap.updateGlassPosition();
       }
       if (title != textTitle) {
         dispatchOffset(title, getBaseController());

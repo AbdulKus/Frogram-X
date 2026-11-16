@@ -979,9 +979,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
           isSelected = selectedFilter == filter;
         }
         sectionView.setSelected(isSelected);
-        sectionView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(Screen.dp(16f),
-          isSelected ? ColorUtils.alphaColor(.12f, Theme.getColor(ColorId.glassActive)) : Color.TRANSPARENT,
-          ColorUtils.alphaColor(.14f, Theme.getColor(ColorId.glassActive)), Color.WHITE));
+        sectionView.setBackground(org.thunderdog.challegram.widget.GlassMenuStyle.rowBackground(isSelected));
         int textColorId = isSelected ? ColorId.glassActive : ColorId.glassIcon;
         sectionView.setTextColor(Theme.getColor(textColorId));
         int iconColorId = isSelected ? ColorId.glassActive : ColorId.glassIcon;

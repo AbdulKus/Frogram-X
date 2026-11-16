@@ -458,6 +458,19 @@ public class MessagesController extends ViewController<MessagesController.Argume
     return glass;
   }
 
+  /** Bottom of the visible floating header/player, in screen coordinates. */
+  public int getFloatingMenuAnchorBottom () {
+    int bottom = 0;
+    int[] location = new int[2];
+    for (View view : new View[] {topGlassView, floatingPlayerView}) {
+      if (view != null && view.isShown() && view.getAlpha() > 0f) {
+        view.getLocationOnScreen(location);
+        bottom = Math.max(bottom, location[1] + view.getHeight());
+      }
+    }
+    return bottom;
+  }
+
   public boolean useFloatingInput () { return newChatInput; }
 
   private final MessageTranscription transcription = new MessageTranscription(this);

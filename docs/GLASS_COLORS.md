@@ -96,9 +96,9 @@ Android verification created and removed one owned test folder, checked all four
 tab styles on Blue/Pink/Night/Black White/Black, and checked archive shell/insets
 on those themes. Existing folders and chats were retained.
 
-Header buttons use a centred 44dp rounded ripple mask without changing their
-touch targets. Folder tab masks share the 14dp corners and 4dp horizontal / 7dp
-vertical insets of the selection surface. Classic headers retain their selectors.
+Header buttons use a centred 44dp circular ripple mask without changing their
+touch targets. Folder tab masks and selection surfaces use capsule ends, with matching
+4dp horizontal / 7dp vertical insets. Classic headers retain their selectors.
 Holding a custom folder opens its folder options. The hold-and-drag filter menu
 is restricted to the main chat list; releasing or cancelling dismisses it.
 
@@ -109,3 +109,13 @@ main list, archive and a media chat; returning from classic Settings restored
 the appropriate selector. Real stationary folder/main-list holds exercised both
 routes. Eight neutral scrim inset/tone combinations faded monotonically to zero.
 The temporary QA folder was removed and theme/style preferences were restored.
+
+The chat overflow menu shares the filter menu's 6dp inner padding, 16dp row
+feedback corners, 14% accent pressed fill and medium 15sp labels. It opens on a
+normal tap, 8dp below the visible floating header/player, with 8dp side clearance.
+Android 11 and Android 16 checks opened the overflow menu twice per theme on
+Blue, Night Black and Night Blue with ordinary taps, verified its header gap,
+row colours/size and back dismissal without invoking any menu action. Android
+16 checks also exercised capsule feedback on the second folder and all four
+folder styles; original theme/style preferences and notification settings were
+restored after the checks.

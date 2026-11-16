@@ -1137,7 +1137,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     if (rtl) left = totalWidth - left - width;
     glassTabBounds.set(left + Screen.dp(4f) - swell, Screen.dp(7f), left + width - Screen.dp(4f) + swell, height - Screen.dp(7f));
     if (glassTabBounds.isEmpty()) return;
-    float radius = Math.min(Screen.dp(org.thunderdog.challegram.widget.GlassRippleDrawable.CORNER_DP), glassTabBounds.height() / 2f);
+    float radius = glassTabBounds.height() / 2f;
     int tint = getGlassTabTint();
     float alpha = 1f - disabledFactor;
     glassTabPaint.setShader(null);

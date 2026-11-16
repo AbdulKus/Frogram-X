@@ -83,6 +83,8 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   private Drawable classicBackground;
   private final android.graphics.Rect classicPadding = new android.graphics.Rect();
   private org.thunderdog.challegram.widget.ChatGlassDrawable glass;
+  private java.lang.ref.WeakReference<org.thunderdog.challegram.ui.MessagesController> glassController;
+  private final int[] parentLocation = new int[2];
 
   private int glassIconColorId () {
     return glass != null ? org.thunderdog.challegram.ui.MessagesController.getGlassIconColorId() : ColorId.icon;
@@ -95,21 +97,51 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
       classicPadding.set(getPaddingLeft(), getPaddingTop(), getPaddingRight(), getPaddingBottom());
     }
     if (glass != null) glass.release();
-    glass = controller != null ? controller.createGlassSurface(this, ColorId.overlayFilling) : null;
+    glassController = controller != null ? new java.lang.ref.WeakReference<>(controller) : null;
+    glass = controller != null ? controller.createGlassSurface(this, ColorId.filling) : null;
     setBackground(glass != null ? glass : classicBackground);
     if (glass != null) {
-      setPadding(Screen.dp(6f), Screen.dp(8f), Screen.dp(6f), Screen.dp(8f));
+      int padding = Screen.dp(org.thunderdog.challegram.widget.GlassMenuStyle.PADDING_DP);
+      setPadding(padding, padding, padding, padding);
+      setMinimumWidth(0);
       setLayerType(LAYER_TYPE_NONE, null);
     } else {
       setPadding(classicPadding.left, classicPadding.top, classicPadding.right, classicPadding.bottom);
+      setMinimumWidth(Screen.dp(196f));
     }
+  }
+
+  private void styleTextItem (TextView item) {
+    int textColor = glass != null ? ColorId.glassIcon : ColorId.text;
+    item.setTextColor(forcedTheme != null ? forcedTheme.getColor(textColor) : Theme.getColor(textColor));
+    item.setTypeface(glass != null ? Fonts.getRobotoMedium() : Fonts.getRobotoRegular());
+    item.setTextSize(TypedValue.COMPLEX_UNIT_DIP, glass != null ? 15f : 16f);
+    item.setPadding(Screen.dp(glass != null ? (Lang.rtl() ? 20f : 16f) : 17f), 0,
+      Screen.dp(glass != null ? (Lang.rtl() ? 16f : 20f) : 17f), 0);
+    item.setCompoundDrawablePadding(Screen.dp(glass != null ? 16f : 18f));
+    if (themeListeners != null && forcedTheme == null) {
+      themeListeners.removeThemeListenerByTarget(item);
+      themeListeners.addThemeColorListener(item, textColor);
+    }
+    if (glass != null) item.setBackground(org.thunderdog.challegram.widget.GlassMenuStyle.rowBackground(false));
+    else RippleSupport.setTransparentSelector(item);
+  }
+
+  public void updateGlassPosition () {
+    org.thunderdog.challegram.ui.MessagesController controller = glassController != null ? glassController.get() : null;
+    if (controller == null || !(getParent() instanceof View)) return;
+    int bottom = controller.getFloatingMenuAnchorBottom();
+    if (bottom == 0) return;
+    ((View) getParent()).getLocationOnScreen(parentLocation);
+    setTranslationY(bottom + Screen.dp(org.thunderdog.challegram.widget.GlassMenuStyle.GAP_DP) - parentLocation[1] - getTop());
+    setTranslationX(Lang.rtl() ? Screen.dp(8f) : -Screen.dp(8f));
   }
 
   @Override protected void dispatchDraw (Canvas canvas) {
     int save = canvas.save();
     if (glass != null) {
       surfaceClip.reset();
-      surfaceClip.addRoundRect(0, 0, getWidth(), getHeight(), Screen.dp(26f), Screen.dp(26f), android.graphics.Path.Direction.CW);
+      surfaceClip.addRoundRect(0, 0, getWidth(), getHeight(), Screen.dp(org.thunderdog.challegram.widget.GlassMenuStyle.RADIUS_DP), Screen.dp(org.thunderdog.challegram.widget.GlassMenuStyle.RADIUS_DP), android.graphics.Path.Direction.CW);
       canvas.clipPath(surfaceClip);
     }
     super.dispatchDraw(canvas);
@@ -215,6 +247,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
     Drawable drawable = icon != 0 ? Drawables.get(getResources(), icon) : null;
     menuItem.setGravity(Gravity.CENTER_VERTICAL | Lang.gravity());
     menuItem.setVisibility(View.VISIBLE);
+    styleTextItem(menuItem);
     if (drawable != null) {
       drawable.setColorFilter(Paints.getColorFilter(Theme.getColor(glassIconColorId())));
       if (themeProvider != null) {
@@ -441,7 +474,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
       }
     }
     Views.setClickable(menuItem);
-    RippleSupport.setTransparentSelector(menuItem);
+    styleTextItem(menuItem);
     itemsLayout.addView(menuItem);
     menuItem.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
     menuItem.setTag(menuItem.getMeasuredWidth());
@@ -455,7 +488,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
 
   @Override
   public int getItemsWidth () {
-    int padding = Screen.dp(PADDING);
+    int padding = glass != null ? getPaddingLeft() + getPaddingRight() : Screen.dp(PADDING) * 2;
     int childCount = getChildCount();
     int maxWidth = 0;
     for (int i = 0; i < childCount; i++) {
@@ -464,7 +497,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
         maxWidth = Math.max(maxWidth, (Integer) v.getTag());
       }
     }
-    return Math.max(getMinimumWidth(), maxWidth + padding + padding);
+    return Math.max(getMinimumWidth(), maxWidth + padding);
   }
 
   private boolean shouldPivotBottom;
@@ -481,7 +514,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   @Override
   public int getItemsHeight () {
     int itemHeight = Screen.dp(ITEM_HEIGHT);
-    int padding = Screen.dp(PADDING);
+    int padding = glass != null ? getPaddingTop() + getPaddingBottom() : Screen.dp(PADDING) * 2;
     int total = 0;
     int childCount = getChildCount();
     for (int i = 0; i < childCount; i++) {
@@ -490,7 +523,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
         total += itemHeight;
       }
     }
-    return total + padding + padding;
+    return total + padding;
   }
 
   private @Nullable Runnable pendingAction;
@@ -503,6 +536,7 @@ public class MenuMoreWrap extends MenuMoreWrapAbstract implements Animated {
   @Override
   protected void onLayout (boolean changed, int l, int t, int r, int b) {
     super.onLayout(changed, l, t, r, b);
+    updateGlassPosition();
     if (pendingAction != null) {
       pendingAction.run();
       pendingAction = null;
