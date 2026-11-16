@@ -48,7 +48,10 @@ This is the reference for new and existing floating UI. Shared implementation:
   Keep the stock continuous avatar-to-compact-header motion, image viewer origin,
   search/media transitions and hit targets. Expanded name/status begin 26dp
   from the start edge, aligned with the back-arrow glyph. Compact avatar/text
-  keep their usual layout.
+  keep their usual layout. The expanded-avatar spacer reserves height only:
+  never draw a rectangular filling behind the rounded avatar/header.
+  Clip photograph scrims to the avatar's current bounds and radius throughout
+  its collapse, so they cannot tint a rectangle outside the shrinking photo.
 - Use white text/icons only over the expanded photograph, blending continuously
   from glass roles as the photograph expands. A missing avatar must remain legible.
 - Without a photo, keep the round placeholder and centre its information group
@@ -73,16 +76,19 @@ This is the reference for new and existing floating UI. Shared implementation:
   sampling for inactive pages and release closed-menu backdrops.
 - Normal profile information/action rows form rounded groups with 8dp side
   margins and 26dp outer corners. Use a quiet accent-derived filling, 14% accent
-  press feedback and inset separators at 10% glass text opacity. Keep row heights
-  and actions; measure multiline text at the inset row width. Leave settings and
+  press feedback and inset separators at 10% glass text opacity. Profile values
+  use 18sp, descriptions 17sp, captions 15sp and icons 28dp. Use 88dp information
+  rows (grow multiline rows), with one aligned text column 64dp from the card
+  start and 20dp end padding. Measure text with those same sizes and insets. Leave settings and
   profile editing screens unchanged. Clip group corners and press feedback together.
   Software backdrop capture draws the row's stable filling without executing its
   live RippleDrawable, preserving the RenderThread press animation.
 - Profile media tabs use a separate glass island, semantic glass colours and
-  capsule selection/press feedback. Before pinning, rest the panel 8dp lower and
-  cover the side gutters so switching pages cannot expose moving date labels.
-  Fade that section backing and extra offset smoothly over the final 48dp of
-  approach. Pin it 6dp below the main header; media rows
+  capsule selection/press feedback. Dates such as Today/Yesterday/month/year
+  remain visible below the tabs from the initial view. Reserve space for the
+  full tab panel before the first media header, and synchronize nested scrolling
+  through the full profile range. Do not mask the date headers or add opaque
+  backing. Pin the panel 6dp below the main header; media rows
   continue behind both islands to the top edge. Preserve the existing media
   search/selection actions, avatar collapse and nested-scroll coordinates.
   Hide the old opaque merging bridge and shadow. Exclude glass panels from

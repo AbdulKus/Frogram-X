@@ -1090,7 +1090,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     int position = baseRecyclerView.getChildAdapterPosition(row);
     if (position < 0 || position >= baseAdapter.getItemCount()) return true;
     int type = baseAdapter.getItemViewType(position);
-    if (type == ListItem.TYPE_SHADOW_TOP || type == ListItem.TYPE_SHADOW_BOTTOM) return false;
+    if (type == ListItem.TYPE_SHADOW_TOP || type == ListItem.TYPE_SHADOW_BOTTOM || type == ListItem.TYPE_EMPTY_OFFSET) return false;
     if (!isProfileCardPart(type)) return true;
     float left = row.getX(), top = row.getY();
     profileRowBounds.set(left, top, left + row.getWidth(), top + row.getHeight());
@@ -1106,7 +1106,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       org.thunderdog.challegram.widget.SeparatorView separator = (org.thunderdog.challegram.widget.SeparatorView) row;
       separator.forceFillingColor(org.thunderdog.challegram.widget.ProfileCardBackground.fillingColor());
       separator.forceColor(ColorUtils.alphaColor(.10f, Theme.getColor(ColorId.glassText)));
-      separator.setOffsets(Screen.dp(type == ListItem.TYPE_SEPARATOR_FULL ? 16f : 73f), Screen.dp(16f));
+      separator.setOffsets(Screen.dp(type == ListItem.TYPE_SEPARATOR_FULL ? 16f : 64f), Screen.dp(20f));
     }
     return true;
   }
@@ -1423,10 +1423,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   private void setTopTranslationY (float y) {
     // Keep the secondary island below the compact header with the shared 6dp gap.
     float pinned = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
-    float distance = me.vkryl.core.MathUtils.clamp((y - pinned) / Screen.dp(48f));
-    float resting = distance * distance * (3f - 2f * distance);
-    topWrap.setSectionBacking(resting);
-    y = Math.max(y, pinned) + Screen.dp(8f) * resting;
+    y = Math.max(y, pinned);
     if (topWrap.getTranslationY() != y) {
       topWrap.setTranslationY(y);
       float headerHeight = HeaderView.getSize(true);
@@ -1650,7 +1647,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       baseRecyclerView = new CustomRecyclerView(context) {
         @Override public boolean drawChild (Canvas canvas, View child, long time) {
           int save = canvas.save();
-          boolean result = !clipProfileRow(canvas, child) || super.drawChild(canvas, child, time);
+          boolean result = clipProfileRow(canvas, child) && super.drawChild(canvas, child, time);
           canvas.restoreToCount(save);
           return result;
         }
@@ -1676,7 +1673,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       baseRecyclerView = new ComplexRecyclerView(context, this) {
         @Override public boolean drawChild (Canvas canvas, View child, long time) {
           int save = canvas.save();
-          boolean result = !clipProfileRow(canvas, child) || super.drawChild(canvas, child, time);
+          boolean result = clipProfileRow(canvas, child) && super.drawChild(canvas, child, time);
           canvas.restoreToCount(save);
           return result;
         }
@@ -1792,15 +1789,21 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     baseAdapter = new SettingsAdapter(this) {
       @Override public void onBindViewHolder (SettingHolder holder, int position) {
         super.onBindViewHolder(holder, position);
+        if (!isEditing() && getItemViewType(position) == ListItem.TYPE_EMPTY_OFFSET) holder.itemView.setBackground(null);
         if (!isEditing() && isProfileCardRow(getItemViewType(position)) &&
             !(holder.itemView.getBackground() instanceof org.thunderdog.challegram.widget.ProfileCardBackground)) {
           holder.itemView.setBackground(new org.thunderdog.challegram.widget.ProfileCardBackground());
         }
       }
 
-      @Override public void modifySettingView (int type, SettingView view) {
-        super.modifySettingView(type, view);
-        if (!isEditing()) view.setIconColorId(ColorId.glassIcon);
+      @Override public SettingHolder onCreateViewHolder (ViewGroup parent, int type) {
+        SettingHolder holder = super.onCreateViewHolder(parent, type);
+        if (!isEditing() && isProfileCardRow(type) && holder.itemView instanceof SettingView) {
+          SettingView view = (SettingView) holder.itemView;
+          view.setIconColorId(ColorId.glassIcon);
+          view.setProfileInformationStyle(true);
+        }
+        return holder;
       }
 
       @Override
@@ -2447,8 +2450,8 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   private TextWrapper aboutWrapper;
   private TdApi.FormattedText currentAbout;
 
-  private static int getTextWidth (int width) {
-    return Math.max(0, width - Screen.dp(73f) - Screen.dp(17f));
+  private int getTextWidth (int width) {
+    return Math.max(0, width - Screen.dp(isEditing() ? 73f : 64f) - Screen.dp(isEditing() ? 17f : 20f));
   }
 
   private boolean setDescription (String text) {
@@ -2468,7 +2471,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       currentAbout = text;
       if (text != null) {
         // TODO: custom emoji support
-        aboutWrapper = new TextWrapper(tdlib, text, Paints.robotoStyleProvider(15f), TextColorSets.Regular.NORMAL, new TdlibUi.UrlOpenParameters().sourceChat(getChatId()), null);
+        aboutWrapper = new TextWrapper(tdlib, text, Paints.robotoStyleProvider(isEditing() ? 15f : 17f), TextColorSets.Regular.NORMAL, new TdlibUi.UrlOpenParameters().sourceChat(getChatId()), null);
         aboutWrapper.addTextFlags(Text.FLAG_CUSTOM_LONG_PRESS | (Lang.rtl() ? Text.FLAG_ALIGN_RIGHT : 0));
         aboutWrapper.prepare(getTextWidth(Screen.currentWidth()));
       } else {
@@ -5536,26 +5539,26 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     switch (item.getViewType()) {
       case ListItem.TYPE_INFO_MULTILINE: {
         if (itemId == R.id.btn_username) {
-          int availWidth = width - Screen.dp(73f) - Screen.dp(17f);
+          int availWidth = getTextWidth(width);
           if (availWidth <= 0) {
             lastUsernameAddHeight = 0;
             lastUsernameWidth = 0;
           } else {
             CharSequence sequence = getUsernameName();
             if (!StringUtils.equalsOrBothEmpty(sequence, lastUsernames) || lastUsernameWidth != availWidth) {
-              Text text = new Text.Builder(tdlib, sequence, null, availWidth, Paints.robotoStyleProvider(13f), TextColorSets.Regular.NORMAL, null).build();
+              Text text = new Text.Builder(tdlib, sequence, null, availWidth, Paints.robotoStyleProvider(isEditing() ? 13f : 15f), TextColorSets.Regular.NORMAL, null).build();
               lastUsernameAddHeight = text.getHeight() - text.getLineHeight();
               lastUsernameWidth = availWidth;
               lastUsernames = sequence;
             }
           }
-          return lastUsernameAddHeight + Screen.dp(76f);
+          return lastUsernameAddHeight + Screen.dp(isEditing() ? 76f : 88f);
         } else if (itemId == R.id.btn_description) {
           if (aboutWrapper != null) {
             aboutWrapper.get(getTextWidth(width));
-            return Math.max(aboutWrapper.getHeight() + Screen.dp(21f + 13f) - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f));
+            return isEditing() ? Math.max(aboutWrapper.getHeight() + Screen.dp(21f + 13f) - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f)) : Math.max(aboutWrapper.getHeight() + Screen.dp(64f), Screen.dp(88f));
           }
-          return Screen.dp(76f);
+          return Screen.dp(isEditing() ? 76f : 88f);
         }
         throw new UnsupportedOperationException();
       }
@@ -5575,6 +5578,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
         return viewHeight;
       }
     }
+    if (!isEditing() && isProfileCardRow(item.getViewType())) return Screen.dp(item.getViewType() == ListItem.TYPE_SETTING ? 64f : 88f);
     return SettingHolder.measureHeightForType(item.getViewType());
   }
 
@@ -5809,7 +5813,8 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   public int maxItemsScrollYOffset () {
-    return maxItemsScrollY() - getPagerTopViewHeight() - getTopViewTopPadding();
+    // Match the space reserved below the media panel, including while unpinned.
+    return isEditing() ? maxItemsScrollY() - getPagerTopViewHeight() - getTopViewTopPadding() : maxItemsScrollY();
   }
 
   public int getItemsBound () {
@@ -5817,7 +5822,8 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private int contentTop () {
-    return getTopItemsHeight() - getPagerTopViewHeight() + getTopViewTopPadding() - ShadowView.simpleTopShadowHeight();
+    // Date headers start below the complete panel instead of underneath its glass.
+    return getTopItemsHeight() - getPagerTopViewHeight() + getTopViewTopPadding() - ShadowView.simpleTopShadowHeight() + (isEditing() ? 0 : getPagerTopViewHeight() + getTopViewTopPadding());
   }
 
   // Shared stuff

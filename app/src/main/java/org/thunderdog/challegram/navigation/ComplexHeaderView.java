@@ -780,6 +780,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
   private final android.graphics.Paint floatingPhotoPaint = new android.graphics.Paint();
   private int floatingPhotoTop = -1;
   private final android.graphics.Path floatingCardClip = new android.graphics.Path();
+  private final android.graphics.Path floatingPhotoClip = new android.graphics.Path();
   public void setFloatingCard (boolean enabled) { floatingCard = enabled; invalidate(); }
 
   private boolean glassTextColors;
@@ -925,6 +926,16 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
         receiver.drawPlaceholderRounded(c, receiver.getDisplayRadius(), Theme.headerPlaceholderColor());
       }
       receiver.draw(c);
+      // Photo scrims must shrink with the avatar, rather than tinting the empty
+      // area of the glass card while the photograph becomes a circle.
+      final boolean clipPhotoScrims = floatingCard && avatarExpandFactor > 0f;
+      if (clipPhotoScrims) {
+        c.save();
+        floatingPhotoClip.reset();
+        floatingPhotoClip.addRoundRect(receiver.getLeft(), receiver.getTop(), receiver.getRight(), receiver.getBottom(),
+          receiver.getDisplayRadius(), receiver.getDisplayRadius(), android.graphics.Path.Direction.CW);
+        c.clipPath(floatingPhotoClip);
+      }
       if (floatingCard && avatarExpandFactor > 0f) {
         int top = currentHeaderOffset + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
         if (floatingPhotoTop != top) {
@@ -948,6 +959,7 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
         getBottomShadow().draw(c);
         c.restore();
       }
+      if (clipPhotoScrims) c.restore();
 
       float baseTextLeft = innerLeftMargin + Screen.dp(4f) + Screen.dp(getBaseAvatarRadiusDp()) * 2 + Screen.dp(9f);
       float baseTitleTop = currentHeaderOffset + Screen.dp(7f) + getPlaceholderOffset();
