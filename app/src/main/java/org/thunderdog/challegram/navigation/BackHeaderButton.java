@@ -201,7 +201,7 @@ public class BackHeaderButton extends HeaderButton implements View.OnClickListen
       float badgeCenterX = endX;
       float badgeCenterY = -endY - Screen.dp(1.5f);
       float badgeVisibility = MathUtils.clamp(1f - factor) * menuHintBadgeVisible.getFloatValue();
-      if (badgeVisibility > 0f) {
+      if (badgeVisibility > 0f && parentHeader != null && parentHeader.shouldDrawMenuBadge()) {
         int cutoutColor = parentHeader.getFilling().getColor();
         int badgeColor = ColorUtils.alphaColor(MathUtils.clamp(badgeVisibility), menuHintBadgeColor.getIntValue());
         c.drawCircle(badgeCenterX, badgeCenterY, Screen.dp(4.5f) * badgeVisibility, Paints.fillingPaint(cutoutColor));

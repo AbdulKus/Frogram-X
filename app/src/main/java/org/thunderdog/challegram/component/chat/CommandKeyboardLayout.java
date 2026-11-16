@@ -16,7 +16,9 @@ package org.thunderdog.challegram.component.chat;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -32,6 +34,8 @@ import android.widget.ScrollView;
 import androidx.annotation.Nullable;
 
 import org.drinkless.tdlib.TdApi;
+import org.thunderdog.challegram.FillingDrawable;
+import org.thunderdog.challegram.tool.Fonts;
 import org.thunderdog.challegram.navigation.ViewController;
 import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.theme.ColorId;
@@ -44,6 +48,7 @@ import org.thunderdog.challegram.widget.CustomEmojiTextView;
 import org.thunderdog.challegram.widget.TextView;
 
 import me.vkryl.android.ViewUtils;
+import me.vkryl.core.ColorUtils;
 import me.vkryl.core.lambda.Destroyable;
 
 public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver.OnPreDrawListener, View.OnAttachStateChangeListener, View.OnClickListener, Destroyable {
@@ -103,6 +108,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
 
   public void setThemeProvider (@Nullable ViewController<?> themeProvider) {
     this.themeProvider = themeProvider;
+    minSize = Screen.dp(glassColors() ? 48f : 42f);
   }
 
   public void setCallback (Callback callback) {
@@ -187,12 +193,13 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
       themeProvider.addThemeInvalidateListener(text);
     }
     text.setGravity(Gravity.CENTER);
-    text.setPadding(Screen.dp(10f), Screen.dp(4f), Screen.dp(10f), Screen.dp(4f));
+    text.setPadding(Screen.dp(12f), Screen.dp(6f), Screen.dp(12f), Screen.dp(6f));
     text.setTextColor(Theme.textAccentColor());
     if (themeProvider != null) {
       themeProvider.addThemeTextColorListener(text, glassColors() ? ColorId.glassIcon : ColorId.text);
     }
-    text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16f);
+    text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f);
+    text.setTypeface(Fonts.getRobotoMedium());
     text.setOnClickListener(this);
     //noinspection ResourceType
     text.setLayoutParams(new MarginLayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
@@ -225,12 +232,28 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
       themeProvider.addThemeTextColorListener(text, contentColorId);
     }
     if (color == 0) {
-      ViewUtils.setBackground(text, Theme.rectSelector(18f, 0f, ColorId.chatKeyboardButton));
+      ViewUtils.setBackground(text, glassColors() ? glassButtonBackground() : Theme.rectSelector(18f, 0f, ColorId.chatKeyboardButton));
       text.setTextColor(Theme.getColor(contentColorId));
     } else {
       ViewUtils.setBackground(text, coloredButtonBackground(color));
       text.setTextColor(Color.WHITE);
     }
+  }
+
+  private Drawable glassButtonBackground () {
+    FillingDrawable filling = new FillingDrawable(ColorId.glassActive, 10f);
+    filling.setAlphaFactor(.06f);
+    GradientDrawable mask = new GradientDrawable();
+    mask.setColor(Color.WHITE);
+    mask.setCornerRadius(Screen.dp(10f));
+    return new RippleDrawable(ColorStateList.valueOf(Color.TRANSPARENT), filling, mask) {
+      private int tint;
+      @Override public void draw (Canvas canvas) {
+        int color = ColorUtils.alphaColor(.08f, Theme.getColor(ColorId.glassActive));
+        if (tint != color) { tint = color; setColor(ColorStateList.valueOf(color)); }
+        super.draw(canvas);
+      }
+    };
   }
 
   private static int buttonStyleColor (TdApi.ButtonStyle style) {
@@ -246,7 +269,7 @@ public class CommandKeyboardLayout extends ViewGroup implements ViewTreeObserver
   private static GradientDrawable coloredButton (int color) {
     GradientDrawable drawable = new GradientDrawable();
     drawable.setColor(color);
-    drawable.setCornerRadius(Screen.dp(18f));
+    drawable.setCornerRadius(Screen.dp(10f));
     return drawable;
   }
 

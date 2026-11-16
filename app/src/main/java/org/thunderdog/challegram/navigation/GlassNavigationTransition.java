@@ -258,11 +258,9 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     progress = 0f;
     prepared = false;
     lastBackdropUpdate = 0;
-    int color = ChatGlassDrawable.surfaceColor(ColorId.filling);
-    int fadeHeight = header.getEffectiveTopOffset() + Screen.dp(24f);
-    status.setShader(new LinearGradient(0, 0, 0, Math.max(1, fadeHeight),
-      new int[] {ColorUtils.alphaColor(.65f, color), ColorUtils.alphaColor(.32f, color), ColorUtils.alphaColor(0f, color)},
-      new float[] {0f, .55f, 1f}, Shader.TileMode.CLAMP));
+    int color = org.thunderdog.challegram.util.StatusBarScrim.backgroundColor();
+    int fadeHeight = header.getEffectiveTopOffset() + Screen.dp(28f);
+    status.setShader(org.thunderdog.challegram.util.StatusBarScrim.create(color, header.getEffectiveTopOffset(), fadeHeight));
     observer = getViewTreeObserver();
     observer.addOnPreDrawListener(this);
     setVisibility(VISIBLE);

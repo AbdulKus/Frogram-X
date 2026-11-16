@@ -944,6 +944,19 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     }
   }
 
+  /** The same animated colour used by this tab's label and icon. */
+  public int getItemTextColor (int itemIndex) {
+    int from = fromTextColorId != ColorId.NONE ?
+      ColorUtils.alphaColor(fromTextColorAlphaId != PropertyId.NONE ? Theme.getProperty(fromTextColorAlphaId) : 1f, Theme.getColor(fromTextColorId)) :
+      ColorUtils.alphaColor(Theme.getSubtitleAlpha(), Theme.getColor(ColorId.headerText));
+    return ColorUtils.fromToArgb(from, Theme.getColor(toTextColorId),
+      getItemSelectionFactor(itemIndex, selectionFactor) * (1f - disabledFactor));
+  }
+
+  public float getItemSelectionFactor (int itemIndex) {
+    return getItemSelectionFactor(itemIndex, selectionFactor) * (1f - disabledFactor);
+  }
+
   public float getSelectionFactor () {
     return selectionFactor;
   }

@@ -384,14 +384,12 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
           MainController.this.context().getRootView().getTopInset() + Screen.dp(3f), Screen.dp(8f), 0));
       }
       @Override protected void onDraw (Canvas canvas) {
-        int height = MainController.this.context().getRootView().getTopInset() + Screen.dp(24f);
-        int color = ChatGlassDrawable.surfaceColor(ColorId.filling);
+        int height = MainController.this.context().getRootView().getTopInset() + Screen.dp(28f);
+        int color = org.thunderdog.challegram.util.StatusBarScrim.backgroundColor();
         if (height != mainStatusHeight || color != mainStatusColor) {
           mainStatusHeight = height;
           mainStatusColor = color;
-          mainStatusPaint.setShader(new android.graphics.LinearGradient(0, 0, 0, height,
-            new int[] {ColorUtils.alphaColor(.65f, color), ColorUtils.alphaColor(.32f, color), ColorUtils.alphaColor(0f, color)},
-            new float[] {0f, .55f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+          mainStatusPaint.setShader(org.thunderdog.challegram.util.StatusBarScrim.create(color, MainController.this.context().getRootView().getTopInset(), height));
         }
         canvas.drawRect(0, 0, getWidth(), height, mainStatusPaint);
       }
@@ -2069,7 +2067,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
   private ViewPagerTopView.Item getDefaultMainItem () {
     if (defaultMainItem == null) {
       CharSequence mainItem = getMenuSectionName(MAIN_PAGER_ITEM_ID, 0, false, ChatFolderStyle.LABEL_ONLY,  /* upperCase */ true);
-      UnreadCounterColorSet unreadCounterColorSet = UnreadCounterColorSet.create(this);
+      UnreadCounterColorSet unreadCounterColorSet = UnreadCounterColorSet.create(this, MAIN_PAGER_ITEM_ID);
       Counter unreadCounter = new Counter.Builder()
         .textSize(12f)
         .backgroundPadding(4f)
@@ -3265,7 +3263,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     if (selectedFilter != FILTER_NONE || (pagerItemId == MAIN_PAGER_ITEM_ID && menuNeedArchive)) {
       return null;
     }
-    UnreadCounterColorSet unreadCounterColorSet = UnreadCounterColorSet.create(this);
+    UnreadCounterColorSet unreadCounterColorSet = UnreadCounterColorSet.create(this, pagerItemId);
     Counter unreadCounter = new Counter.Builder()
       .textSize(12f)
       .backgroundPadding(4f)
@@ -3329,14 +3327,18 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     private @Nullable Counter counter;
     private final FutureBool displayTabsAtBottom;
     private FutureBool floatingHeader = () -> false;
+    private MainController parent;
+    private long pagerItemId;
 
     public UnreadCounterColorSet (FutureBool displayTabsAtBottom) {
       this.displayTabsAtBottom = displayTabsAtBottom;
     }
 
-    private static UnreadCounterColorSet create(MainController parent) {
+    private static UnreadCounterColorSet create(MainController parent, long pagerItemId) {
       UnreadCounterColorSet colors = new UnreadCounterColorSet(parent::displayTabsAtBottom);
       colors.floatingHeader = parent::hasFloatingHeader;
+      colors.parent = parent;
+      colors.pagerItemId = pagerItemId;
       return colors;
     }
 
@@ -3347,18 +3349,26 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     @ColorInt
     @Override
     public int defaultTextColor () {
+      if (floatingHeader.getBoolValue()) {
+        float fill = selectionFactor() * (counter != null ? 1f - counter.getMuteFactor() : 1f);
+        return ColorUtils.fromToArgb(backgroundColor(), foregroundColor(), fill);
+      }
       return counter != null ? ColorUtils.fromToArgb(foregroundColor(), backgroundColor(), counter.getMuteFactor()) : foregroundColor();
     }
 
     @ColorInt
     @Override
     public int backgroundColor (boolean isPressed) {
+      if (floatingHeader.getBoolValue()) {
+        return ColorUtils.alphaColor(selectionFactor() * (counter != null ? 1f - counter.getMuteFactor() : 1f), backgroundColor());
+      }
       return counter != null ? ColorUtils.alphaColor(1f - counter.getMuteFactor(), backgroundColor()) : backgroundColor();
     }
 
     @ColorInt
     @Override
     public int outlineColor (boolean isPressed) {
+      if (floatingHeader.getBoolValue()) return Color.TRANSPARENT;
       return counter != null ? backgroundColor() : Color.TRANSPARENT;
     }
 
@@ -3367,9 +3377,19 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
       return Theme.getColor(floatingHeader.getBoolValue() ? ColorId.filling : displayTabsAtBottom.getBoolValue() ? ColorId.headerLightBackground : ColorId.headerBackground);
     }
 
+    private float selectionFactor () {
+      int position = parent != null ? parent.getPagerItemPosition(pagerItemId) : NO_POSITION;
+      return position != NO_POSITION && parent.headerCell != null ? parent.headerCell.getTopView().getItemSelectionFactor(position) : 0f;
+    }
+
     @ColorInt
     private int backgroundColor() {
-      return Theme.getColor(floatingHeader.getBoolValue() ? ColorId.glassIcon : displayTabsAtBottom.getBoolValue() ? ColorId.headerLightText : ColorId.headerText);
+      if (floatingHeader.getBoolValue()) {
+        int position = parent != null ? parent.getPagerItemPosition(pagerItemId) : NO_POSITION;
+        if (position != NO_POSITION && parent.headerCell != null) return parent.headerCell.getTopView().getItemTextColor(position);
+        return Theme.getColor(ColorId.glassIcon);
+      }
+      return Theme.getColor(displayTabsAtBottom.getBoolValue() ? ColorId.headerLightText : ColorId.headerText);
     }
   }
 

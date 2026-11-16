@@ -955,14 +955,12 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void drawStatusFade (Canvas c, int width) {
-    int fadeHeight = context().getRootView().getTopInset() + Screen.dp(24f);
-    int fadeColor = ChatGlassDrawable.surfaceColor(ColorId.filling);
+    int fadeHeight = context().getRootView().getTopInset() + Screen.dp(28f);
+    int fadeColor = org.thunderdog.challegram.util.StatusBarScrim.backgroundColor();
     if (statusFadeHeight != fadeHeight || statusFadeColor != fadeColor) {
       statusFadeHeight = fadeHeight;
       statusFadeColor = fadeColor;
-      statusFadePaint.setShader(new android.graphics.LinearGradient(0, 0, 0, fadeHeight,
-        new int[] {ColorUtils.alphaColor(.65f, fadeColor), ColorUtils.alphaColor(.32f, fadeColor), ColorUtils.alphaColor(0f, fadeColor)},
-        new float[] {0f, .55f, 1f}, android.graphics.Shader.TileMode.CLAMP));
+      statusFadePaint.setShader(org.thunderdog.challegram.util.StatusBarScrim.create(fadeColor, context().getRootView().getTopInset(), fadeHeight));
     }
     c.drawRect(0, 0, width, fadeHeight, statusFadePaint);
   }

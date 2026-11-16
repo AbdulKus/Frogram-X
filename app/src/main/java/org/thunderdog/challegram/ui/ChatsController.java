@@ -104,6 +104,10 @@ import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Test;
 import org.thunderdog.challegram.util.Poller;
+import org.thunderdog.challegram.util.FloatingPlayerGeometry;
+import org.thunderdog.challegram.util.StatusBarScrim;
+import org.thunderdog.challegram.v.CustomRecyclerView;
+import org.thunderdog.challegram.widget.ChatGlassDrawable;
 import org.thunderdog.challegram.util.RateLimiter;
 import org.thunderdog.challegram.util.StringList;
 import org.thunderdog.challegram.v.ChatsRecyclerView;
@@ -467,6 +471,144 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
     return list;
   }
 
+  // Standalone archive screens share the same shell and content insets as chats.
+  private View archiveGlassView, archivePlayerView;
+  private ChatGlassDrawable archiveGlass, archivePlayerGlass;
+  private CustomRecyclerView archiveSearchView;
+  private float archivePlayerOffset;
+  private final int[] archiveRootPosition = new int[2], archiveListPosition = new int[2];
+
+  @Override public boolean hasFloatingHeader () {
+    return parentController == null && pickerDelegate == null && !isInForceTouchMode() && TD.isChatListArchive(chatList());
+  }
+  @Override public boolean hasFloatingPlayer () { return hasFloatingHeader(); }
+  @Override public int getHeaderControlsInset () { return hasFloatingHeader() ? Screen.dp(4.5f) : 0; }
+  @Override public boolean allowLayerTypeChanges () { return !hasFloatingHeader(); }
+  @Override protected int getHeaderIconColorId () { return hasFloatingHeader() ? ColorId.glassIcon : super.getHeaderIconColorId(); }
+  @Override protected int getHeaderTextColorId () { return hasFloatingHeader() ? ColorId.glassText : super.getHeaderTextColorId(); }
+  @Override protected int getSearchTextColorId () { return hasFloatingHeader() ? ColorId.glassText : super.getSearchTextColorId(); }
+  @Override protected int getSelectHeaderIconColorId () { return hasFloatingHeader() ? ColorId.glassIcon : super.getSelectHeaderIconColorId(); }
+  @Override protected int getSelectTextColorId () { return hasFloatingHeader() ? ColorId.glassText : super.getSelectTextColorId(); }
+  @Override public boolean drawHeaderBackground (Canvas c, HeaderView header, int width, int height, int color) {
+    return hasFloatingHeader() && archiveGlassView != null;
+  }
+  @Override public org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene createGlassNavigationScene () {
+    return archiveGlass == null ? null : new org.thunderdog.challegram.navigation.GlassNavigationTransition.Scene(getValue(), archiveGlassView, archiveGlass)
+      .player(archivePlayerView, archivePlayerGlass);
+  }
+  @Override public void invalidateFloatingPlayer () {
+    if (archivePlayerView != null) archivePlayerView.invalidate();
+  }
+  @Override protected boolean applyPlayerOffset (float factor, float top) {
+    if (!hasFloatingHeader()) return super.applyPlayerOffset(factor, top);
+    archivePlayerOffset = top;
+    updateArchiveGlassGeometry();
+    invalidateFloatingPlayer();
+    return true;
+  }
+  @Override protected void applySearchTransformFactor (float factor, boolean isOpening) {
+    super.applySearchTransformFactor(factor, isOpening);
+    invalidateArchiveGlass(null);
+  }
+
+  private int archiveHeaderOverflow () {
+    return hasFloatingHeader() ? getHeaderHeight() + context().getRootView().getTopInset() : 0;
+  }
+  private void invalidateArchiveGlass (View changed) {
+    if (archiveGlass != null) archiveGlass.invalidateBackdrop(changed);
+    if (archivePlayerGlass != null) archivePlayerGlass.invalidateBackdrop(changed);
+  }
+  private void drawArchiveList (Canvas canvas, CustomRecyclerView list) {
+    if (list == null || !list.isShown() || list.getAlpha() <= 0f) return;
+    list.getLocationInWindow(archiveListPosition);
+    int save = canvas.save();
+    canvas.translate(archiveListPosition[0] - archiveRootPosition[0], archiveListPosition[1] - archiveRootPosition[1]);
+    if (canvas.clipRect(0, 0, list.getWidth(), list.getHeight())) {
+      if (list.getAlpha() < 1f) canvas.saveLayerAlpha(0, 0, list.getWidth(), list.getHeight(), Math.round(list.getAlpha() * 255f));
+      list.drawForGlass(canvas);
+    }
+    canvas.restoreToCount(save);
+  }
+  private void drawArchiveBackdrop (Canvas canvas) {
+    canvas.drawColor(Theme.fillingColor());
+    contentView.getLocationInWindow(archiveRootPosition);
+    drawArchiveList(canvas, chatsView);
+    drawArchiveList(canvas, archiveSearchView);
+  }
+  private void updateArchiveListInsets (CustomRecyclerView list, int overflow, int padding) {
+    if (list == null) return;
+    Views.setTopMargin(list, -overflow);
+    if (list.getPaddingTop() != padding) list.setPadding(list.getPaddingLeft(), padding, list.getPaddingRight(), list.getPaddingBottom());
+    if (list.getClipToPadding()) list.setClipToPadding(false);
+    list.setGlassOverlay(true);
+  }
+  private void updateArchiveGlassGeometry () {
+    if (archiveGlassView == null) return;
+    int overflow = archiveHeaderOverflow();
+    Views.setTopMargin(archiveGlassView, -overflow);
+    Views.setLayoutHeight(archiveGlassView, overflow + Screen.dp(6f));
+    int padding = overflow + Screen.dp(6f) + FloatingPlayerGeometry.inset(archivePlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f));
+    updateArchiveListInsets(chatsView, overflow, padding);
+    updateArchiveListInsets(archiveSearchView, overflow, padding);
+    Views.setTopMargin(archivePlayerView, Screen.dp(12f));
+    Views.setLayoutHeight(archivePlayerView, HeaderView.getPlayerSize());
+    float visibility = FloatingPlayerGeometry.visibility(archivePlayerOffset, HeaderView.getPlayerSize());
+    archivePlayerView.setAlpha(visibility);
+    archivePlayerView.setTranslationY(-Screen.dp(8f) * (1f - visibility));
+    archivePlayerView.setVisibility(visibility > 0f ? View.VISIBLE : View.GONE);
+    invalidateArchiveGlass(null);
+  }
+  private void createArchiveGlass (Context context) {
+    archiveGlassView = new View(context) {
+      private final Paint fade = new Paint();
+      private int fadeHeight, fadeColor;
+      @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+        setBackground(new android.graphics.drawable.InsetDrawable(archiveGlass, Screen.dp(8f),
+          ChatsController.this.context().getRootView().getTopInset() + Screen.dp(3f), Screen.dp(8f), 0));
+      }
+      @Override protected void onDraw (Canvas canvas) {
+        int inset = ChatsController.this.context().getRootView().getTopInset();
+        int height = inset + Screen.dp(28f), color = StatusBarScrim.backgroundColor();
+        if (height != fadeHeight || color != fadeColor) {
+          fadeHeight = height; fadeColor = color;
+          fade.setShader(StatusBarScrim.create(color, inset, height));
+        }
+        canvas.drawRect(0, 0, getWidth(), height, fade);
+      }
+    };
+    archiveGlass = new ChatGlassDrawable(contentView, archiveGlassView, ColorId.filling, this::drawArchiveBackdrop);
+    archiveGlassView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    contentView.addView(archiveGlassView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+    addThemeInvalidateListener(archiveGlassView);
+    archivePlayerView = new View(context) {
+      private final android.graphics.Path clip = new android.graphics.Path();
+      @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+        archivePlayerGlass.setBounds(Screen.dp(8f), 0, w - Screen.dp(8f), h);
+      }
+      @Override protected void onDraw (Canvas canvas) {
+        if (headerView == null) return;
+        archivePlayerGlass.draw(canvas);
+        int save = canvas.save();
+        clip.reset();
+        clip.addRoundRect(Screen.dp(8f), 0, getWidth() - Screen.dp(8f), getHeight(), Screen.dp(18f), Screen.dp(18f), android.graphics.Path.Direction.CW);
+        canvas.clipPath(clip);
+        headerView.getFilling().drawFloatingPlayer(canvas, getHeight());
+        canvas.restoreToCount(save);
+      }
+      @Override public boolean onTouchEvent (MotionEvent event) {
+        return headerView != null && headerView.getFilling().onFloatingPlayerTouch(event, getHeight());
+      }
+    };
+    archivePlayerGlass = new ChatGlassDrawable(contentView, archivePlayerView, ColorId.filling, this::drawArchiveBackdrop);
+    contentView.addView(archivePlayerView, FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, 0));
+    addThemeInvalidateListener(archivePlayerView);
+    chatsView.setBackdropRegionInvalidationListener(this::invalidateArchiveGlass);
+    if (archiveSearchView != null) archiveSearchView.setBackdropRegionInvalidationListener(this::invalidateArchiveGlass);
+    if (headerView != null) archivePlayerOffset = headerView.getFilling().getPlayerOffset();
+    contentView.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> updateArchiveGlassGeometry());
+    updateArchiveGlassGeometry();
+  }
+
   private TdlibMessageViewer.Viewport chatsViewport;
 
   @Override
@@ -485,7 +627,16 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
     list();
     updateNetworkStatus(tdlib.connectionState());
 
-    contentView = new ContentFrameLayout(context);
+    contentView = new ContentFrameLayout(context) {
+      @Override protected void dispatchDraw (Canvas canvas) {
+        int save = canvas.save();
+        canvas.clipRect(0, -archiveHeaderOverflow(), getWidth(), getHeight());
+        super.dispatchDraw(canvas);
+        canvas.restoreToCount(save);
+      }
+    };
+    contentView.setClipChildren(!hasFloatingHeader());
+    contentView.setClipToPadding(!hasFloatingHeader());
     contentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
     chatsViewport = tdlib.messageViewer().createViewport(new TdApi.MessageSourceChatList(), this);
@@ -602,7 +753,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
     checkDisplayProgress();
 
     if (!isBaseController()) {
-      generateChatSearchView(contentView);
+      archiveSearchView = generateChatSearchView(contentView);
     }
 
     updateNetworkStatus(tdlib.connectionState());
@@ -735,6 +886,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
 
     initializationTime = SystemClock.uptimeMillis();
 
+    if (hasFloatingHeader()) createArchiveGlass(context);
     return contentView;
   }
 
@@ -1155,6 +1307,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
   @Override
   public void onPrepareToShow () {
     super.onPrepareToShow();
+    updateArchiveGlassGeometry();
     if (isBaseController()) {
       if (headerView != null) {
         headerView.updateLockButton(getMenuId());
@@ -2093,7 +2246,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
 
   @Override
   protected int getSearchHeaderIconColorId () {
-    return ColorId.headerLightIcon;
+    return hasFloatingHeader() ? ColorId.glassIcon : ColorId.headerLightIcon;
   }
 
   // click listeners
@@ -2722,6 +2875,8 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
   @Override
   public void destroy () {
     super.destroy();
+    if (archiveGlass != null) archiveGlass.release();
+    if (archivePlayerGlass != null) archivePlayerGlass.release();
     if (liveLocationHelper != null) {
       liveLocationHelper.destroy();
     }

@@ -49,7 +49,7 @@ References:
 - [Material colour roles](https://m3.material.io/styles/color/roles)
 
 
-Android verification covered Blue, Black White, Red, Orange, Green, Pink, Cyan
+Android verification covered Blue, White Black, Red, Orange, Green, Pink, Cyan
 and Classic. AndroidX's independent contrast calculation reported a minimum of
 4.5002:1 against the conservative reference surface. The filter menu's displayed
 text matched its normal/selected roles. Composer and bot-keyboard text updated
@@ -62,3 +62,33 @@ Repaintable custom emoji in TextView-based bot buttons now inherit the current
 label colour instead of forcing `ColorId.text`. Non-repaintable emoji keep their
 own colours. Composer placeholder title/subtitle rendering uses the placeholder
 role as well as its paint/hint state.
+
+
+Both system-bar update paths share the floating-header foreground rule. This
+prevents navigation-bar colour updates from restoring white status icons over
+light glass in coloured themes such as Pink.
+
+
+The status scrim is neutral white/black according to the theme. It covers the
+entire status inset before fading over another 28dp, including during navigation.
+On Android 11+, WindowInsetsController exclusively owns icon appearance; legacy
+LIGHT_* flags no longer overwrite it. Focus/resume reapplies the requested status
+visibility and icon tone. Android 16 emulator verification passed 18 notification
+shade/quick-settings cycles across Blue/Pink/Night, Home/resume (including automatic
+day/night restoration), and fullscreen recovery. Android 17 hardware was not
+available for this verification.
+
+The standalone archive now uses floating header/player surfaces and the same
+foreground roles, with content/search padding extending behind the header.
+The main hamburger has no badge over its strokes. Bot keyboard keys use 48dp
+minimum height, medium-weight labels, 10dp inner corners, a 6% accent fill and
+an 8% accent ripple inside one shared glass panel.
+
+Folder counters derive their tone from their own tab's animated selection.
+Inactive and muted numbers match the tab label; the selected unmuted badge uses
+that tab's accent with the theme filling as its contrasting foreground. The
+shared selection calculation also handles jumps over intermediate tabs.
+`test_folder_counter_colors.py` executes production colour/selection methods.
+Android verification created and removed one owned test folder, checked all four
+tab styles on Blue/Pink/Night/Black White/Black, and checked archive shell/insets
+on those themes. Existing folders and chats were retained.

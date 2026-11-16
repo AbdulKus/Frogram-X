@@ -869,6 +869,29 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     }
   }
 
+  private final Runnable restoreSystemBars = () -> {
+    if (getActivityState() == UI.State.RESUMED && getWindow().getDecorView().hasWindowFocus()) {
+      updateWindowDecorSystemUiVisibility();
+    }
+  };
+
+  private void restoreSystemBarsAfterFocus () {
+    View decor = getWindow().getDecorView();
+    decor.removeCallbacks(restoreSystemBars);
+    decor.post(restoreSystemBars);
+  }
+
+  @Override
+  public void onWindowFocusChanged (boolean hasFocus) {
+    super.onWindowFocusChanged(hasFocus);
+    if (hasFocus && getActivityState() == UI.State.RESUMED) {
+      updateWindowDecorSystemUiVisibility();
+      restoreSystemBarsAfterFocus();
+    } else {
+      getWindow().getDecorView().removeCallbacks(restoreSystemBars);
+    }
+  }
+
   public void updateWindowDecorSystemUiVisibility () {
     setWindowDecorSystemUiVisibility(lastWindowVisibility, false);
   }
@@ -877,12 +900,21 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     getWindow().getContext().getTheme().applyStyle(Theme.isDark() ? R.style.AppTheme_Dark : R.style.AppTheme, true);
   }
 
+  private boolean hasGlassStatusBar () {
+    ViewController<?> controller = navigation != null ? navigation.getCurrentStackItem() : null;
+    return controller != null && controller.hasFloatingHeader();
+  }
+
+  private boolean useLightStatusBar () {
+    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+      (hasGlassStatusBar() ? !Theme.isDark() : Theme.needLightStatusBar());
+  }
+
   public void setWindowDecorSystemUiVisibility (int visibility, boolean remember) {
     boolean lightNavigationBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Config.USE_CUSTOM_NAVIGATION_COLOR && !Theme.isDark() && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
-    ViewController<?> statusController = navigation != null ? navigation.getCurrentStackItem() : null;
-    boolean glassHeader = statusController != null && statusController.hasFloatingHeader();
+    boolean glassHeader = hasGlassStatusBar();
     if (statusBar != null) statusBar.setFloatingHeader(glassHeader);
-    boolean lightStatusBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && (glassHeader ? !Theme.isDark() : Theme.needLightStatusBar());
+    boolean lightStatusBar = useLightStatusBar();
     UI.setLightSystemBars(getWindow(), lightNavigationBar, lightStatusBar, visibility, true);
     if (this.isWindowLight != lightNavigationBar) {
       this.isWindowLight = lightNavigationBar;
@@ -1156,6 +1188,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
       throw t;
     }
     checkAutoNightMode();
+    restoreSystemBarsAfterFocus();
     setGestureNavigationEnabled(Screen.isGesturalNavigationEnabled(getResources()));
     Intents.revokeFileReadPermissions();
     enableFocus();
@@ -3507,7 +3540,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
       UI.setNavigationBarColor(getWindow(), color, isGestureNavigationEnabled);
       if (this.isWindowLight != isLight) {
         this.isWindowLight = isLight;
-        UI.setLightSystemBars(getWindow(), isLight, Theme.needLightStatusBar(), lastWindowVisibility, true);
+        UI.setLightSystemBars(getWindow(), isLight, useLightStatusBar(), lastWindowVisibility, true);
       }
     }
   }

@@ -590,22 +590,36 @@ public class UI {
 
   @SuppressWarnings("deprecation")
   public static void setLightSystemBars (Window w, boolean lightNavigationBar, boolean lightStatusBar, int newVisibility, boolean forceNewVisibility) {
-    if (Settings.instance().useEdgeToEdge() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      android.view.WindowInsetsController insetsController = w.getInsetsController();
-      if (insetsController != null) {
-        int flags =
-          android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS |
+    View decor = w.getDecorView();
+    int previous = decor.getSystemUiVisibility();
+    int visibility = forceNewVisibility ? newVisibility : previous;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      // Insets own appearance on modern Android. Do not overwrite that state
+      // with deprecated LIGHT_* visibility flags afterwards.
+      int legacyAppearance = View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+      visibility = (visibility & ~legacyAppearance) | (previous & legacyAppearance);
+      if (visibility != previous) decor.setSystemUiVisibility(visibility);
+      android.view.WindowInsetsController controller = w.getInsetsController();
+      if (controller != null) {
+        int mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS |
           android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
-        int setFlags =
+        int appearance =
           BitwiseUtils.optional(android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS, lightNavigationBar) |
           BitwiseUtils.optional(android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS, lightStatusBar);
-        insetsController.setSystemBarsAppearance(setFlags, flags);
+        controller.setSystemBarsAppearance(appearance, mask);
+        if (forceNewVisibility) {
+          if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0) {
+            controller.hide(android.view.WindowInsets.Type.statusBars());
+          } else if ((w.getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0) {
+            controller.show(android.view.WindowInsets.Type.statusBars());
+          }
+        }
       }
+      return;
     }
-    int visibility = forceNewVisibility ? newVisibility : w.getDecorView().getSystemUiVisibility();
     visibility = BitwiseUtils.setFlag(visibility, View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR, lightNavigationBar);
     visibility = BitwiseUtils.setFlag(visibility, View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR, lightStatusBar);
-    w.getDecorView().setSystemUiVisibility(visibility);
+    decor.setSystemUiVisibility(visibility);
   }
 
   @SuppressWarnings("deprecation")

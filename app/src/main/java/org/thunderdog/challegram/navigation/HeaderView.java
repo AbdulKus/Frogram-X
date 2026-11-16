@@ -1278,6 +1278,11 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     return controller != null && controller.hasFloatingHeader() ? Screen.dp(10f) : 0;
   }
 
+  public boolean shouldDrawMenuBadge () {
+    ViewController<?> controller = getBaseController();
+    return controller == null || !controller.hasFloatingHeader();
+  }
+
   private ViewController<?> getBaseController () {
     return previewOpened ? (baseItem != null ? baseItem : previewItem) : stack != null ? stack.getCurrent() : null;
   }

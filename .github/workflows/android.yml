@@ -289,6 +289,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Preserve release crash mapping
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Frogram-X-mapping-${{ github.sha }}
+          path: app/build/outputs/mapping/latestArm64Release/mapping.txt
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Preserve APK if metadata generation fails
         if: failure() && steps.collect_apk.outcome == 'success' && steps.update_manifest.outcome == 'failure'
         uses: actions/upload-artifact@v4
