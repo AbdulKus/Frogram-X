@@ -142,7 +142,7 @@ public final class ChatGlassDrawable extends Drawable implements View.OnAttachSt
     this.host = host;
     this.colorId = colorId;
     prepareFrame = () -> {
-      if (!released && enabled && !navigationFrozen && host.isShown() && hasVisibleAlpha() && prepareBackdrop()) host.invalidate();
+      if (!released && enabled && !navigationFrozen && isHostVisible() && prepareBackdrop()) host.invalidate();
       return true;
     };
     host.addOnAttachStateChangeListener(this);

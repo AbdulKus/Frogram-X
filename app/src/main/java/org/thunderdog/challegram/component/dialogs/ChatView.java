@@ -17,6 +17,8 @@ package org.thunderdog.challegram.component.dialogs;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Picture;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.text.TextPaint;
@@ -346,6 +348,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
   }
 
   public void attach () {
+    glassPicture = null;
     avatarReceiver.attach();
     textMediaReceiver.attach();
     emojiStatusReceiver.attach();
@@ -353,6 +356,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
   }
 
   public void detach () {
+    glassPicture = null;
     avatarReceiver.detach();
     textMediaReceiver.detach();
     emojiStatusReceiver.detach();
@@ -360,6 +364,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
   }
 
   public void setChat (TGChat chat) {
+    glassPicture = null;
     if (this.chat != chat) {
       if (this.chat != null) {
         this.chat.detachFromView(this);
@@ -412,6 +417,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
 
   @Override
   public void invalidateEmojiStatusReceiver (Text text, @Nullable TextMedia specificMedia) {
+    glassPictureDirty = true;
     requestEmojiStatus();
   }
 
@@ -507,6 +513,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
 
   @Override
   protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
+    glassPicture = null;
     super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(getViewHeight(getChatListMode()), MeasureSpec.EXACTLY));
     layoutReceiver();
     if (chat != null && chat.checkLayout(getMeasuredWidth())) {
@@ -554,6 +561,7 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
   @Override
   public boolean invalidateContent (Object cause) {
     if (this.chat == cause) {
+      glassPictureDirty = true;
       requestTextContent();
       requestEmojiStatus();
       requestReactionFiles();
@@ -562,7 +570,50 @@ public class ChatView extends BaseView implements TdlibSettingsManager.Preferenc
     return false;
   }
 
-  public void drawForGlass (Canvas c) { onDraw(c); }
+  private Picture glassPicture;
+  private boolean glassPictureDirty = true;
+
+  @Override public void invalidate () {
+    glassPictureDirty = true;
+    super.invalidate();
+  }
+
+  @Override public void invalidate (Rect dirty) {
+    glassPictureDirty = true;
+    super.invalidate(dirty);
+  }
+
+  @Override public void invalidate (int left, int top, int right, int bottom) {
+    glassPictureDirty = true;
+    super.invalidate(left, top, right, bottom);
+  }
+
+  public void drawForGlass (Canvas c) {
+    if (c.isHardwareAccelerated()) {
+      onDraw(c);
+      return;
+    }
+    int width = getMeasuredWidth(), height = getMeasuredHeight();
+    if (width <= 0 || height <= 0) return;
+    if (glassPicture == null || glassPictureDirty || glassPicture.getWidth() != width || glassPicture.getHeight() != height) {
+      Picture next = new Picture();
+      // Scrolling changes the row's position, not its contents. Record glyphs
+      // once and replay them into the small blur sample without shaping again.
+      // An image/emoji/typing update during recording must remain dirty.
+      glassPictureDirty = false;
+      boolean complete = false;
+      Canvas recording = next.beginRecording(width, height);
+      try {
+        onDraw(recording);
+        complete = true;
+      } finally {
+        next.endRecording();
+        if (!complete) glassPictureDirty = true;
+      }
+      glassPicture = next;
+    }
+    c.drawPicture(glassPicture);
+  }
 
   @Override
   protected void onDraw (Canvas c) {

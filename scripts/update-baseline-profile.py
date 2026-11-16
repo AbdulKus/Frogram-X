@@ -20,6 +20,10 @@ HPLorg/thunderdog/challegram/navigation/GlassContentSnapshot;->capture(Landroid/
 HPLorg/thunderdog/challegram/navigation/GlassContentSnapshot;->captureContents(Landroid/view/View;IZ)Z
 HPLorg/thunderdog/challegram/widget/ChatGlassDrawable;->prepareBackdrop()Z
 HPLorg/thunderdog/challegram/widget/ChatGlassDrawable;->prepareBackdropContents()Z
+HPLorg/thunderdog/challegram/widget/ChatGlassDrawable;->draw(Landroid/graphics/Canvas;)V
+HPLorg/thunderdog/challegram/widget/ChatGlassDrawable;->drawNavigationSurface(Landroid/graphics/Canvas;Landroid/graphics/RectF;F)V
+HPLorg/thunderdog/challegram/widget/ChatGlassDrawable;->drawNavigationChrome(Landroid/graphics/Canvas;Landroid/graphics/RectF;FIZ)V
+HPLorg/thunderdog/challegram/component/dialogs/ChatView;->drawForGlass(Landroid/graphics/Canvas;)V
 HPLorg/thunderdog/challegram/util/AlphaBlur;->blur([III)V
 HPLorg/thunderdog/challegram/util/GlassBlur;->blur([III)V
 """.strip()

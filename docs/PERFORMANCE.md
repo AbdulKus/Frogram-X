@@ -10,9 +10,9 @@ The maintained Telegram X base is `0583baf9104ed9b4423f671c58d38dc99f153b7a`
   Clearing a static list also bypasses the dynamic-list identity fast path;
   changing the quote or locally picked media invalidates the retained preview.
 - [d132af88](https://github.com/TGX-Android/Telegram-X/commit/d132af883b8408760f1ff716021fa20ff86f392a):
-  the latest upstream baseline profile. `scripts/update-baseline-profile.py`
+  the upstream baseline profile at that revision. `scripts/update-baseline-profile.py`
   imports it into AGP's standard `app/src/main/baseline-prof.txt` location and adds
-  eleven explicit Frogram navigation methods, including the traced creation
+  fifteen explicit Frogram navigation/rendering methods, including the traced creation
   and opening implementations. R8 rewrites the rules for the release
   DEX; unmatched upstream methods are omitted. ProfileInstaller is enabled for
   the Marshmallow/latest flavors so APK installations also receive the profile.
@@ -376,3 +376,95 @@ lifting over the tab closed it and preserved the filter; dragged selection used
 the final release point and closed it; cancellation and outside release closed
 without selection. The original filter was restored. All nine performance
 regressions and the debug APK build pass.
+
+
+## Android 16 / API 36 audit, 2026-11-16
+
+The second AVD uses the same Intel UHD 630 host, 1080 × 2340 resolution, density
+440 and 60 Hz. Only one AVD runs at a time; Gradle is stopped before collecting
+traces. OpenGL identifies the Intel adapter. An experimental Vulkan renderer
+crashed the host emulator and was rejected; subsequent runs use `skiagl`.
+The Android 17 / 90 Hz physical device from the crash report is not emulated here.
+Account sessions survive all test APK updates; no application data is cleared.
+
+### Retained rendering changes
+
+`ChatView.drawForGlass` records an unchanged row into a `Picture` and replays its
+commands into the existing small software blur sample. This avoids re-entering
+the row's Java drawing code and shaping its text on every scroll frame. Normal
+hardware drawing is unchanged. Full and partial invalidations dirty the recording;
+binding, measuring, attaching and detaching discard it. An invalidation emitted
+during recording remains pending, and failed recordings are never published.
+Avatar, emoji and typing refreshes already invalidate the row through their
+receiver listeners. Content-only and emoji-status refresh requests explicitly
+dirty the recording even when the requested media file is unchanged. Theme
+listeners also invalidate each row.
+
+The existing glass renderer, sampling resolution, blur kernel, animation duration
+and history readiness policy are retained. The profile additionally marks the
+row replay and the existing glass drawing methods as hot paths.
+
+The transition's neutral status scrim now covers the same inset plus 28 dp as
+the settled main/chat screens; its last 4 dp were previously clipped during slides.
+
+Native Android 11 and Android 16 checks each compared 30 actual chat-row clip/scale
+cases against direct software drawing: blurred RGB pixels matched exactly. Fifty
+clean replays reused each recording; partial invalidation replaced it. A five-colour
+live-source check on both OS versions confirmed that updated samples reach the GPU.
+
+An isolated Android 11 debug fixture drew one actual row 50 times into a small
+software sample, after warm-up, for five rounds. With the left part of the row
+visible, median batch times were 8.83 ms for direct drawing and 0.71 ms for clean
+picture replay. Invalidating and rebuilding the recording on every call took
+9.89 ms, including those invalidations. This illustrates both cache reuse and
+its rebuild cost; it is not a release frame-rate measurement.
+
+### Rejected experiments
+
+Skipping pre-draw invalidation when `View.isDirty()` was already true did not
+demonstrate a transition improvement. The final path continues to invalidate
+the host when new backdrop pixels are ready, including already-dirty views;
+view dirtiness alone is not a substitute for refreshing its cached display list.
+Using rounded bitmap shaders, including a variant combining bitmap, veil and sheen
+into a single shader, did not establish a consistent overall frame-time gain.
+The composed variant was validated with 45 GPU fixtures on each of Android 11
+and Android 16, covering light/dark/black themes, drawable and navigation alpha,
+custom corners and changing source pixels. Interior RGB differences had maximum
+mean 0.297/255 and p99 1/255; an initial Android 11 capture contaminated by another
+client's heads-up notification was rerun. Despite passing rendering checks, these
+shader variants are not retained. A later control series did not confirm their
+initial scrolling improvement, and history frame timings also varied unfavourably.
+
+Temporary full-screen textures for the pager and message recycler were tested
+separately. Native checks preserved the overflowing glass, and a real partial
+back gesture, cancellation, repeated preview and completed back restored the
+original layer types. Release traces nevertheless showed no consistent navigation
+gain, so these extra layers and their ownership machinery are not retained.
+They allocate a screen-sized texture and can rebuild it when animated rows change.
+
+### Official client comparison
+
+Both applications are authenticated normally on the API 36 AVD. The official
+Telegram X APK is [v0.29.1.1817](https://github.com/TGX-Android/Telegram-X/releases/tag/v0.29.1.1817).
+For the initial comparison, both installed APKs use `arm64-v8a` through the same
+native bridge and are compiled with ART's `speed` filter. The Frogram artifact
+is published build 177, with only its local test signature changed to preserve
+the existing test installation. Its DEX is unchanged.
+
+Five avatar-verified open/back cycles and six matched swipes are collected per
+round, with three rounds per scenario. A common 600 ms window after each touch
+selects main-thread frame sections in both clients; no Frogram-only marker is
+used to select the official client's frames. The group contains photo previews.
+Theme geometry and restored history positions can differ, so this is a
+representative workload comparison rather than a pixel-identical scene.
+
+| Median of per-round UI frame p95, ms | Official 1817 | Frogram build 177 |
+| --- | ---: | ---: |
+| Opening the photo group | 21.23 | 22.45 |
+| Scrolling the chat list | 9.64 | 16.81 |
+| Scrolling group history | 18.87 | 20.07 |
+
+These are UI-thread section durations, not average FPS or presentation latency.
+The largest initial gap is chat-list scrolling. Subsequent source A/B measurements
+use identical x64 release native libraries and full ART compilation, separately
+from this ARM64 official-client comparison.

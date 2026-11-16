@@ -330,7 +330,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     from.glass.drawNavigationChrome(canvas, shell, to.glass, factor);
     // Settled surfaces draw their background first, then this status fade in
     // View.onDraw. Keep that same order where the fade overlaps the glass.
-    canvas.drawRect(0, 0, getWidth(), header.getEffectiveTopOffset() + Screen.dp(24f), status);
+    canvas.drawRect(0, 0, getWidth(), header.getEffectiveTopOffset() + Screen.dp(28f), status);
     save = canvas.save();
     canvas.clipPath(clip);
     from.draw(canvas, from.top, GlassNavigationMotion.outgoing(progress));
