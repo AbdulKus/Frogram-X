@@ -122,11 +122,40 @@ public class HeaderButton extends View {
   }
 
   private int lastBgResource;
+  private boolean glassBackground;
+  private int glassRippleColor;
+
+  public void setGlassBackground (boolean enabled) {
+    if (glassBackground == enabled && (!enabled || getBackground() instanceof org.thunderdog.challegram.widget.GlassRippleDrawable)) return;
+    glassBackground = enabled;
+    if (enabled) {
+      glassRippleColor = getGlassRippleColor();
+      setBackground(new org.thunderdog.challegram.widget.GlassRippleDrawable(glassRippleColor, true));
+    } else {
+      setBackgroundResource(lastBgResource);
+    }
+  }
+
+  private int getGlassRippleColor () {
+    return ColorUtils.alphaColor(Theme.isDark() ? .18f : .08f, Theme.getColor(ColorId.glassActive));
+  }
+
+  @Override public void draw (Canvas canvas) {
+    if (glassBackground) {
+      if (!(getBackground() instanceof org.thunderdog.challegram.widget.GlassRippleDrawable)) setGlassBackground(true);
+      int color = getGlassRippleColor();
+      if (glassRippleColor != color) {
+        glassRippleColor = color;
+        ((android.graphics.drawable.RippleDrawable) getBackground()).setColor(android.content.res.ColorStateList.valueOf(color));
+      }
+    }
+    super.draw(canvas);
+  }
 
   public void setButtonBackground (int resource) {
     if (lastBgResource != resource) {
       lastBgResource = resource;
-      setBackgroundResource(resource);
+      if (!glassBackground) setBackgroundResource(resource);
     }
   }
 

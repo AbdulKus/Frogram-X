@@ -955,7 +955,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
   }
 
   private void drawStatusFade (Canvas c, int width) {
-    int fadeHeight = context().getRootView().getTopInset() + Screen.dp(28f);
+    int fadeHeight = org.thunderdog.challegram.util.StatusBarScrim.height(context().getRootView().getTopInset());
     int fadeColor = org.thunderdog.challegram.util.StatusBarScrim.backgroundColor();
     if (statusFadeHeight != fadeHeight || statusFadeColor != fadeColor) {
       statusFadeHeight = fadeHeight;

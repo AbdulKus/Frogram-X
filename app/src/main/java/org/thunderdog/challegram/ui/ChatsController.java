@@ -568,7 +568,7 @@ public class ChatsController extends TelegramViewController<ChatsController.Argu
       }
       @Override protected void onDraw (Canvas canvas) {
         int inset = ChatsController.this.context().getRootView().getTopInset();
-        int height = inset + Screen.dp(28f), color = StatusBarScrim.backgroundColor();
+        int height = StatusBarScrim.height(inset), color = StatusBarScrim.backgroundColor();
         if (height != fadeHeight || color != fadeColor) {
           fadeHeight = height; fadeColor = color;
           fade.setShader(StatusBarScrim.create(color, inset, height));

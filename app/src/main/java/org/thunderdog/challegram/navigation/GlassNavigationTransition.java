@@ -259,7 +259,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     prepared = false;
     lastBackdropUpdate = 0;
     int color = org.thunderdog.challegram.util.StatusBarScrim.backgroundColor();
-    int fadeHeight = header.getEffectiveTopOffset() + Screen.dp(28f);
+    int fadeHeight = org.thunderdog.challegram.util.StatusBarScrim.height(header.getEffectiveTopOffset());
     status.setShader(org.thunderdog.challegram.util.StatusBarScrim.create(color, header.getEffectiveTopOffset(), fadeHeight));
     observer = getViewTreeObserver();
     observer.addOnPreDrawListener(this);
@@ -330,7 +330,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     from.glass.drawNavigationChrome(canvas, shell, to.glass, factor);
     // Settled surfaces draw their background first, then this status fade in
     // View.onDraw. Keep that same order where the fade overlaps the glass.
-    canvas.drawRect(0, 0, getWidth(), header.getEffectiveTopOffset() + Screen.dp(28f), status);
+    canvas.drawRect(0, 0, getWidth(), org.thunderdog.challegram.util.StatusBarScrim.height(header.getEffectiveTopOffset()), status);
     save = canvas.save();
     canvas.clipPath(clip);
     from.draw(canvas, from.top, GlassNavigationMotion.outgoing(progress));

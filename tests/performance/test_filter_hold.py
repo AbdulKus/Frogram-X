@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2] / 'app/src/main/java/org/thunderdog/c
 
 
 class FilterHoldTest(unittest.TestCase):
-    def test_hold_precedes_folder_options_and_rows_define_width(self):
+    def test_main_hold_folder_options_release_and_width(self):
         tabs = (ROOT / 'navigation/ViewPagerTopView.java').read_text()
         menu = (ROOT / 'widget/ChatFilterMenu.java').read_text()
         controller = (ROOT / 'ui/MainController.java').read_text()
@@ -21,6 +21,8 @@ class FilterHoldTest(unittest.TestCase):
         ]))
         code = code.replace('MEASURE_METHOD', method(menu, 'protected void onMeasure ('))
         code = code.replace('MENU_FINISH', method(controller, 'public void onSlideOffFinish ('))
+        code = code.replace('MAIN_PREPARE', method(controller, 'public boolean onSlideOffPrepare ('))
+        code = code.replace('FOLDER_OPTIONS', method(controller, 'public boolean onPagerItemLongClick (').replace('@Override', ''))
         with tempfile.TemporaryDirectory(prefix='frogram-filter-hold-') as folder:
             target = Path(folder) / 'FilterHoldRegression.java'
             target.write_text(code)
@@ -92,7 +94,19 @@ public class FilterHoldRegression {
     void setMenuVisible(View anchor,long id,boolean show){check(!show,"finish reopened menu");closes++;closedItem=id;if(menu!=null)menu.shown=show;}
     MENU_FINISH
   }
+  static class TdApi {static class ChatList {}}
+  static class Routing {
+    static final long MAIN_PAGER_ITEM_ID=10;long[] ids={10,20,30,40};boolean folders;int options;
+    java.util.List<TdApi.ChatList> pagerChatLists=java.util.Arrays.asList(new TdApi.ChatList(),new TdApi.ChatList(),new TdApi.ChatList(),new TdApi.ChatList());
+    long getPagerItemId(int index){return ids[index];}boolean hasFolders(){return folders;}void showChatListOptions(TdApi.ChatList list){options++;}
+    MAIN_PREPARE
+    FOLDER_OPTIONS
+  }
   public static void main(String[] args){
+    Routing routing=new Routing();
+    for(boolean folders:new boolean[]{false,true}){routing.folders=folders;for(int i=0;i<4;i++)check(routing.onSlideOffPrepare(new View(),new MotionEvent(),i)==(i==0),"filters intercepted a folder/archive/calls tab");}
+    routing.folders=true;check(routing.onPagerItemLongClick(1)&&routing.options==1,"folder settings did not receive the hold");
+    routing.folders=false;check(!routing.onPagerItemLongClick(1)&&routing.options==1,"non-folder page opened folder options");
     MenuCallback release=new MenuCallback();
     release.onSlideOffFinish(new View(),new MotionEvent(),0,true);
     check(!release.menu.shown&&release.closes==1&&release.menu.row.clicks==0,"release over held tab kept filters open");

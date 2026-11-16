@@ -69,8 +69,9 @@ prevents navigation-bar colour updates from restoring white status icons over
 light glass in coloured themes such as Pink.
 
 
-The status scrim is neutral white/black according to the theme. It covers the
-entire status inset before fading over another 28dp, including during navigation.
+The status scrim is neutral white/black according to the theme. Its smooth fade ends 12dp below
+the status inset, including during navigation; the previous 28dp tail reached too
+far into the content. Nine smoothstep samples soften the lower boundary.
 On Android 11+, WindowInsetsController exclusively owns icon appearance; legacy
 LIGHT_* flags no longer overwrite it. Focus/resume reapplies the requested status
 visibility and icon tone. Android 16 emulator verification passed 18 notification
@@ -85,10 +86,26 @@ minimum height, medium-weight labels, 10dp inner corners, a 6% accent fill and
 an 8% accent ripple inside one shared glass panel.
 
 Folder counters derive their tone from their own tab's animated selection.
-Inactive and muted numbers match the tab label; the selected unmuted badge uses
-that tab's accent with the theme filling as its contrasting foreground. The
-shared selection calculation also handles jumps over intermediate tabs.
+Every visible counter, including inactive and muted folders, keeps a filled
+badge matching its own label/icon. Numbers use the theme filling for contrast.
+On neutral black themes only, active and inactive label/icon roles are reversed;
+Night Blue and light themes retain their roles. The shared colour and selection
+calculation also handles jumps over intermediate tabs.
 `test_folder_counter_colors.py` executes production colour/selection methods.
 Android verification created and removed one owned test folder, checked all four
 tab styles on Blue/Pink/Night/Black White/Black, and checked archive shell/insets
 on those themes. Existing folders and chats were retained.
+
+Header buttons use a centred 44dp rounded ripple mask without changing their
+touch targets. Folder tab masks share the 14dp corners and 4dp horizontal / 7dp
+vertical insets of the selection surface. Classic headers retain their selectors.
+Holding a custom folder opens its folder options. The hold-and-drag filter menu
+is restricted to the main chat list; releasing or cancelling dismisses it.
+
+Android 16 verification repeated all four folder styles across Blue, Pink,
+Night Black, Black White and Night Blue, checking both selected states against
+resolved theme roles. Header press masks remained bounded and centred on the
+main list, archive and a media chat; returning from classic Settings restored
+the appropriate selector. Real stationary folder/main-list holds exercised both
+routes. Eight neutral scrim inset/tone combinations faded monotonically to zero.
+The temporary QA folder was removed and theme/style preferences were restored.

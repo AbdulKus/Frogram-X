@@ -355,8 +355,20 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     }
   }
 
+  private void styleGlassButtons (@Nullable ViewGroup group, boolean enabled) {
+    if (group == null) return;
+    for (int i = 0; i < group.getChildCount(); i++) {
+      View child = group.getChildAt(i);
+      if (child instanceof HeaderButton) ((HeaderButton) child).setGlassBackground(enabled);
+      else if (child instanceof ViewGroup) styleGlassButtons((ViewGroup) child, enabled);
+    }
+  }
+
   public void resetColors (ViewController<?> c, ViewController<?> preview) {
     updateControlInsets();
+    backButton.setGlassBackground(c.hasFloatingHeader());
+    styleGlassButtons(menu, c.hasFloatingHeader());
+    if (preview != null) styleGlassButtons(menuPreview, preview.hasFloatingHeader());
     boolean animating = (navigation != null && navigation.isAnimating());
     if (animating) {
       if (previewOpened) {
@@ -767,6 +779,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   public HeaderButton genButton (@IdRes int id, @DrawableRes int image, @ColorId int themeColorId, @Nullable ViewController<?> themeProvider, int width, int resource, OnClickListener listener) {
     HeaderButton btn = new HeaderButton(getContext());
     btn.setButtonBackground(resource);
+    btn.setGlassBackground(themeProvider != null && themeProvider.hasFloatingHeader());
     btn.setId(id);
     if (image != 0) {
       btn.setImageResource(image);
@@ -923,6 +936,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     button = new StopwatchHeaderButton(getContext());
     button.setOnClickListener(this);
     if (themeProvider != null) {
+      button.setGlassBackground(themeProvider.hasFloatingHeader());
       button.setThemeColorId(themeProvider.getHeaderIconColorId());
       themeProvider.addThemeInvalidateListener(button);
     }
@@ -949,7 +963,9 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   }
 
   public ClearButton addClearButton (LinearLayout menu, ViewController<?> c) {
-    return addClearButton(menu, c.getHeaderIconColorId(), c.getBackButtonResource());
+    ClearButton button = addClearButton(menu, c.getHeaderIconColorId(), c.getBackButtonResource());
+    button.setGlassBackground(c.hasFloatingHeader());
+    return button;
   }
 
   public ClearButton addClearButton (LinearLayout menu, @ColorId int colorId, int background) {
@@ -1874,6 +1890,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         backButton.invalidate();
       }
       backButton.setButtonBackground(bg);
+      backButton.setGlassBackground(current.hasFloatingHeader());
       filling.forceBigOutline(current.useBigHeaderButtons());
     }
 
@@ -2300,8 +2317,9 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
       backButton.setButtonFactor(item.getBackButton());
       backButton.setVisibility(View.VISIBLE);
       if (item.getBackButtonResource() != 0) {
-        backButton.setBackgroundResource(item.getBackButtonResource());
+        backButton.setButtonBackground(item.getBackButtonResource());
       }
+      backButton.setGlassBackground(item.hasFloatingHeader());
       backButton.setColor(Theme.getColor(item.getHeaderIconColorId()));
     } else {
       backButton.setVisibility(View.GONE);

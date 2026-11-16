@@ -11,11 +11,20 @@ public final class StatusBarScrim {
     return org.thunderdog.challegram.theme.Theme.isDark() ? android.graphics.Color.BLACK : android.graphics.Color.WHITE;
   }
 
+  public static int height (int inset) {
+    return inset + org.thunderdog.challegram.tool.Screen.dp(12f);
+  }
+
   public static Shader create (int color, int inset, int height) {
-    float edge = Math.max(.01f, Math.min(.65f, inset / (float) Math.max(1, height)));
-    return new LinearGradient(0, 0, 0, Math.max(1, height),
-      new int[] {ColorUtils.alphaColor(.86f, color), ColorUtils.alphaColor(.76f, color),
-        ColorUtils.alphaColor(.38f, color), ColorUtils.alphaColor(0f, color)},
-      new float[] {0f, edge, .78f, 1f}, Shader.TileMode.CLAMP);
+    float start = Math.max(0f, Math.min(.65f, inset * .65f / Math.max(1, height)));
+    int[] colors = new int[9];
+    float[] positions = new float[9];
+    for (int i = 0; i < colors.length; i++) {
+      float position = i / (float) (colors.length - 1);
+      float t = Math.max(0f, (position - start) / (1f - start));
+      colors[i] = ColorUtils.alphaColor(.76f * (1f - t * t * (3f - 2f * t)), color);
+      positions[i] = position;
+    }
+    return new LinearGradient(0, 0, 0, Math.max(1, height), colors, positions, Shader.TileMode.CLAMP);
   }
 }

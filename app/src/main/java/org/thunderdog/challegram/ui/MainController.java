@@ -384,7 +384,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
           MainController.this.context().getRootView().getTopInset() + Screen.dp(3f), Screen.dp(8f), 0));
       }
       @Override protected void onDraw (Canvas canvas) {
-        int height = MainController.this.context().getRootView().getTopInset() + Screen.dp(28f);
+        int height = org.thunderdog.challegram.util.StatusBarScrim.height(MainController.this.context().getRootView().getTopInset());
         int color = org.thunderdog.challegram.util.StatusBarScrim.backgroundColor();
         if (height != mainStatusHeight || color != mainStatusColor) {
           mainStatusHeight = height;
@@ -565,9 +565,6 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
 
         @Override
         public boolean onSlideOffPrepare (View view, MotionEvent event, int index) {
-          if (hasFolders()) {
-            return !useGlobalFilter() || globalFilter == FILTER_NONE;
-          }
           return getPagerItemId(index) == MAIN_PAGER_ITEM_ID;
         }
 
@@ -3350,8 +3347,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     @Override
     public int defaultTextColor () {
       if (floatingHeader.getBoolValue()) {
-        float fill = selectionFactor() * (counter != null ? 1f - counter.getMuteFactor() : 1f);
-        return ColorUtils.fromToArgb(backgroundColor(), foregroundColor(), fill);
+        return foregroundColor();
       }
       return counter != null ? ColorUtils.fromToArgb(foregroundColor(), backgroundColor(), counter.getMuteFactor()) : foregroundColor();
     }
@@ -3360,7 +3356,7 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     @Override
     public int backgroundColor (boolean isPressed) {
       if (floatingHeader.getBoolValue()) {
-        return ColorUtils.alphaColor(selectionFactor() * (counter != null ? 1f - counter.getMuteFactor() : 1f), backgroundColor());
+        return backgroundColor();
       }
       return counter != null ? ColorUtils.alphaColor(1f - counter.getMuteFactor(), backgroundColor()) : backgroundColor();
     }
@@ -3375,11 +3371,6 @@ public class MainController extends ViewPagerController<Void> implements Menu, M
     @ColorInt
     private int foregroundColor () {
       return Theme.getColor(floatingHeader.getBoolValue() ? ColorId.filling : displayTabsAtBottom.getBoolValue() ? ColorId.headerLightBackground : ColorId.headerBackground);
-    }
-
-    private float selectionFactor () {
-      int position = parent != null ? parent.getPagerItemPosition(pagerItemId) : NO_POSITION;
-      return position != NO_POSITION && parent.headerCell != null ? parent.headerCell.getTopView().getItemSelectionFactor(position) : 0f;
     }
 
     @ColorInt

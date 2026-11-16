@@ -946,11 +946,20 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
 
   /** The same animated colour used by this tab's label and icon. */
   public int getItemTextColor (int itemIndex) {
-    int from = fromTextColorId != ColorId.NONE ?
+    return ColorUtils.fromToArgb(getTabTextColor(false), getTabTextColor(true),
+      getItemSelectionFactor(itemIndex, selectionFactor) * (1f - disabledFactor));
+  }
+
+  private int getTabTextColor (boolean selected) {
+    if (glassSelection && Theme.isDark()) {
+      int surface = Theme.getColor(ColorId.filling);
+      // Reverse only neutral black themes; Night Blue keeps its existing roles.
+      if (((surface >> 16) & 255) == ((surface >> 8) & 255) && ((surface >> 8) & 255) == (surface & 255)) selected = !selected;
+    }
+    if (selected) return Theme.getColor(toTextColorId);
+    return fromTextColorId != ColorId.NONE ?
       ColorUtils.alphaColor(fromTextColorAlphaId != PropertyId.NONE ? Theme.getProperty(fromTextColorAlphaId) : 1f, Theme.getColor(fromTextColorId)) :
       ColorUtils.alphaColor(Theme.getSubtitleAlpha(), Theme.getColor(ColorId.headerText));
-    return ColorUtils.fromToArgb(from, Theme.getColor(toTextColorId),
-      getItemSelectionFactor(itemIndex, selectionFactor) * (1f - disabledFactor));
   }
 
   public float getItemSelectionFactor (int itemIndex) {
@@ -1070,12 +1079,8 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
 
   private void styleTabBackground (View view) {
     if (glassSelection) {
-      android.graphics.drawable.GradientDrawable mask = new android.graphics.drawable.GradientDrawable();
-      mask.setColor(android.graphics.Color.WHITE);
-      mask.setCornerRadius(Screen.dp(20f));
-      view.setBackground(new android.graphics.drawable.RippleDrawable(
-        android.content.res.ColorStateList.valueOf(ColorUtils.alphaColor(Theme.isDark() ? .22f : .04f, getGlassTabTint())), null,
-        new android.graphics.drawable.InsetDrawable(mask, Screen.dp(4f), Screen.dp(8f), Screen.dp(4f), Screen.dp(8f))));
+      view.setBackground(new org.thunderdog.challegram.widget.GlassRippleDrawable(
+        ColorUtils.alphaColor(Theme.isDark() ? .18f : .06f, getGlassTabTint()), false));
     } else if (isDark) {
       RippleSupport.setTransparentBlackSelector(view);
     } else {
@@ -1088,7 +1093,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
   }
 
   private void updateGlassTabRippleColors () {
-    int color = ColorUtils.alphaColor(Theme.isDark() ? .22f : .04f, getGlassTabTint());
+    int color = ColorUtils.alphaColor(Theme.isDark() ? .18f : .06f, getGlassTabTint());
     if (glassTabRippleColor == color) return;
     glassTabRippleColor = color;
     android.content.res.ColorStateList colors = android.content.res.ColorStateList.valueOf(color);
@@ -1130,9 +1135,9 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     float swell = org.thunderdog.challegram.unsorted.Settings.instance().needReduceMotion() ? 0f :
       (float) Math.sin(Math.PI * progress) * Math.min(Screen.dp(8f), width * .08f);
     if (rtl) left = totalWidth - left - width;
-    glassTabBounds.set(left + Screen.dp(4f) - swell, Screen.dp(8f), left + width - Screen.dp(4f) + swell, height - Screen.dp(8f));
+    glassTabBounds.set(left + Screen.dp(4f) - swell, Screen.dp(7f), left + width - Screen.dp(4f) + swell, height - Screen.dp(7f));
     if (glassTabBounds.isEmpty()) return;
-    float radius = glassTabBounds.height() / 2f;
+    float radius = Math.min(Screen.dp(org.thunderdog.challegram.widget.GlassRippleDrawable.CORNER_DP), glassTabBounds.height() / 2f);
     int tint = getGlassTabTint();
     float alpha = 1f - disabledFactor;
     glassTabPaint.setShader(null);
@@ -1173,10 +1178,8 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
     final boolean wrapContent = shouldWrapContent();
 
     if (overlayFactor != 1f) {
-      int textToColor = Theme.getColor(toTextColorId);
-      int textFromColor = fromTextColorId != ColorId.NONE ?
-        ColorUtils.alphaColor(fromTextColorAlphaId != PropertyId.NONE ? Theme.getProperty(fromTextColorAlphaId) : 1f, Theme.getColor(fromTextColorId)) :
-        ColorUtils.alphaColor(Theme.getSubtitleAlpha(), Theme.getColor(ColorId.headerText));
+      int textToColor = getTabTextColor(true);
+      int textFromColor = getTabTextColor(false);
       int selectionColor = selectionColorId != ColorId.NONE ?
         ColorUtils.alphaColor(selectionAlpha, Theme.getColor(selectionColorId)) :
         ColorUtils.alphaColor(.9f, Theme.getColor(ColorId.headerText));
@@ -1220,15 +1223,15 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
           int color = ColorUtils.fromToArgb(textFromColor, textToColor, itemSelectionFactor * (1f - disabledFactor));
           if (item.counter != null) {
             float alphaFactor = itemSelectionFactor;
-            float imageAlpha = counterAlphaProvider.getDrawableAlpha(item.counter, alphaFactor);
+            float imageAlpha = glassSelection ? 1f - disabledFactor : counterAlphaProvider.getDrawableAlpha(item.counter, alphaFactor);
             if (items.get(0).hidden) {
               alphaFactor = Math.max(alphaFactor, 1f - MathUtils.clamp(selectionFactor));
               if (i == 1 && selectionFactor < 1) {
                 alphaFactor = 1f;
               }
             }
-            float textAlpha = counterAlphaProvider.getTextAlpha(item.counter, alphaFactor);
-            float backgroundAlpha = counterAlphaProvider.getBackgroundAlpha(item.counter, alphaFactor);
+            float textAlpha = glassSelection ? 1f - disabledFactor : counterAlphaProvider.getTextAlpha(item.counter, alphaFactor);
+            float backgroundAlpha = glassSelection ? 1f - disabledFactor : counterAlphaProvider.getBackgroundAlpha(item.counter, alphaFactor);
             if (item.ellipsizedStringLayout != null) {
               int stringX;
               if (item.iconRes != 0) {
