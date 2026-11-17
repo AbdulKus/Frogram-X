@@ -163,6 +163,17 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
         child == title ? glassOutgoingAlpha : child == preview || child == menuPreview ? glassIncomingAlpha :
         useMenuSwitch ? glassOutgoingAlpha : Math.max(glassOutgoingAlpha, glassIncomingAlpha);
       if (visibility <= 0f) return true;
+      if (child instanceof ComplexHeaderView) {
+        // Expanded avatars are live content. A cached foreground can retain a
+        // transient empty avatar/text state when an interactive back reverses.
+        // Keep their hardware display list, clipped by the morphing shell.
+        int save = canvas.saveLayerAlpha(child.getLeft(), child.getTop(),
+          child.getRight(), child.getBottom(), Math.round(255f * visibility * visibility));
+        clipGlassNavigationForeground(canvas, child);
+        boolean drawn = super.drawChild(canvas, child, drawingTime);
+        canvas.restoreToCount(save);
+        return drawn;
+      }
       GlassContentSnapshot snapshot = glassNavigationSnapshots.get(child);
       if (snapshot == null && !glassNavigationSnapshots.containsKey(child)) {
         snapshot = new GlassContentSnapshot();

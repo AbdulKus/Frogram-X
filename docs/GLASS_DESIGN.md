@@ -147,8 +147,12 @@ This is the reference for new and existing floating UI. Shared implementation:
   Hide the old opaque merging bridge and shadow. Exclude glass panels from
   backdrop sampling and ignore their own invalidations to avoid feedback loops.
 - Horizontal page navigation uses the same stationary glass-shell morph as
-  main-to-chat. Cross-fade the header contents inside the changing rounded shell;
-  the page content keeps its normal slide. Each foreground keeps its own
+  main-to-chat. Cross-fade the header contents inside the changing rounded shell.
+  Expanded avatar headers keep their live hardware foreground during navigation.
+  Reversing an Android back gesture must reveal the avatar, name and status while
+  the finger is still down, including at zero progress; never wait for cancellation
+  to finish or reuse an empty foreground snapshot.
+  The page content keeps its normal slide. Each foreground keeps its own
   endpoint expansion during the dissolve; applying the interpolated shell
   height to both foregrounds displaces folder tabs and avatar text. Expanded
   photos must be clipped to the shell on intermediate frames and endpoints.
