@@ -70,6 +70,9 @@ This is the reference for new and existing floating UI. Shared implementation:
   Every attached row keeps an explicit clip to its own bounds: allowing list
   overflow must not let a row's background erase its neighbours. Restore its
   original clip on detach/recycle.
+  The extended page itself remains clipped to its own viewport. Cached horizontal
+  media pages must not escape sideways over the chat during back navigation;
+  software backdrop sampling respects that same outer boundary.
 - Sample only rows intersecting the small glass capture. The page paints the
   neutral background beneath these rows; the header must not paint an opaque
   rectangle over them. Invalidate on descendant/scroll/theme changes, disable
@@ -103,6 +106,17 @@ This is the reference for new and existing floating UI. Shared implementation:
   on theme changes so its contour/shadow display list updates without a scroll.
   A second header row of tabs has the same 12dp side inset as profile media tabs,
   keeping its selection/press capsules inside the rounded glass shell.
+  Settings separators keep their original line length, centred horizontally
+  within the group, and resolve their fill/stroke from the current theme when
+  drawing. Fill only their own bounds; never cache a previous theme filling.
+  Settings editor cards use compact floating hints with 12dp internal hint
+  travel and 20dp list clearance from the logical header (14dp visible gap).
+  Account avatars and session glyphs share the 28dp/64dp icon/text columns;
+  light-theme device glyphs use quiet grey with a small accent tint.
+  Popular sticker/emoji packs use separate 26dp cards, 8dp side margins and
+  12dp gaps; pack preview grid cells and install buttons keep their hit targets.
+  Floating confirmation buttons use the header glass and semantic icon colour,
+  retaining their original 56dp circle, 4dp outer padding and progress states.
   Software backdrop capture draws the row's stable filling without executing its
   live RippleDrawable, preserving the RenderThread press animation.
 - Profile media tabs use a separate glass island, semantic glass colours and

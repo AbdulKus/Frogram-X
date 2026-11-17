@@ -85,6 +85,9 @@ public class MediaStickersAdapter extends RecyclerView.Adapter<MediaStickersAdap
     isBig = true;
   }
 
+  private boolean settingsCards;
+  public void setSettingsCards () { settingsCards = true; }
+
   public MediaStickersAdapter (ViewController<?> context, StickerSmallView.StickerMovementCallback callback, boolean isTrending, @Nullable ViewController<?> themeProvider) {
     this.context = context;
     this.callback = callback;
@@ -739,6 +742,7 @@ public class MediaStickersAdapter extends RecyclerView.Adapter<MediaStickersAdap
           contentView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Screen.dp(isBig ? 57f : 52f)));
           contentView.setButtonOnClickListener(onClickListener);
           contentView.setThemeProvider(themeProvider);
+          if (adapter.settingsCards) contentView.setCardStyle();
 
           return new StickerHolder(contentView);
         }

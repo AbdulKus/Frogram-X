@@ -345,6 +345,11 @@ public class NonMaterialButton extends View implements FactorAnimator.Target, Cl
     return doneFactor == 0f ? Screen.dp(3f) : Screen.dp(3f) + (int) ((float) (Screen.dp(14f) - Screen.dp(3f)) * doneFactor);
   }
 
+  private float cornerRadiusDp = 3f;
+  public void setCornerRadiusDp (float radius) {
+    if (cornerRadiusDp != radius) { cornerRadiusDp = radius; updatePath(); invalidate(); }
+  }
+
   private int getStrokeWidth () {
     return Screen.dp(1.5f);
   }
@@ -358,7 +363,7 @@ public class NonMaterialButton extends View implements FactorAnimator.Target, Cl
     rect.set(left, padding, width - padding, height - padding);
 
     rectPath.reset();
-    rectPath.addRoundRect(rect, Screen.dp(3f), Screen.dp(3f), Path.Direction.CCW);
+    rectPath.addRoundRect(rect, Screen.dp(cornerRadiusDp), Screen.dp(cornerRadiusDp), Path.Direction.CCW);
   }
 
   private void setProgressBounds () {
@@ -438,7 +443,7 @@ public class NonMaterialButton extends View implements FactorAnimator.Target, Cl
 
     if (buttonFactor > 0f) {
       RectF rectF = Paints.getRectF();
-      int radius = Screen.dp(3f);
+      int radius = Screen.dp(cornerRadiusDp);
 
       int padding = (getStrokeWidth() / 2);
       rectF.set(padding, padding, width - padding, height - padding);

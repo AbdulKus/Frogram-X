@@ -38,6 +38,15 @@ public class SeparatorView extends View {
   private int forcedFillingColor;
   private int forcedColor, colorId = ColorId.separator;
   private boolean noAlign;
+  private boolean cardStyle;
+
+  public void setCardStyle () {
+    if (!cardStyle) {
+      cardStyle = true;
+      setOffsets(left, right);
+      invalidate();
+    }
+  }
 
   public SeparatorView (Context context) {
     super(context);
@@ -61,8 +70,13 @@ public class SeparatorView extends View {
   }
 
   public void setOffsets (float left, float right) {
-    this.left = left;
-    this.right = right;
+    // Keep the original line length, centred within the symmetric card insets.
+    if (cardStyle) left = right = (left + right) / 2f;
+    if (this.left != left || this.right != right) {
+      this.left = left;
+      this.right = right;
+      invalidate();
+    }
   }
 
   private boolean useFilling;
@@ -105,22 +119,26 @@ public class SeparatorView extends View {
   @Override
   protected void onDraw (Canvas c) {
     int width = getMeasuredWidth();
-    if (useFilling) {
-      c.drawColor(forcedFillingColor != 0 ? forcedFillingColor : Theme.fillingColor());
+    if (useFilling || cardStyle) {
+      c.drawRect(0, 0, width, getHeight(), org.thunderdog.challegram.tool.Paints.fillingPaint(
+        cardStyle ? ProfileCardBackground.fillingColor() : forcedFillingColor != 0 ? forcedFillingColor : Theme.fillingColor()));
     }
-    if (forcedColor == 0) {
+    if (cardStyle) {
+      paint.setColor(me.vkryl.core.ColorUtils.alphaColor(.10f, Theme.getColor(ColorId.glassText)));
+    } else if (forcedColor == 0) {
       paint.setColor(Theme.getColor(colorId));
     } else {
       paint.setColor(forcedColor);
     }
+    float lineTop = cardStyle ? Math.max(0, (getHeight() - height) / 2f) : top;
     if (left != 0 || right != 0) {
       if (Lang.rtl()) {
-        c.drawRect(right, top, width - left, top + height, paint);
+        c.drawRect(right, lineTop, width - left, lineTop + height, paint);
       } else {
-        c.drawRect(left, top, width - right, top + height, paint);
+        c.drawRect(left, lineTop, width - right, lineTop + height, paint);
       }
     } else {
-      c.drawRect(0, top, width, top + height, paint);
+      c.drawRect(0, lineTop, width, lineTop + height, paint);
     }
   }
 

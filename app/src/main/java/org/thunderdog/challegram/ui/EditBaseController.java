@@ -114,6 +114,7 @@ public abstract class EditBaseController<T> extends ViewController<T> implements
     contentView.addView(doneButton);
 
     onCreateView(context, contentView, recyclerView);
+    recyclerView.setPadding(recyclerView.getPaddingLeft(), Screen.dp(20f), recyclerView.getPaddingRight(), recyclerView.getPaddingBottom());
 
     FrameLayoutFix wrapper = new FrameLayoutFix(context);
     wrapper.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));

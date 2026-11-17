@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class SettingsSurfaceTest(unittest.TestCase):
     def test_light_group_edges_do_not_create_internal_borders(self):
         source = (ROOT / 'app/src/main/java/org/thunderdog/challegram/widget/SettingsCardSurface.java').read_text()
-        draw = method(source, 'public void draw (')
+        draw = method(source, 'public void draw (') + '\n' + method(source, 'private void paintSurface (')
         with tempfile.TemporaryDirectory(prefix='frogram-settings-surface-') as directory:
             path = Path(directory) / 'SurfaceTest.java'
             path.write_text(FIXTURE.replace('DRAW', draw))

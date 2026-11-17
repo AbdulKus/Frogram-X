@@ -1104,8 +1104,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     canvas.clipPath(profileRowClip);
     if (row instanceof org.thunderdog.challegram.widget.SeparatorView) {
       org.thunderdog.challegram.widget.SeparatorView separator = (org.thunderdog.challegram.widget.SeparatorView) row;
-      separator.forceFillingColor(org.thunderdog.challegram.widget.ProfileCardBackground.fillingColor());
-      separator.forceColor(ColorUtils.alphaColor(.10f, Theme.getColor(ColorId.glassText)));
+      separator.setCardStyle();
       separator.setOffsets(Screen.dp(type == ListItem.TYPE_SEPARATOR_FULL ? 16f : 64f), Screen.dp(20f));
     }
     return true;

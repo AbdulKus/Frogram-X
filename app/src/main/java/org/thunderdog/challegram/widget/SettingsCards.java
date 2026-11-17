@@ -21,8 +21,6 @@ import org.thunderdog.challegram.ui.ListItem;
 import org.thunderdog.challegram.ui.SettingsAdapter;
 import org.thunderdog.challegram.v.CustomRecyclerView;
 
-import me.vkryl.core.ColorUtils;
-
 /** Opt-in page styling: sheet/dialog adapters and chat lists keep their own layout. */
 public final class SettingsCards extends RecyclerView.ItemDecoration {
   private final SettingsAdapter adapter;
@@ -155,11 +153,33 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
 
   public static void applyRow (View view, int type) {
     if (type == ListItem.TYPE_EMPTY_OFFSET) { view.setBackground(null); return; }
+    if (view instanceof SeparatorView) { ((SeparatorView) view).setCardStyle(); return; }
     if (!isRow(type)) return;
     if (view instanceof SettingView) {
       SettingView setting = (SettingView) view;
       setting.setProfileInformationStyle(true);
       setting.setIconColorId(ColorId.glassIcon);
+      if (type == ListItem.TYPE_CHECKBOX_OPTION_WITH_AVATAR || type == ListItem.TYPE_RADIO_OPTION_WITH_AVATAR) {
+        setting.forcePadding(Screen.dp(64f), setting.getForcedPaddingRight());
+        for (int i = 0; i < setting.getChildCount(); i++) {
+          View child = setting.getChildAt(i);
+          if (child instanceof AvatarView) {
+            me.vkryl.android.widget.FrameLayoutFix.LayoutParams p = (me.vkryl.android.widget.FrameLayoutFix.LayoutParams) child.getLayoutParams();
+            p.width = p.height = Screen.dp(28f);
+            p.gravity = android.view.Gravity.CENTER_VERTICAL | org.thunderdog.challegram.core.Lang.gravity();
+            p.leftMargin = org.thunderdog.challegram.core.Lang.rtl() ? 0 : Screen.dp(18f);
+            p.rightMargin = org.thunderdog.challegram.core.Lang.rtl() ? Screen.dp(18f) : 0;
+            child.setLayoutParams(p);
+          }
+        }
+      }
+    }
+    if (view instanceof org.thunderdog.challegram.component.RelativeSessionLayout) ((org.thunderdog.challegram.component.RelativeSessionLayout) view).setCardStyle();
+    if (view instanceof ViewGroup && (type == ListItem.TYPE_EDITTEXT || type == ListItem.TYPE_EDITTEXT_COUNTERED ||
+        type == ListItem.TYPE_EDITTEXT_NO_PADDING || type == ListItem.TYPE_EDITTEXT_NO_PADDING_REUSABLE || type == ListItem.TYPE_EDITTEXT_REUSABLE)) {
+      view.setPadding(view.getPaddingLeft(), Screen.dp(8f), view.getPaddingRight(), Screen.dp(8f));
+      ViewGroup group = (ViewGroup) view;
+      for (int i = 0; i < group.getChildCount(); i++) if (group.getChildAt(i) instanceof MaterialEditTextGroup) ((MaterialEditTextGroup) group.getChildAt(i)).setCompactCardStyle();
     }
     android.graphics.drawable.Drawable background = view.getBackground();
     if (!(background instanceof ProfileCardBackground) &&
@@ -202,8 +222,7 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
     canvas.clipPath(clip);
     if (view instanceof SeparatorView) {
       SeparatorView separator = (SeparatorView) view;
-      separator.forceFillingColor(ProfileCardBackground.fillingColor());
-      separator.forceColor(ColorUtils.alphaColor(.10f, Theme.getColor(ColorId.glassText)));
+      separator.setCardStyle();
       ListItem next = adapter.getItem(position + 1);
       separator.setOffsets(Screen.dp(type == ListItem.TYPE_SEPARATOR_FULL || next == null || next.getIconResource() == 0 ? 16f : 64f), Screen.dp(20f));
     }

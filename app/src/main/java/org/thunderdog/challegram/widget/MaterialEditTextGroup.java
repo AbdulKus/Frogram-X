@@ -43,6 +43,7 @@ import org.thunderdog.challegram.tool.Fonts;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Strings;
 import org.thunderdog.challegram.tool.UI;
+import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.util.HeightChangeListener;
 import org.thunderdog.challegram.v.EditText;
 
@@ -197,6 +198,22 @@ public class MaterialEditTextGroup extends FrameLayoutFix implements View.OnFocu
   }
 
   private boolean isRtl;
+  private float hintInsetDp = 20f;
+
+  /** Compact settings fields retain their font sizes and grow with multiline text. */
+  public void setCompactCardStyle () {
+    if (hintInsetDp == 12f) return;
+    hintInsetDp = 12f;
+    Views.setTopMargin(editText, Screen.dp(hintInsetDp));
+    if (hintView != null) {
+      Views.setTopMargin(hintView, Screen.dp(hintInsetDp));
+      hintView.getLayoutParams().height = Screen.dp(32f);
+      hintView.requestLayout();
+    }
+    if (lengthCounter != null) Views.setTopMargin(lengthCounter, Screen.dp(hintInsetDp + 11f));
+    updateScale();
+    requestLayout();
+  }
 
   public void applyRtl (boolean rtl) {
     if (this.isRtl != rtl) {
@@ -260,7 +277,7 @@ public class MaterialEditTextGroup extends FrameLayoutFix implements View.OnFocu
 
       FrameLayoutFix.LayoutParams params;
       params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-      params.topMargin = reduceOffset ? Screen.dp(19f) : Screen.dp(20f) + Screen.dp(11f);
+      params.topMargin = reduceOffset ? Screen.dp(hintInsetDp - 1f) : Screen.dp(hintInsetDp + 11f);
       params.leftMargin = params.rightMargin = Screen.dp(6f);
       params.gravity = isRtl ? Gravity.LEFT : Gravity.RIGHT;
 
@@ -629,7 +646,7 @@ public class MaterialEditTextGroup extends FrameLayoutFix implements View.OnFocu
       float scale = 1f - .23076923f * scaleFactor;
       hintView.setScaleX(scale);
       hintView.setScaleY(scale);
-      hintView.setTranslationY((float) -Screen.dp(20f) * scaleFactor);
+      hintView.setTranslationY((float) -Screen.dp(hintInsetDp) * scaleFactor);
     }
   }
 

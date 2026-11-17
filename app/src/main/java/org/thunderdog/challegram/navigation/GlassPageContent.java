@@ -24,6 +24,7 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
   private RootFrameLayout root;
   private int overflow;
   private boolean capturing, notifying;
+  private final Rect pageClip = new Rect();
   private final java.util.Set<RecyclerView> lists = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
   /** Opening the list's clip must not let a row's drawColor erase other rows. */
@@ -127,6 +128,10 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
 
   @Override protected void onLayout (boolean changed, int l, int t, int r, int b) {
     super.onLayout(changed, l, t, r, b);
+    // Lists may overflow upward inside this extended viewport, but cached pager
+    // neighbours must never escape sideways over the chat during back navigation.
+    pageClip.set(0, 0, getWidth(), getHeight());
+    setClipBounds(pageClip);
     openScrollClipping(getChildAt(0));
   }
 
@@ -170,7 +175,11 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
     if (view.getVisibility() != VISIBLE || view.getAlpha() <= 0f) return;
     int alphaSave = canvas.save();
     if (view.getAlpha() < 1f) canvas.saveLayerAlpha(null, Math.round(view.getAlpha() * 255f));
-    if (view instanceof GlassPageContent) canvas.drawColor(Theme.getColor(ColorId.background));
+    if (view instanceof GlassPageContent) {
+      // Manual backdrop traversal must respect the same page boundary as HWUI.
+      canvas.clipRect(0, 0, view.getWidth(), view.getHeight());
+      canvas.drawColor(Theme.getColor(ColorId.background));
+    }
     if (view instanceof CustomRecyclerView) {
       ((CustomRecyclerView) view).drawForGlass(canvas);
     } else if (view instanceof ViewGroup && !(view instanceof RecyclerView)) {

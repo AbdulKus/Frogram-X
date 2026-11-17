@@ -71,10 +71,52 @@ public class DoneButton extends CircleButton implements RootFrameLayout.InsetsCh
   }
 
   private RootFrameLayout rootFrameLayout;
+  private ChatGlassDrawable confirmationGlass;
+  private android.view.View glassSource;
+  private final androidx.recyclerview.widget.RecyclerView.OnScrollListener glassScroll = new androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+    @Override public void onScrolled (androidx.recyclerview.widget.RecyclerView view, int dx, int dy) {
+      if (confirmationGlass != null) confirmationGlass.invalidateBackdrop();
+    }
+  };
+  private final android.view.View.OnLayoutChangeListener glassLayout = (view, l, t, r, b, oldL, oldT, oldR, oldB) -> {
+    if (confirmationGlass != null) confirmationGlass.invalidateBackdrop();
+  };
+
+  private android.view.View findBackdrop (android.view.View view) {
+    if (view == this || view.getVisibility() != VISIBLE || view.getAlpha() <= 0f) return null;
+    if (view instanceof androidx.recyclerview.widget.RecyclerView) {
+      androidx.recyclerview.widget.RecyclerView.LayoutManager manager = ((androidx.recyclerview.widget.RecyclerView) view).getLayoutManager();
+      if (manager instanceof androidx.recyclerview.widget.LinearLayoutManager &&
+          ((androidx.recyclerview.widget.LinearLayoutManager) manager).getOrientation() == androidx.recyclerview.widget.RecyclerView.VERTICAL) return view;
+      return null;
+    }
+    if (view instanceof android.view.ViewGroup) {
+      android.view.ViewGroup group = (android.view.ViewGroup) view;
+      for (int i = group.getChildCount() - 1; i >= 0; i--) {
+        android.view.View source = findBackdrop(group.getChildAt(i));
+        if (source != null) return source;
+      }
+    }
+    return null;
+  }
 
   @Override
   protected void onAttachedToWindow () {
     super.onAttachedToWindow();
+    glassSource = getParent() instanceof android.view.View ? findBackdrop((android.view.View) getParent()) : null;
+    android.view.View source = glassSource;
+    confirmationGlass = new ChatGlassDrawable(source != null ? source : this, this, ColorId.filling, canvas -> {
+      canvas.drawColor(org.thunderdog.challegram.theme.Theme.getColor(ColorId.background));
+      if (source != null) org.thunderdog.challegram.navigation.GlassPageContent.drawViewForGlass(canvas, source);
+    });
+    confirmationGlass.setRadius(Screen.dp(28f));
+    setGlassDrawable(confirmationGlass);
+    // Keep the original 56dp circle inside its existing 4dp touch/shadow padding.
+    setBackground(new android.graphics.drawable.InsetDrawable(confirmationGlass, Screen.dp(4f)));
+    if (glassSource != null) {
+      glassSource.addOnLayoutChangeListener(glassLayout);
+      ((androidx.recyclerview.widget.RecyclerView) glassSource).addOnScrollListener(glassScroll);
+    }
     if (Settings.instance().useEdgeToEdge()) {
       rootFrameLayout = Views.findAncestor(this, RootFrameLayout.class, true);
       if (rootFrameLayout != null) {
@@ -87,6 +129,12 @@ public class DoneButton extends CircleButton implements RootFrameLayout.InsetsCh
   @Override
   protected void onDetachedFromWindow () {
     super.onDetachedFromWindow();
+    if (glassSource != null) {
+      glassSource.removeOnLayoutChangeListener(glassLayout);
+      ((androidx.recyclerview.widget.RecyclerView) glassSource).removeOnScrollListener(glassScroll);
+      glassSource = null;
+    }
+    if (confirmationGlass != null) { confirmationGlass.release(); confirmationGlass = null; }
     if (rootFrameLayout != null) {
       rootFrameLayout.removeInsetsChangeListener(this);
       rootFrameLayout = null;

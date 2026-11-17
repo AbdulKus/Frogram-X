@@ -138,6 +138,12 @@ public class TrendingPackHeaderView extends RelativeLayout {
     button.setOnClickListener(listener);
   }
 
+  public void setCardStyle () {
+    setPadding(Screen.dp(16f), Screen.dp(12f), Screen.dp(16f), 0);
+    setBackground(new ProfileCardBackground());
+    button.setCornerRadiusDp(14f);
+  }
+
   public void setThemeProvider (@Nullable ViewController<?> themeProvider) {
     if (themeProvider != null) {
       themeProvider.addThemeTextColorListener(newView, ColorId.promoContent);

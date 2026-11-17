@@ -25,21 +25,39 @@ public final class SettingsCardSurface {
     // Joined rows expose only the group's outer sides, never a shadow/border seam.
     canvas.clipRect(bounds.left - Screen.dp(5f), top - (first ? Screen.dp(5f) : 0),
       bounds.right + Screen.dp(5f), bottom + (last ? Screen.dp(6f) : 0));
-    paint.setAlpha(Math.round(255 * row.getAlpha()));
+    paintSurface(canvas, row.getAlpha(), foreground, radius);
+    canvas.restoreToCount(save);
+  }
+
+  public void drawGroup (Canvas canvas, RectF group, boolean foreground) {
+    if (Theme.isDark() && foreground) return;
+    bounds.set(group);
+    if (canvas.quickReject(bounds, Canvas.EdgeType.AA)) return;
+    if (Theme.isDark()) {
+      paint.clearShadowLayer();
+      paint.setStyle(Paint.Style.FILL);
+      paint.setColor(ProfileCardBackground.fillingColor());
+      canvas.drawRoundRect(bounds, Screen.dp(GlassStyle.RADIUS_DP), Screen.dp(GlassStyle.RADIUS_DP), paint);
+    } else {
+      paintSurface(canvas, 1f, foreground, Screen.dp(GlassStyle.RADIUS_DP));
+    }
+  }
+
+  private void paintSurface (Canvas canvas, float alpha, boolean foreground, float radius) {
+    paint.setAlpha(Math.round(255 * alpha));
     if (foreground) {
       paint.clearShadowLayer();
       paint.setStyle(Paint.Style.STROKE);
       paint.setStrokeWidth(Screen.dp(.75f));
-      paint.setColor(ColorUtils.alphaColor(.09f * row.getAlpha(), Theme.getColor(ColorId.glassText)));
+      paint.setColor(ColorUtils.alphaColor(.09f * alpha, Theme.getColor(ColorId.glassText)));
       canvas.drawRoundRect(bounds, radius, radius, paint);
     } else {
       paint.setStyle(Paint.Style.FILL);
       paint.setColor(ProfileCardBackground.fillingColor());
-      paint.setAlpha(Math.round(255 * row.getAlpha()));
-      paint.setShadowLayer(Screen.dp(2f), 0, Screen.dp(1f), ColorUtils.alphaColor(.10f * row.getAlpha(), 0xff000000));
+      paint.setAlpha(Math.round(255 * alpha));
+      paint.setShadowLayer(Screen.dp(2f), 0, Screen.dp(1f), ColorUtils.alphaColor(.10f * alpha, 0xff000000));
       canvas.drawRoundRect(bounds, radius, radius, paint);
       paint.clearShadowLayer();
     }
-    canvas.restoreToCount(save);
   }
 }

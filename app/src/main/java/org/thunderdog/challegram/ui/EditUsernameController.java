@@ -197,7 +197,8 @@ public class EditUsernameController extends EditBaseController<EditUsernameContr
     decoration = new FillingDecoration(recyclerView, this);
     decoration.addRange(0, items.size());
     items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM, R.id.shadowBottom));
-    recyclerView.addItemDecoration(decoration);
+    // Rounded settings cards own the filling; keep ranges only for the username model.
+    if (!usesSettingsCards()) recyclerView.addItemDecoration(decoration);
 
     recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
       @Override

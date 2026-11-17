@@ -39,6 +39,7 @@ import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.tool.Views;
+import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.util.CancellableResultHandler;
 
 import java.util.ArrayList;
@@ -89,6 +90,8 @@ public class StickersTrendingController extends ViewController<Void> implements 
   protected View onCreateView (Context context) {
     adapter = new MediaStickersAdapter(this, this, !isEmoji, this);
     adapter.setIsBig();
+    adapter.setSettingsCards();
+    org.thunderdog.challegram.widget.TrendingPackCards cards = new org.thunderdog.challegram.widget.TrendingPackCards(adapter);
 
     GridLayoutManager manager = new GridLayoutManager(context, getSpanCount()) {
       @Override protected void calculateExtraLayoutSpace (@androidx.annotation.NonNull RecyclerView.State state, @androidx.annotation.NonNull int[] space) {
@@ -103,13 +106,23 @@ public class StickersTrendingController extends ViewController<Void> implements 
       }
     });
 
-    recyclerView = (RecyclerView) Views.inflate(context(), R.layout.recycler, null);
+    recyclerView = new RecyclerView(new android.view.ContextThemeWrapper(context, R.style.WhiteRecyclerTheme)) {
+      @Override public boolean drawChild (android.graphics.Canvas canvas, View child, long time) {
+        int save = canvas.save();
+        try { return cards.clipChild(canvas, child, this) && super.drawChild(canvas, child, time); }
+        finally { canvas.restoreToCount(save); }
+      }
+    };
+    recyclerView.setVerticalScrollBarEnabled(true);
+    recyclerView.setPadding(Screen.dp(8f), Screen.dp(12f), Screen.dp(8f), 0);
+    recyclerView.addItemDecoration(cards);
+    addThemeInvalidateListener(recyclerView);
     Views.applyBottomInset(recyclerView, extraBottomInset);
     Views.setScrollBarPosition(recyclerView);
     // recyclerView.setItemAnimator(null);
     recyclerView.setLayoutManager(manager);
     recyclerView.setAdapter(adapter);
-    ViewSupport.setThemedBackground(recyclerView, ColorId.filling, this);
+    ViewSupport.setThemedBackground(recyclerView, ColorId.background, this);
     recyclerView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     adapter.setManager(recyclerView.getLayoutManager());
     adapter.setItem(new MediaStickersAdapter.StickerItem(MediaStickersAdapter.StickerHolder.TYPE_PROGRESS));
