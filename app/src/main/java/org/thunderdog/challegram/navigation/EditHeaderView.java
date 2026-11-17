@@ -59,6 +59,7 @@ public class EditHeaderView extends FrameLayoutFix implements RtlCheckListener, 
   private final Path clipPath = new Path();
 
   private Drawable icon;
+  private boolean compact;
   private @PorterDuffColorId int iconColorId = ColorId.white;
 
   public EditHeaderView (Context context, ViewController<?> parent) {
@@ -110,11 +111,43 @@ public class EditHeaderView extends FrameLayoutFix implements RtlCheckListener, 
 
   @Override
   public void onHeaderOffsetChanged (HeaderView headerView, int newOffset) {
-    Views.setTopMargin(this, newOffset + Screen.dp(62f));
+    Views.setTopMargin(this, newOffset + (compact ? parent.getHeaderControlsInset() : Screen.dp(62f)));
+  }
+
+  /** A fixed-size title editor; folder icon actions live in the settings body. */
+  public void setCompact () {
+    compact = true;
+    FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, Size.getHeaderPortraitSize());
+    params.topMargin = parent.getHeaderControlsInset();
+    params.leftMargin = Screen.dp(Lang.rtl() ? 20f : 68f);
+    params.rightMargin = Screen.dp(Lang.rtl() ? 68f : 20f);
+    setLayoutParams(params);
+    input.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    input.setPadding(0, 0, 0, 0);
+    input.setTextSize(20f);
+    input.setTypeface(org.thunderdog.challegram.tool.Fonts.getRobotoMedium());
+    input.setSingleLine(true);
+    input.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    setEditing(false);
+  }
+
+  public void setEditing (boolean editing) {
+    input.setFocusable(editing);
+    input.setFocusableInTouchMode(editing);
+    input.setCursorVisible(editing);
+    input.setShowSoftInputOnFocus(editing);
+    input.setLongClickable(editing);
+    if (!editing) input.clearFocus();
   }
 
   @Override
   public void checkRtl () {
+    if (compact) {
+      input.checkRtl();
+      Views.setMargins(this, Screen.dp(Lang.rtl() ? 20f : 68f), ((FrameLayoutFix.LayoutParams) getLayoutParams()).topMargin,
+        Screen.dp(Lang.rtl() ? 68f : 20f), 0);
+      return;
+    }
     input.setGravity(Gravity.CENTER_VERTICAL | Lang.gravity());
     int leftMargin = Screen.dp(96f);
     int rightMargin = Screen.dp(20f);
@@ -232,6 +265,7 @@ public class EditHeaderView extends FrameLayoutFix implements RtlCheckListener, 
 
   @Override
   public void setScaleFactor (float scaleFactor, float fromFactor, float toScaleFactor, boolean byScroll) {
+    if (compact) return;
     scaleFactor = Size.convertExpandedFactor(scaleFactor);
     this.scaleFactor = scaleFactor;
     layoutReceiver();
@@ -257,6 +291,7 @@ public class EditHeaderView extends FrameLayoutFix implements RtlCheckListener, 
   private int avatarRadius;
 
   private void layoutReceiver () {
+    if (compact) return;
     int margin = Screen.dp(36f);
     int paddingLeft = Screen.dp(4f);
     avatarRadius = Screen.dp(20.5f) + (int) ((float) Screen.dp(10f) * scaleFactor);
@@ -277,6 +312,7 @@ public class EditHeaderView extends FrameLayoutFix implements RtlCheckListener, 
 
   @Override
   protected void onDraw (Canvas c) {
+    if (compact) return;
     layoutReceiver();
     int s = Views.save(c);
     c.clipPath(clipPath);

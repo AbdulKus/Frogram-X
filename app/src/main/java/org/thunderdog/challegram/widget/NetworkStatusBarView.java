@@ -307,7 +307,10 @@ public class NetworkStatusBarView extends FrameLayoutFix implements Destroyable,
   }
 
   private void checkLowProfile () {
-    setLowProfile(!isPaused && (isVisible || factor != 0f));
+    // LOW_PROFILE removes notification/connectivity glyphs on modern Android,
+    // sometimes until another window reapplies the bars. Keep system icons
+    // visible throughout the connection indicator's delayed exit animation.
+    setLowProfile(Build.VERSION.SDK_INT < Build.VERSION_CODES.R && !isPaused && (isVisible || factor != 0f));
   }
 
   private boolean inLowProfile;

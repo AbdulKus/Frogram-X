@@ -178,7 +178,7 @@ public class EditChatFolderInviteLinkController extends EditBaseController<EditC
     adapter.setLockFocusOn(this, false);
     adapter.setTextChangeListener(this);
     adapter.setItems(items, false);
-    recyclerView.setLayoutManager(new LinearLayoutManager(context));
+    recyclerView.setLayoutManager(new org.thunderdog.challegram.navigation.GlassLayoutManager(context, recyclerView));
     recyclerView.setAdapter(adapter);
     updateDoneButton();
 

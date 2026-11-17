@@ -104,6 +104,8 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
       case ListItem.TYPE_SESSION_WITH_AVATAR:
       case ListItem.TYPE_USER:
       case ListItem.TYPE_USER_SMALL:
+      case ListItem.TYPE_CHAT_SMALL:
+      case ListItem.TYPE_CHAT_SMALL_SELECTABLE:
       case ListItem.TYPE_STICKER_SET:
       case ListItem.TYPE_ARCHIVED_STICKER_SET:
       case ListItem.TYPE_BUTTON:
@@ -120,6 +122,8 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
   /** Fixed SettingView heights only; editors, sliders and sessions keep their own measurements. */
   public static int fixedHeight (int type) {
     switch (type) {
+      case ListItem.TYPE_CHAT_SMALL:
+      case ListItem.TYPE_CHAT_SMALL_SELECTABLE:
       case ListItem.TYPE_VALUED_SETTING:
       case ListItem.TYPE_INFO_SETTING:
       case ListItem.TYPE_VALUED_SETTING_WITH_RADIO:
@@ -155,6 +159,12 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
     if (type == ListItem.TYPE_EMPTY_OFFSET) { view.setBackground(null); return; }
     if (view instanceof SeparatorView) { ((SeparatorView) view).setCardStyle(); return; }
     if (!isRow(type)) return;
+    if (view instanceof SmallChatView) ((SmallChatView) view).setCardStyle();
+    if (type == ListItem.TYPE_CHAT_SMALL_SELECTABLE && view instanceof ViewGroup) {
+      ViewGroup group = (ViewGroup) view;
+      view.getLayoutParams().height = Screen.dp(68f);
+      for (int i = 0; i < group.getChildCount(); i++) if (group.getChildAt(i) instanceof SmallChatView) ((SmallChatView) group.getChildAt(i)).setCardStyle();
+    }
     if (view instanceof SettingView) {
       SettingView setting = (SettingView) view;
       setting.setProfileInformationStyle(true);
@@ -213,7 +223,9 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
     if (type == ListItem.TYPE_SHADOW_TOP || type == ListItem.TYPE_SHADOW_BOTTOM || type == ListItem.TYPE_EMPTY_OFFSET) return false;
     if (!partAt(position)) return true;
     bounds.set(view.getX(), view.getY(), view.getX() + view.getWidth(), view.getY() + view.getHeight());
-    if (canvas.quickReject(bounds, Canvas.EdgeType.AA)) return false;
+    // RecordingCanvas reports the list's original viewport, not the overflow
+    // shown by HWUI below an unclipped ancestor. Let HWUI cull those child nodes.
+    if (!canvas.isHardwareAccelerated() && canvas.quickReject(bounds, Canvas.EdgeType.AA)) return false;
     float radius = Math.min(Screen.dp(GlassStyle.RADIUS_DP), view.getHeight() / 2f);
     java.util.Arrays.fill(radii, 0, 4, partAt(position - 1) ? 0 : radius);
     java.util.Arrays.fill(radii, 4, 8, partAt(position + 1) ? 0 : radius);

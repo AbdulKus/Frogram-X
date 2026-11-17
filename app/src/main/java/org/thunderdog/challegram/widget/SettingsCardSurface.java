@@ -32,7 +32,7 @@ public final class SettingsCardSurface {
   public void drawGroup (Canvas canvas, RectF group, boolean foreground) {
     if (Theme.isDark() && foreground) return;
     bounds.set(group);
-    if (canvas.quickReject(bounds, Canvas.EdgeType.AA)) return;
+    if (!canvas.isHardwareAccelerated() && canvas.quickReject(bounds, Canvas.EdgeType.AA)) return;
     if (Theme.isDark()) {
       paint.clearShadowLayer();
       paint.setStyle(Paint.Style.FILL);

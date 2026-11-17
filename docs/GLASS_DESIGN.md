@@ -27,6 +27,12 @@ This is the reference for new and existing floating UI. Shared implementation:
   8dp side margins, top at status inset + 3dp, bottom at the logical header
   bottom + 6dp, and controls shifted down by 4.5dp to centre them in that shell.
   Ordinary settings rows begin with 12dp clearance from the logical header.
+  Folder settings use a fixed compact header, with a separate Edit name action
+  that activates its title field. Keep icon selection and visibility in the body;
+  no expanded-avatar spacer, collapsing title or rectangular header backing.
+  Folder inclusion/exclusion pages retain a compact title/search action. Selected
+  chats/types are removable capsules in a separate rounded body group, followed
+  by the type/chat lists. These rows use the shared card insets and colours.
 - Menus have an 8dp gap and 8dp screen clearance. Chat menus follow the visible
   header/player; settings/profile overflow menus follow the actual overflow
   button bottom, including when the photograph is expanded. Never anchor those
@@ -39,6 +45,8 @@ This is the reference for new and existing floating UI. Shared implementation:
   badge digits contrast with the fill and inactive folders retain the filled badge.
 - The status scrim is neutral white/black, never accent-tinted, and ends 12dp below
   the status inset with a smooth fade. Android owns the actual status icon colour.
+  On Android 11+, connection-state UI never requests LOW_PROFILE: notification
+  and connectivity icons remain visible during reconnects and their exit delay.
 
 ## Settings and profiles
 
@@ -73,6 +81,9 @@ This is the reference for new and existing floating UI. Shared implementation:
   The extended page itself remains clipped to its own viewport. Cached horizontal
   media pages must not escape sideways over the chat during back navigation;
   software backdrop sampling respects that same outer boundary.
+  Do not use RecordingCanvas viewport rejection to cull overflow rows: its local
+  recording bounds end below the header although HWUI can still display those
+  child nodes above the list. Retain software capture rejection for performance.
 - Sample only rows intersecting the small glass capture. The page paints the
   neutral background beneath these rows; the header must not paint an opaque
   rectangle over them. Invalidate on descendant/scroll/theme changes, disable

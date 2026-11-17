@@ -100,6 +100,7 @@ import me.vkryl.android.AnimatorUtils;
 import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.util.ClickHelper;
 import me.vkryl.core.MathUtils;
+import me.vkryl.core.ColorUtils;
 import me.vkryl.core.StringUtils;
 import me.vkryl.core.lambda.Destroyable;
 import me.vkryl.core.lambda.RunnableData;
@@ -191,11 +192,6 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
 
   private @Px int headerOffset;
 
-  private final BoolAnimator chipGroupVisibilityAnimator = new BoolAnimator(0, (id, factor, fraction, callee) -> {
-    RecyclerView recyclerView = getRecyclerView();
-    recyclerView.post(recyclerView::invalidateItemDecorations);
-  }, AnimatorUtils.DECELERATE_INTERPOLATOR, 180l);
-
   public SelectChatsController (@NonNull Context context, Tdlib tdlib) {
     super(context, tdlib);
     setNeedSearch();
@@ -243,9 +239,9 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
     Arguments arguments = getArgumentsStrict();
     switch (arguments.mode) {
       case MODE_FOLDER_INCLUDE_CHATS:
-        return Lang.getString(R.string.IncludeChats);
+        return Lang.getString(R.string.FolderActionIncludeChats);
       case MODE_FOLDER_EXCLUDE_CHATS:
-        return Lang.getString(R.string.ExcludeChats);
+        return Lang.getString(R.string.FolderActionExcludeChats);
       case MODE_SELECT_CHATS:
         return Lang.getString(R.string.SelectChats);
       default:
@@ -293,7 +289,7 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
 
   @Override
   protected int getMenuId () {
-    return ResourcesCompat.ID_NULL;
+    return hasBubbles() ? ResourcesCompat.ID_NULL : super.getMenuId();
   }
 
   private static final int MAX_BUBBLE_LINES = 3;
@@ -342,6 +338,8 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
 
     ArrayList<ListItem> items = new ArrayList<>();
     if (!hasBubbles()) {
+      items.add(new ListItem(ListItem.TYPE_HEADER, 0, 0, mode == MODE_FOLDER_EXCLUDE_CHATS ? R.string.FolderExcludedChats : R.string.FolderIncludedChats));
+      items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
       items.add(new ListItem(ListItem.TYPE_CUSTOM, R.id.input));
       items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
     }
@@ -414,19 +412,7 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
         }
       }
     });
-    recyclerView.addItemDecoration(new RecyclerView.ItemDecoration() {
-      @Override
-      public void getItemOffsets (@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
-        if (view instanceof ChipGroup) {
-          int height = ((ChipGroup) view).measureHeight(ViewCompat.isLaidOut(parent) ? parent.getWidth() : Screen.currentWidth());
-          int totalHeight = height + SettingHolder.measureHeightForType(ListItem.TYPE_SHADOW_BOTTOM);
-          int offsetTop = -Math.round(totalHeight * (1f - chipGroupVisibilityAnimator.getFloatValue()));
-          outRect.set(0, offsetTop, 0, 0);
-        } else {
-          outRect.setEmpty();
-        }
-      }
-    });
+
   }
 
   @Override
@@ -503,8 +489,11 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
   }
 
   private boolean hasBubbles () {
-    return true;
+    return mode == MODE_SELECT_CHATS;
   }
+
+  @Override protected boolean usesGlassPageHeader () { return !hasBubbles(); }
+  @Override protected boolean usesSettingsCards () { return !hasBubbles(); }
 
   private int indexOfChatBubble (long chatId) {
     for (int index = 0; index < bubbles.size(); index++) {
@@ -954,10 +943,11 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
     @Override
     public void onDrawOver (@NonNull Canvas c, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
       boolean isRtl = Lang.rtl();
-      int separatorColor = Theme.separatorColor();
+      boolean cards = parent instanceof CustomRecyclerView && ((CustomRecyclerView) parent).getSettingsCards() != null;
+      int separatorColor = cards ? ColorUtils.alphaColor(.10f, Theme.getColor(ColorId.glassText)) : Theme.separatorColor();
       int separatorHeight = Math.max(1, Screen.dp(.5f));
       Paint sepratorPaint = Paints.fillingPaint(separatorColor);
-      int startOffset = Screen.dp(72f);
+      int startOffset = Screen.dp(cards ? 42f : 72f);
       int childCount = parent.getChildCount();
       for (int i = 0; i < childCount; i++) {
         View child = parent.getChildAt(i);
@@ -974,11 +964,9 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
         }
         int bottom = child.getBottom();
         int top = bottom - separatorHeight;
-        if (isRtl) {
-          c.drawRect(0, top, child.getWidth() - startOffset, bottom, sepratorPaint);
-        } else {
-          c.drawRect(startOffset, top, child.getWidth(), bottom, sepratorPaint);
-        }
+        if (cards) c.drawRect(child.getLeft() + startOffset, top, child.getRight() - startOffset, bottom, sepratorPaint);
+        else if (isRtl) c.drawRect(0, top, child.getWidth() - startOffset, bottom, sepratorPaint);
+        else c.drawRect(startOffset, top, child.getWidth(), bottom, sepratorPaint);
       }
     }
 
@@ -998,7 +986,7 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
       int spacing = Screen.dp(8f);
       ChipGroup chipGroup = new ChipGroup(parent.getContext());
       chipGroup.setSpacing(spacing);
-      chipGroup.setPadding(spacing, spacing, spacing, spacing);
+      chipGroup.setPadding(Screen.dp(16f), Screen.dp(12f), Screen.dp(16f), Screen.dp(12f));
       chipGroup.setDelegate(new ChipGroup.Delegate() {
         @Override
         public void onCrossClick (Chip chip) {
@@ -1028,7 +1016,6 @@ public class SelectChatsController extends RecyclerViewController<SelectChatsCon
         chips.add(chipGroup.chat(tdlib, selectedChatId));
       }
       chipGroup.setChips(chips);
-      chipGroupVisibilityAnimator.setValue(!chips.isEmpty(), isFocused());
     }
 
     @Override
@@ -1113,7 +1100,8 @@ class Chip extends Drawable implements FlowListAnimator.Measurable, Drawable.Cal
   }
 
   private Text buildLabel (String text) {
-    int maxWidth = (Screen.currentWidth() - Screen.dp(8f) * 3) / 2 - getIntrinsicWidth(/* labelWidth */ 0, /* hasIcon */ isSecretChat); // (´・ᴗ・ ` )
+    // Two capsules fit inside the 8dp card insets and 16dp inner padding.
+    int maxWidth = (Screen.currentWidth() - Screen.dp(56f)) / 2 - getIntrinsicWidth(/* labelWidth */ 0, /* hasIcon */ isSecretChat);
     return new Text.Builder(text, maxWidth, Paints.robotoStyleProvider(14f), this)
       .noClickable()
       .ignoreNewLines()
@@ -1129,7 +1117,7 @@ class Chip extends Drawable implements FlowListAnimator.Measurable, Drawable.Cal
     ShapeDrawable mask = new ShapeDrawable(new OvalShape());
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
       mask.setTint(Color.WHITE);
-      crossIconRipple = new RippleDrawable(ColorStateList.valueOf(Theme.RIPPLE_COLOR), /* content */ null, mask);
+      crossIconRipple = new RippleDrawable(ColorStateList.valueOf(ColorUtils.alphaColor(.14f, Theme.getColor(ColorId.glassActive))), /* content */ null, mask);
     } else {
       mask.getPaint().setColor(Theme.RIPPLE_COLOR);
       crossIconRipple = Drawables.getColorSelector(null, mask);
@@ -1194,13 +1182,14 @@ class Chip extends Drawable implements FlowListAnimator.Measurable, Drawable.Cal
       saveCount = Integer.MIN_VALUE;
     }
 
-    int outlineColor = Theme.inlineOutlineColor(false);
+    int outlineColor = ColorUtils.alphaColor(.14f, Theme.getColor(ColorId.glassIcon));
     Paint outlinePaint = Paints.strokeSmallPaint(outlineColor);
     float outlineInset = outlinePaint.getStrokeWidth() / 2f;
-    int radius = Screen.dp(8f);
+    int radius = Screen.dp(16f);
     RectF roundRect = Paints.getRectF();
     roundRect.set(bounds.left + outlineInset, bounds.top + outlineInset, bounds.right - outlineInset, bounds.bottom - outlineInset);
-    canvas.drawRoundRect(roundRect, radius, radius, Paints.fillingPaint(Theme.fillingColor()));
+    canvas.drawRoundRect(roundRect, radius, radius, Paints.fillingPaint(ColorUtils.fromToArgb(
+      org.thunderdog.challegram.widget.ProfileCardBackground.fillingColor(), Theme.getColor(ColorId.glassActive), .08f)));
     canvas.drawRoundRect(roundRect, radius, radius, outlinePaint);
 
     int avatarRadius = Screen.dp(AVATAR_RADIUS);
@@ -1235,7 +1224,7 @@ class Chip extends Drawable implements FlowListAnimator.Measurable, Drawable.Cal
       crossIconRipple.setBounds(iconX - rippleRadius, iconY - rippleRadius, iconX + rippleRadius, iconY + rippleRadius);
       crossIconRipple.draw(canvas);
     }
-    Drawables.drawCentered(canvas, crossIcon, iconX, iconY, PorterDuffPaint.get(ColorId.inlineIcon));
+    Drawables.drawCentered(canvas, crossIcon, iconX, iconY, PorterDuffPaint.get(ColorId.glassIcon));
 
     if (alpha < 0xFF) {
       canvas.restoreToCount(saveCount);
@@ -1301,7 +1290,7 @@ class Chip extends Drawable implements FlowListAnimator.Measurable, Drawable.Cal
 
   @Override
   public int defaultTextColor () {
-    return Theme.textAccentColor();
+    return Theme.getColor(ColorId.glassText);
   }
 }
 
@@ -1348,7 +1337,10 @@ class ChipGroup extends SparseDrawableView implements ClickHelper.Delegate, Atta
   @SuppressLint("ClickableViewAccessibility")
   @Override
   public boolean onTouchEvent (MotionEvent event) {
-    return delegate != null && clickHelper.onTouchEvent(this, event);
+    // Drawable bounds are local to the padded content, just like its drawing.
+    event.offsetLocation(-getPaddingLeft(), -getPaddingTop());
+    try { return delegate != null && clickHelper.onTouchEvent(this, event); }
+    finally { event.offsetLocation(getPaddingLeft(), getPaddingTop()); }
   }
 
   public Chip chat (Tdlib tdlib, long chatId) {
@@ -1400,7 +1392,10 @@ class ChipGroup extends SparseDrawableView implements ClickHelper.Delegate, Atta
 
   @Override
   protected void onDraw (Canvas canvas) {
-    canvas.drawRect(0, 0, getWidth(), getHeight(), Paints.fillingPaint(Theme.fillingColor()));
+    if (chips.isEmpty()) {
+      Paint paint = Paints.getRegularTextPaint(14f, Theme.getColor(ColorId.glassPlaceholder));
+      canvas.drawText(Lang.getString(R.string.SelectChats), getPaddingLeft(), (getHeight() - paint.ascent() - paint.descent()) / 2f, paint);
+    }
     canvas.translate(getPaddingLeft(), getPaddingTop());
     for (FlowListAnimator.Entry<Chip> entry : animator) {
       int alpha = Math.round(entry.getVisibility() * 0xFF);

@@ -46,6 +46,16 @@ public class SmallChatView extends BaseView implements AttachDelegate, TooltipOv
   private final EmojiStatusHelper emojiStatusHelper;
 
   private DoubleTextWrapper chat;
+  private boolean cardStyle;
+
+  public void setCardStyle () {
+    if (cardStyle) return;
+    cardStyle = true;
+    getLayoutParams().height = Screen.dp(68f);
+    if (chat != null) chat.setCardStyle();
+    layoutReceiver();
+    requestLayout();
+  }
 
   public SmallChatView (Context context, Tdlib tdlib) {
     super(context, tdlib);
@@ -58,10 +68,10 @@ public class SmallChatView extends BaseView implements AttachDelegate, TooltipOv
   }
 
   private void layoutReceiver () {
-    int viewHeight = Screen.dp(62f);
-    int radius = Screen.dp(50f) / 2;
-    int left = Screen.dp(11f);
-    int right = Screen.dp(11f) + radius * 2;
+    int viewHeight = Screen.dp(cardStyle ? 68f : 62f);
+    int radius = Screen.dp(cardStyle ? 28f : 50f) / 2;
+    int left = Screen.dp(cardStyle ? 18f : 11f);
+    int right = left + radius * 2;
     int viewWidth = getMeasuredWidth();
     if (viewWidth == 0)
       return;
@@ -110,6 +120,7 @@ public class SmallChatView extends BaseView implements AttachDelegate, TooltipOv
     }
 
     this.chat = chat;
+    if (chat != null && cardStyle) chat.setCardStyle();
     if (chat != null) {
       setPreviewChatId(null, chat.getChatId(), null);
     } else {

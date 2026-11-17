@@ -159,7 +159,7 @@ public abstract class TelegramViewController<T> extends ViewController<T> {
   }
 
   protected LinearLayoutManager createChatSearchLayoutManager () {
-    return new LinearLayoutManager(context(), RecyclerView.VERTICAL, false);
+    return new GlassLayoutManager(context(), chatSearchView);
   }
 
   protected final CustomRecyclerView generateChatSearchView (@Nullable ViewGroup parent) {
