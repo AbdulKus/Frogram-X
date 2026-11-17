@@ -31,13 +31,13 @@ class ManagementTabsTest(unittest.TestCase):
  public static void main(String[] args){ManagementTest p=new ManagementTest();
   for(int height:new int[]{180,520,1400})for(int tabs:new int[]{40,48,60}){
    total=height;pager=tabs;
-   check(p.managementPanelTop()-(total-pager-getShadowBottomHeight())==8);
+   check(p.managementPanelTop()-(total-pager-getShadowBottomHeight())==6);
    check(p.maxItemsScrollY()==p.maxItemsScrollYOffset());
    for(int viewport:new int[]{400,700,1000})check(total+p.managementScrollTail(viewport)-viewport==p.maxItemsScrollY());
    for(int scroll=0;scroll<=p.maxItemsScrollY();scroll++){
     int panel=p.managementPanelTop()-scroll;
     int rows=p.contentTop()-scroll;
-    check(rows-(panel+pager+12)==8);
+    check(rows-(panel+pager+12)==4);
     check(panel>=p.managementPinnedTop());
    }
    check(p.managementPanelTop()-p.maxItemsScrollY()==p.managementPinnedTop());

@@ -122,8 +122,10 @@ This is the reference for new and existing floating UI. Shared implementation:
   Both the base list and its participant pages preserve their original padding:
   never add standalone settings-page clearance to these synchronized lists.
   Check repeated drags through the pinning boundary and idle stability after release.
-  Management tabs have 8dp clearance above and below from their initial position
+  Management tabs have 6dp clearance above and 4dp below from their initial position
   through pinning. Their compact header needs no separate expansion animator.
+  Their tab labels replace the repeated list headings (Admins/Restricted/Blocked).
+  Profile attachment content starts 4dp closer to its island; keep date labels visible.
   Base and participant lists use one handoff range; reserve the base scroll tail
   independently of member counts, including when switching to empty or short tabs.
   Allowed reactions use independent rounded tiles in the four-column grid, with

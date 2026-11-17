@@ -616,6 +616,7 @@ public class SharedMembersController extends SharedBaseController<DoubleTextWrap
 
   @Override
   protected String getExplainedTitle () {
+    if (managementCards) return null; // The floating tabs already name this list.
     if (specificFilter != null) {
       switch (specificFilter.getConstructor()) {
         case TdApi.SupergroupMembersFilterRestricted.CONSTRUCTOR:

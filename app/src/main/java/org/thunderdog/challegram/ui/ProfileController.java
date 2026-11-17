@@ -5860,7 +5860,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private int managementPanelTop () {
-    return getTopItemsHeight() - getPagerTopViewHeight() - getShadowBottomHeight() + Screen.dp(8f);
+    return getTopItemsHeight() - getPagerTopViewHeight() - getShadowBottomHeight() + Screen.dp(6f);
   }
 
   private int managementScrollTail (int viewportHeight) {
@@ -5877,9 +5877,9 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private int contentTop () {
-    if (isEditing()) return managementPanelTop() + getPagerTopViewHeight() + getTopViewTopPadding() + Screen.dp(6f + 8f);
+    if (isEditing()) return managementPanelTop() + getPagerTopViewHeight() + getTopViewTopPadding() + Screen.dp(6f + 4f);
     // Date headers start below the complete panel instead of underneath its glass.
-    return getTopItemsHeight() - getPagerTopViewHeight() + getTopViewTopPadding() - ShadowView.simpleTopShadowHeight() + (isEditing() ? 0 : getPagerTopViewHeight() + getTopViewTopPadding());
+    return getTopItemsHeight() + getTopViewTopPadding() * 2 - ShadowView.simpleTopShadowHeight() - Screen.dp(4f);
   }
 
   // Shared stuff
