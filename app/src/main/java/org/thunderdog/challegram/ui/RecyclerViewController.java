@@ -83,7 +83,7 @@ public abstract class RecyclerViewController<T> extends TelegramViewController<T
     if (manager != null) {
       savedRecyclerPosition = manager.findFirstVisibleItemPosition();
       View view = manager.findViewByPosition(savedRecyclerPosition);
-      savedRecyclerPositionOffset = view != null ? view.getTop() : 0;
+      savedRecyclerPositionOffset = view != null ? manager.getDecoratedTop(view) - recyclerView.getPaddingTop() : 0;
     } else {
       savedRecyclerPosition = RecyclerView.NO_POSITION;
       savedRecyclerPositionOffset = 0;
@@ -205,7 +205,7 @@ public abstract class RecyclerViewController<T> extends TelegramViewController<T
     if (manager != null) {
       int position = manager.findFirstVisibleItemPosition();
       View view = manager.findViewByPosition(position);
-      int scrollBy = view != null ? manager.getDecoratedTop(view) : 0;
+      int scrollBy = view != null ? manager.getDecoratedTop(view) - recyclerView.getPaddingTop() : 0;
       outState.putInt(keyPrefix + "base_scroll_position", position);
       outState.putInt(keyPrefix + "base_scroll_offset", scrollBy);
     }
@@ -253,7 +253,7 @@ public abstract class RecyclerViewController<T> extends TelegramViewController<T
         int scrollTop = ((SettingsAdapter) recyclerView.getAdapter()).measureScrollTop(firstVisiblePosition);
         View view = manager.findViewByPosition(firstVisiblePosition);
         if (view != null) {
-          scrollTop -= view.getTop();
+          scrollTop -= view.getTop() - recyclerView.getPaddingTop();
         }
         getRecyclerView().smoothScrollBy(0, -scrollTop);
       } catch (Throwable t) {
@@ -290,7 +290,7 @@ public abstract class RecyclerViewController<T> extends TelegramViewController<T
 
   protected int getViewTop (int position) {
     View view = recyclerView.getLayoutManager().findViewByPosition(position);
-    return view != null ? view.getTop() : 0;
+    return view != null ? recyclerView.getLayoutManager().getDecoratedTop(view) - recyclerView.getPaddingTop() : 0;
   }
 
   protected void removeItemAnimatorDelayed () {

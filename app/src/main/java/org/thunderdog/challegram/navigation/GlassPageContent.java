@@ -3,6 +3,8 @@ package org.thunderdog.challegram.navigation;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.os.Build;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -26,6 +28,7 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
   private boolean capturing, notifying;
   private final Rect pageClip = new Rect();
   private final java.util.Set<RecyclerView> lists = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+  private final java.util.Map<View, Integer> viewportInsets = new java.util.IdentityHashMap<>();
 
   /** Opening the list's clip must not let a row's drawColor erase other rows. */
   private static final class RowClips implements RecyclerView.OnChildAttachStateChangeListener, View.OnLayoutChangeListener {
@@ -101,11 +104,45 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
     return 0;
   }
 
+  /** Physical space added above a settings list; its logical content origin stays put. */
+  public static int viewportInset (View list) {
+    View view = list;
+    while (view != null) {
+      if (view instanceof GlassPageContent) {
+        Integer inset = ((GlassPageContent) view).viewportInsets.get(list);
+        return inset != null ? inset : 0;
+      }
+      view = view.getParent() instanceof View ? (View) view.getParent() : null;
+    }
+    return 0;
+  }
+
+  private void extendViewport (RecyclerView list) {
+    // Stretch overscroll clips the list's RenderNode to its physical bounds,
+    // even with clipChildren disabled. Include the header area in those bounds.
+    // Equal extra padding preserves row positions and the scrollable extent.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+    if (!(getTag() instanceof ViewController) || !((ViewController<?>) getTag()).usesSettingsCards()) return;
+    if (!(list.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) || list.getLayoutParams().height != ViewGroup.LayoutParams.MATCH_PARENT) return;
+    Integer previous = viewportInsets.get(list);
+    int delta = overflow - (previous != null ? previous : 0);
+    if (delta == 0) return;
+    ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) list.getLayoutParams();
+    params.topMargin -= delta;
+    viewportInsets.put(list, overflow);
+    list.setLayoutParams(params);
+    list.setPadding(list.getPaddingLeft(), list.getPaddingTop() + delta, list.getPaddingRight(), list.getPaddingBottom());
+    // A list already laid out keeps its anchor relative to its old physical
+    // start. Move that anchor with the padding when an inset changes.
+    list.offsetChildrenVertical(delta);
+  }
+
   private boolean openScrollClipping (View view) {
     if (view instanceof RecyclerView) {
       RecyclerView list = (RecyclerView) view;
       RecyclerView.LayoutManager manager = list.getLayoutManager();
       if (!(manager instanceof LinearLayoutManager) || ((LinearLayoutManager) manager).getOrientation() != RecyclerView.VERTICAL) return false;
+      extendViewport(list);
       if (lists.add(list)) {
         RowClips clips = new RowClips();
         list.addOnChildAttachStateChangeListener(clips);
@@ -126,6 +163,12 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
     return scrolls;
   }
 
+  @Override protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
+    // Establish padding before the first list layout, including landscape.
+    openScrollClipping(getChildAt(0));
+    super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+  }
+
   @Override protected void onLayout (boolean changed, int l, int t, int r, int b) {
     super.onLayout(changed, l, t, r, b);
     // Lists may overflow upward inside this extended viewport, but cached pager
@@ -137,6 +180,13 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
 
   @Override protected void onDraw (@NonNull Canvas canvas) {
     canvas.drawRect(0, 0, getWidth(), getHeight(), org.thunderdog.challegram.tool.Paints.fillingPaint(Theme.getColor(ColorId.background)));
+  }
+
+  @Override public boolean dispatchTouchEvent (MotionEvent event) {
+    // The added viewport is for painting behind the header, not new row targets.
+    // Continue gestures started in the body when they move into this area.
+    if (event.getActionMasked() == MotionEvent.ACTION_DOWN && event.getY() < getPaddingTop()) return false;
+    return super.dispatchTouchEvent(event);
   }
 
   @Override public void onDescendantInvalidated (View child, View target) {

@@ -123,7 +123,7 @@ public class ComplexRecyclerView extends CustomRecyclerView implements Runnable 
     }
     View view = getLayoutManager().findViewByPosition(0);
     int diff = Size.getHeaderBigPortraitSize(true) - target.getMaximumHeaderHeight();
-    float t = view == null ? Size.getHeaderSizeDifference(true) : -view.getTop() + diff;
+    float t = view == null ? Size.getHeaderSizeDifference(true) : -view.getTop() + GlassPageContent.viewportInset(this) + diff;
     float factor = 1f - t / (float) Size.getHeaderSizeDifference(true);
     scrollFactor = MathUtils.clamp(factor);
     if ((flags & FLAG_FORCE) == 0) {

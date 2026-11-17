@@ -1342,7 +1342,7 @@ public class EditChatFolderController extends EditBaseController<EditChatFolderC
 
       if (isLast) {
         LinearLayoutManager manager = (LinearLayoutManager) parent.getLayoutManager();
-        int recyclerHeight = recyclerView.getMeasuredHeight();
+        int recyclerHeight = recyclerView.getMeasuredHeight() - org.thunderdog.challegram.navigation.GlassPageContent.viewportInset(recyclerView);
         int emptyHeight;
         if (manager.findFirstVisibleItemPosition() == 0 && manager.findLastVisibleItemPosition() == lastIndex) {
           if (DECORATION_LOGGING_ENABLED) {

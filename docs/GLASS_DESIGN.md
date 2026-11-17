@@ -71,8 +71,8 @@ This is the reference for new and existing floating UI. Shared implementation:
   over the final 20% of its reveal, avoiding a thin fragment of a card/controls
   while the photograph still occupies the header. Hidden controls reject touches.
 - Settings and profile rows scroll behind the floating header to the screen edge.
-  Extend the page's painting viewport without moving the original content or
-  changing its height, padding, scroll origin, avatar-collapse or media coordinates.
+  Extend the page's painting viewport without moving the original rows or
+  changing the logical viewport, clearance, scroll origin, avatar-collapse or media coordinates.
   Keep the additional rows above the viewport attached only as far as the header.
   Open clipping along the scrolling-container path, preserving row/icon clipping.
   Every attached row keeps an explicit clip to its own bounds: allowing list
@@ -84,6 +84,12 @@ This is the reference for new and existing floating UI. Shared implementation:
   Do not use RecordingCanvas viewport rejection to cull overflow rows: its local
   recording bounds end below the header although HWUI can still display those
   child nodes above the list. Retain software capture rejection for performance.
+  On Android 12+, settings lists include header overflow in their physical viewport, with
+  equal extra top padding. Android's stretch effect must retain the rows behind
+  the header during pull, hold and release. Preserve the original logical row
+  origin, scroll extent, saved scroll positions and expanded-header factor.
+  Establish the viewport before initial layout and preserve attached row anchors
+  when insets change; profiles/chat media keep their own viewport geometry.
 - Sample only rows intersecting the small glass capture. The page paints the
   neutral background beneath these rows; the header must not paint an opaque
   rectangle over them. Invalidate on descendant/scroll/theme changes, disable
