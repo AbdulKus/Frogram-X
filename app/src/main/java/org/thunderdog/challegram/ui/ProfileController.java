@@ -5552,13 +5552,13 @@ public class ProfileController extends ViewController<ProfileController.Args> im
               lastUsernames = sequence;
             }
           }
-          return lastUsernameAddHeight + Screen.dp(isEditing() ? 76f : 88f);
+          return lastUsernameAddHeight + Screen.dp(isEditing() ? 76f : 68f);
         } else if (itemId == R.id.btn_description) {
           if (aboutWrapper != null) {
             aboutWrapper.get(getTextWidth(width));
-            return isEditing() ? Math.max(aboutWrapper.getHeight() + Screen.dp(21f + 13f) - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f)) : Math.max(aboutWrapper.getHeight() + Screen.dp(71f), Screen.dp(88f));
+            return isEditing() ? Math.max(aboutWrapper.getHeight() + Screen.dp(21f + 13f) - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f)) : Math.max(aboutWrapper.getHeight() + Screen.dp(49f), Screen.dp(68f));
           }
-          return Screen.dp(isEditing() ? 76f : 88f);
+          return Screen.dp(isEditing() ? 76f : 68f);
         }
         throw new UnsupportedOperationException();
       }
@@ -5578,7 +5578,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
         return viewHeight;
       }
     }
-    if (!isEditing() && isProfileCardRow(item.getViewType())) return Screen.dp(item.getViewType() == ListItem.TYPE_SETTING ? 64f : 88f);
+    if (!isEditing() && isProfileCardRow(item.getViewType())) return Screen.dp(item.getViewType() == ListItem.TYPE_SETTING ? 56f : 68f);
     return SettingHolder.measureHeightForType(item.getViewType());
   }
 

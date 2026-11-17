@@ -385,9 +385,9 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
   private int getCurrentHeight () {
     int height;
     if (text != null) {
-      height = profileInformationStyle ? Math.max(text.getHeight() + (int) bodyTop() + Screen.dp(44f), Screen.dp(88f)) : Math.max(text.getHeight() + (int) pDataTop - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f));
+      height = profileInformationStyle ? Math.max(text.getHeight() + (int) bodyTop() + Screen.dp(32f), Screen.dp(68f)) : Math.max(text.getHeight() + (int) pDataTop - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f));
     } else {
-      height = Screen.dp(profileInformationStyle ? 88f : 76f);
+      height = Screen.dp(profileInformationStyle ? 68f : 76f);
     }
     if (displayItemNameText != null) {
       height += displayItemNameText.getHeight() - displayItemNameText.getLineHeight();
@@ -500,7 +500,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
     if (profileInformationStyle == enabled) return;
     profileInformationStyle = enabled;
     if (getLayoutParams() != null && type != TYPE_INFO_MULTILINE) {
-      getLayoutParams().height = Screen.dp(enabled ? (type == TYPE_SETTING ? 64f : 88f) : (type == TYPE_SETTING ? 55f : 76f));
+      getLayoutParams().height = Screen.dp(enabled ? (type == TYPE_SETTING ? 56f : 68f) : (type == TYPE_SETTING ? 55f : 76f));
     }
     buildLayout();
     requestLayout();
@@ -617,7 +617,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
       pTop = Screen.dp(21f + 13f);
     }
 
-    if (profileInformationStyle) pTop = Screen.dp(type == TYPE_SETTING ? 38f : 40f);
+    if (profileInformationStyle) pTop = Screen.dp(type == TYPE_SETTING ? 34f : 30f);
 
     if (swapDataAndName) {
       displayItemData = itemName;

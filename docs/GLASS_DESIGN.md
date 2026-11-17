@@ -80,10 +80,12 @@ This is the reference for new and existing floating UI. Shared implementation:
   retain their original 16sp, descriptions 15sp and captions 13sp; icons use
   28dp. Centre icons beside the first two text lines (value and caption for
   short fields, the first two body lines for a long description), rather than
-  aligning them to the first line. Use 88dp information
-  rows (grow multiline rows), with one aligned text column 64dp from the card
-  start and 20dp end padding. Measure text with those same sizes and insets. Leave settings and
-  profile editing screens unchanged. Clip group corners and press feedback together.
+  aligning them to the first line. Use compact 68dp information rows and
+  56dp single-line action rows. Grow multiline rows only as their content needs,
+  with approximately 16dp top and bottom clearance, one aligned text column
+  64dp from the card start and 20dp end padding. Measure text with those same sizes
+  and insets. Leave settings and profile editing screens unchanged. Clip group
+  corners and press feedback together.
   Software backdrop capture draws the row's stable filling without executing its
   live RippleDrawable, preserving the RenderThread press animation.
 - Profile media tabs use a separate glass island, semantic glass colours and
