@@ -135,6 +135,9 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
   private @Nullable RecyclerView.OnScrollListener innerOnScrollListener;
   private @Nullable ClickHelper.Delegate clickHelperDelegate;
   private boolean noEmptyProgress;
+  private boolean cardStyle;
+
+  public void setCardStyle () { cardStyle = true; }
 
   private @Nullable HeightChangeListener heightChangeListener;
 
@@ -1881,6 +1884,7 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
   @Override
   public void onBindViewHolder (SettingHolder holder, int position) {
     updateView(holder, position, holder.getItemViewType());
+    if (cardStyle) org.thunderdog.challegram.widget.SettingsCards.applyRow(holder.itemView, getItemViewType(position));
   }
 
   public void resetRecyclerScrollById (int id) {
@@ -2063,11 +2067,11 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
     int height = 0;
     if (size == 0) {
       for (int i = 0; i < itemCount; i++) {
-        height += SettingHolder.measureHeightForType(getItemViewType(i));
+        height += measureItemHeight(i);
       }
     } else {
       for (int i = 0; i < itemCount && i < size; i++) {
-        height += SettingHolder.measureHeightForType(items.get(i));
+        height += measureItemHeight(i);
       }
     }
     return maxHeight < 0 ? height : Math.min(maxHeight, height);
@@ -2076,14 +2080,23 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
   @Override
   public int measureScrollTop (int position) {
     if (items.isEmpty()) {
-      return SettingHolder.measureHeightForType(getItemViewType(position));
+      return measureItemHeight(position);
     }
     int top = 0;
     final int size = items.size();
     for (int i = 0; i < position && i < size; i++) {
-      top += SettingHolder.measureHeightForType(items.get(i));
+      top += measureItemHeight(i);
     }
     return top;
+  }
+
+  private int measureItemHeight (int position) {
+    int type = getItemViewType(position);
+    if (cardStyle) {
+      int fixed = org.thunderdog.challegram.widget.SettingsCards.fixedHeight(type);
+      if (fixed >= 0) return fixed;
+    }
+    return position < items.size() ? SettingHolder.measureHeightForType(items.get(position)) : SettingHolder.measureHeightForType(type);
   }
 
   @Override

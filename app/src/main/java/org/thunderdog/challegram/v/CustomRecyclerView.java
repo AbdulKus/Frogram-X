@@ -26,6 +26,25 @@ import androidx.recyclerview.widget.RecyclerView;
 import me.vkryl.android.animator.Animated;
 
 public class CustomRecyclerView extends RecyclerView implements Animated {
+  private org.thunderdog.challegram.widget.SettingsCards settingsCards;
+  private boolean settingsCardsEnabled;
+
+  public org.thunderdog.challegram.widget.SettingsCards getSettingsCards () { return settingsCards; }
+  public void enableSettingsCards () { settingsCardsEnabled = true; }
+  public void setSettingsCards (org.thunderdog.challegram.widget.SettingsCards cards) { settingsCards = cards; }
+
+  @Override public void setAdapter (@Nullable RecyclerView.Adapter adapter) {
+    if (settingsCards != null) { removeItemDecoration(settingsCards); settingsCards = null; }
+    super.setAdapter(adapter);
+    if (settingsCardsEnabled) org.thunderdog.challegram.widget.SettingsCards.install(this);
+  }
+
+  @Override public boolean drawChild (android.graphics.Canvas canvas, View child, long time) {
+    if (settingsCards == null) return super.drawChild(canvas, child, time);
+    int save = canvas.save();
+    try { return settingsCards.clipChild(canvas, child, this) && super.drawChild(canvas, child, time); }
+    finally { canvas.restoreToCount(save); }
+  }
   private Runnable backdropInvalidationListener;
   private java.util.function.Consumer<View> backdropRegionInvalidationListener;
   private boolean capturingGlass;
@@ -88,7 +107,13 @@ public class CustomRecyclerView extends RecyclerView implements Animated {
     capturingGlass = true;
     try {
       if (getBackground() != null) getBackground().draw(canvas);
-      for (int i = 0; i < getChildCount(); i++) drawGlassChild(canvas, getChildAt(i));
+      for (int i = 0; i < getChildCount(); i++) {
+        View child = getChildAt(i);
+        if (settingsCards == null) { drawGlassChild(canvas, child); continue; }
+        int save = canvas.save();
+        if (settingsCards.clipChild(canvas, child, this)) drawGlassChild(canvas, child);
+        canvas.restoreToCount(save);
+      }
     } finally {
       capturingGlass = false;
     }

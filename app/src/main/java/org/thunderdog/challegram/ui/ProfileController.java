@@ -1113,6 +1113,20 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   // base recycler view decorator
   public class BaseItemsDecoration extends RecyclerView.ItemDecoration {
+    private final org.thunderdog.challegram.widget.SettingsCardSurface cardSurface = new org.thunderdog.challegram.widget.SettingsCardSurface();
+
+    private void drawCardSurfaces (Canvas canvas, RecyclerView parent, boolean foreground) {
+      if (isEditing()) return;
+      for (int i = 0; i < parent.getChildCount(); i++) {
+        View row = parent.getChildAt(i);
+        int position = parent.getChildAdapterPosition(row);
+        if (profileCardAt(position)) cardSurface.draw(canvas, row, !profileCardAt(position - 1), !profileCardAt(position + 1), foreground);
+      }
+    }
+
+    @Override public void onDraw (@NonNull Canvas canvas, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) { drawCardSurfaces(canvas, parent, false); }
+    @Override public void onDrawOver (@NonNull Canvas canvas, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) { drawCardSurfaces(canvas, parent, true); }
+
     @Override
     public void getItemOffsets (@NonNull Rect outRect, @NonNull View view, RecyclerView parent, @NonNull RecyclerView.State state) {
       RecyclerView.ViewHolder holder = parent.getChildViewHolder(view);
@@ -1685,6 +1699,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       };
       ((ComplexRecyclerView) baseRecyclerView).setHeaderView(headerCell, this);
     }
+    addThemeInvalidateListener(baseRecyclerView);
     baseRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
       private boolean oneShot;
 

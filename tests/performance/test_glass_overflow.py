@@ -44,7 +44,8 @@ class GlassOverflowTest(unittest.TestCase):
 FIXTURE = '''public class OverflowTest {
  @interface NonNull {}
  static void check(boolean v,String message){if(!v)throw new AssertionError(message);}
- static class View {Object parent;int margin,padding;Object getParent(){return parent;}}
+ static class ViewGroup {static class MarginLayoutParams {}}
+ static class View {Object parent;int margin,padding;Object getParent(){return parent;}Object getLayoutParams(){return new ViewGroup.MarginLayoutParams();}}
  static class HeaderView {static int size;static int getSize(boolean offset){return size;}}
  static class Views {static void setTopMargin(View view,int n){view.margin=n;}}
  static class GlassPageContent extends View {

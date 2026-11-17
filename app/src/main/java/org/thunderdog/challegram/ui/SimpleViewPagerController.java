@@ -33,6 +33,14 @@ public class SimpleViewPagerController extends ViewPagerController<Object> {
   private final @Nullable String[] sections;
   private final boolean isWhite;
 
+  @Override protected boolean usesGlassPageHeader () {
+    if (controllers == null || controllers.length == 0) return false;
+    for (ViewController<?> controller : controllers) if (!(controller instanceof SettingsPageController)) return false;
+    return true;
+  }
+
+  @Override protected boolean usesSettingsCards () { return usesGlassPageHeader(); }
+
   public SimpleViewPagerController (Context context, Tdlib tdlib, ViewController<?>[] controllers, @Nullable String[] sections, boolean isWhite) {
     super(context, tdlib);
     this.controllers = controllers;
@@ -70,7 +78,7 @@ public class SimpleViewPagerController extends ViewPagerController<Object> {
 
   @Override
   protected void onCreateView (Context context, FrameLayoutFix contentView, ViewPager pager) {
-    if (isWhite && headerCell != null) {
+    if (isWhite && headerCell != null && !hasFloatingHeader()) {
       headerCell.getTopView().setTextFromToColorId(ColorId.NONE, ColorId.text);
     }
     prepareControllerForPosition(0, this::executeScheduledAnimation);

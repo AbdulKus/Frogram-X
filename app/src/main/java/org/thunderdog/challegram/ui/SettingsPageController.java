@@ -7,6 +7,7 @@ import org.thunderdog.challegram.telegram.Tdlib;
 public abstract class SettingsPageController<T> extends RecyclerViewController<T> {
   protected SettingsPageController (Context context, Tdlib tdlib) { super(context, tdlib); }
   @Override protected boolean usesGlassPageHeader () { return true; }
+  @Override protected boolean usesSettingsCards () { return true; }
   @Override protected android.view.View onCreateView (Context context) {
     android.view.View view = super.onCreateView(context);
     android.view.View recycler = getRecyclerView();

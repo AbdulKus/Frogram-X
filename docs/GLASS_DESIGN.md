@@ -74,7 +74,7 @@ This is the reference for new and existing floating UI. Shared implementation:
   neutral background beneath these rows; the header must not paint an opaque
   rectangle over them. Invalidate on descendant/scroll/theme changes, disable
   sampling for inactive pages and release closed-menu backdrops.
-- Normal profile information/action rows form rounded groups with 8dp side
+- Profile and settings information/action rows form rounded groups with 8dp side
   margins and 26dp outer corners. Use a quiet accent-derived filling, 14% accent
   press feedback and inset separators at 10% glass text opacity. Profile values
   retain their original 16sp, descriptions 15sp and captions 13sp; icons use
@@ -84,8 +84,25 @@ This is the reference for new and existing floating UI. Shared implementation:
   56dp single-line action rows. Grow multiline rows only as their content needs,
   with approximately 16dp top and bottom clearance, one aligned text column
   64dp from the card start and 20dp end padding. Measure text with those same sizes
-  and insets. Leave settings and profile editing screens unchanged. Clip group
-  corners and press feedback together.
+  and insets. Apply the same groups to settings subpages, pickers and settings
+  editors, keeping the original font sizes, destructive-action colours, input
+  behaviour, focus/keyboard handling, and control measurements. Clip group
+  corners and press feedback together. Ordinary single-line controls use 56dp;
+  two-line controls use 68dp. Sliders, session/device rows and editors retain
+  their content-specific heights and must not be forced into a text-row height.
+  Section titles and help text stay outside the cards. Replace legacy section
+  shadows with the shared card surface, retaining their spacing.
+  Light themes use a soft neutral 2dp shadow with a 1dp downward offset and a
+  thin contour at 9% glass text opacity. Separate each whole group from its
+  background without adding borders or shadow seams between joined rows. Dark
+  themes retain the quiet existing filling. This separation also applies to
+  profile groups. Chat/message lists and modal option sheets keep their layouts.
+  Editable settings headers use glass text/hint/icon roles too; never carry
+  white legacy header text or placeholder glyphs onto light glass. Tabbed settings
+  pages share the floating shell and capsule feedback. Invalidate the list itself
+  on theme changes so its contour/shadow display list updates without a scroll.
+  A second header row of tabs has the same 12dp side inset as profile media tabs,
+  keeping its selection/press capsules inside the rounded glass shell.
   Software backdrop capture draws the row's stable filling without executing its
   live RippleDrawable, preserving the RenderThread press animation.
 - Profile media tabs use a separate glass island, semantic glass colours and

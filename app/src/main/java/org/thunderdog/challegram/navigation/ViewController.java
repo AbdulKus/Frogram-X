@@ -1278,6 +1278,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   protected boolean usesGlassPageHeader () { return false; }
+  protected boolean usesSettingsCards () { return false; }
 
   protected void onGlassPageContentInvalidated () {
     if (glassPageHeader != null) glassPageHeader.invalidateBackdrop();
@@ -3235,7 +3236,9 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   public final View getValue () {
     if (contentView == null) {
       contentView = onCreateView(context());
-      if (usesGlassPageHeader() && !isInForceTouchMode()) {
+      if (usesSettingsCards() && !isInForceTouchMode()) org.thunderdog.challegram.widget.SettingsCards.install(contentView, this);
+      // The pager's outer page owns overflow. Its child LayoutParams have no margins.
+      if (usesGlassPageHeader() && !isInForceTouchMode() && !(parentWrapper instanceof ViewPagerController)) {
         contentView = new GlassPageContent(context(), contentView, this::onGlassPageContentInvalidated);
         addThemeInvalidateListener(contentView);
       }

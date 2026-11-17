@@ -53,6 +53,8 @@ import me.vkryl.core.StringUtils;
 import me.vkryl.core.collection.IntList;
 
 public class ThemeController extends ViewPagerController<ThemeController.Args> implements Menu, MoreDelegate, ClipboardManager.OnPrimaryClipChangedListener {
+  @Override protected boolean usesGlassPageHeader () { return true; }
+  @Override protected boolean usesSettingsCards () { return true; }
   public static class Args {
     private final ThemeInfo theme;
     private Runnable after;

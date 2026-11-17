@@ -11,7 +11,7 @@ import org.thunderdog.challegram.theme.Theme;
 
 import me.vkryl.core.ColorUtils;
 
-/** Quiet, theme-derived surfaces for profile information groups only. */
+/** Shared quiet, theme-derived surfaces for profile and settings groups. */
 public final class ProfileCardBackground extends RippleDrawable {
   private int lastAccent;
 

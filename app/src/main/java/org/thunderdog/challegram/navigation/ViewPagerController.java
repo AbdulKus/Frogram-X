@@ -28,6 +28,7 @@ import androidx.annotation.IdRes;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.collection.SparseArrayCompat;
 import androidx.core.util.ObjectsCompat;
 import androidx.viewpager.widget.PagerAdapter;
@@ -225,8 +226,8 @@ public abstract class ViewPagerController<T> extends TelegramViewController<T> i
           if (getTitleStyle() == TITLE_STYLE_COMPACT_BIG) {
             headerCell.getTopView().setItemPadding(Screen.dp(12f));
             TextView title = SimpleHeaderView.newTitle(context);
-            title.setTextColor(Theme.headerTextColor());
-            addThemeTextColorListener(title, ColorId.headerText);
+            title.setTextColor(getHeaderTextColor());
+            addThemeTextColorListener(title, getHeaderTextColorId());
             title.setId(R.id.text_title);
             Views.setMediumText(title, getName());
             ((ViewPagerHeaderViewCompact) headerCell).addView(title);
@@ -236,6 +237,16 @@ public abstract class ViewPagerController<T> extends TelegramViewController<T> i
       }
       headerCell.getTopView().setOnItemClickListener(this);
       headerCell.getTopView().setItems(sections);
+      if (hasFloatingHeader()) {
+        headerCell.getTopView().setGlassSelection(true);
+        headerCell.getTopView().setTextFromToColorId(ColorId.glassIcon, ColorId.glassActive);
+        if (getTitleStyle() == TITLE_STYLE_COMPACT_BIG) {
+          RecyclerView strip = ((ViewPagerHeaderViewCompact) headerCell).getRecyclerView();
+          FrameLayoutFix.LayoutParams tabsParams = (FrameLayoutFix.LayoutParams) strip.getLayoutParams();
+          tabsParams.leftMargin = tabsParams.rightMargin = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP + 4f);
+          strip.setLayoutParams(tabsParams);
+        }
+      }
       addThemeInvalidateListener(headerCell.getTopView());
     }
 

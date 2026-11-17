@@ -35,6 +35,7 @@ import org.thunderdog.challegram.loader.ImageGalleryFile;
 import org.thunderdog.challegram.loader.ImageReceiver;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.PorterDuffColorId;
+import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.tool.Drawables;
 import org.thunderdog.challegram.tool.Keyboard;
 import org.thunderdog.challegram.tool.Paints;
@@ -89,6 +90,13 @@ public class EditHeaderView extends FrameLayoutFix implements RtlCheckListener, 
     }
 
     input = HeaderEditText.create(this, false, null);
+    if (parent.hasFloatingHeader()) {
+      input.setTextColor(Theme.getColor(ColorId.glassText));
+      input.setHintTextColor(Theme.getColor(ColorId.glassPlaceholder));
+      parent.addThemeTextColorListener(input, ColorId.glassText);
+      parent.addThemeHintTextColorListener(input, ColorId.glassPlaceholder);
+      parent.addThemeInvalidateListener(this);
+    }
     input.setHint(Lang.getString(R.string.ChannelName));
     input.addTextChangedListener(this);
     input.checkRtl();
@@ -276,8 +284,9 @@ public class EditHeaderView extends FrameLayoutFix implements RtlCheckListener, 
     Views.restore(c, s);
     int cx = receiver.centerX();
     int cy = receiver.centerY();
-    c.drawCircle(cx, cy, avatarRadius, Paints.fillingPaint(0x20000000));
-    Drawables.draw(c, icon, cx - (int) (icon.getMinimumWidth() * .5f), cy - (int) (icon.getMinimumHeight() * .5f), PorterDuffPaint.get(iconColorId));
+    boolean glassPlaceholder = parent.hasFloatingHeader() && file == null;
+    c.drawCircle(cx, cy, avatarRadius, Paints.fillingPaint(glassPlaceholder ? me.vkryl.core.ColorUtils.alphaColor(.10f, Theme.getColor(ColorId.glassActive)) : 0x20000000));
+    Drawables.draw(c, icon, cx - (int) (icon.getMinimumWidth() * .5f), cy - (int) (icon.getMinimumHeight() * .5f), PorterDuffPaint.get(glassPlaceholder ? ColorId.glassIcon : iconColorId));
   }
 
   public void setInputEnabled (boolean enabled) {

@@ -115,6 +115,7 @@ public class SettingsController extends ViewController<Void> implements
   private SettingsAdapter adapter;
 
   @Override protected boolean usesGlassPageHeader () { return true; }
+  @Override protected boolean usesSettingsCards () { return true; }
 
   public SettingsController (Context context, Tdlib tdlib) {
     super(context, tdlib);

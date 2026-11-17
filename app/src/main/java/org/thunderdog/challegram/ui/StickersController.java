@@ -55,6 +55,8 @@ import me.vkryl.core.collection.LongSparseIntArray;
 import tgx.td.Td;
 
 public class StickersController extends RecyclerViewController<StickersController.Args> implements View.OnClickListener, StickersListener {
+  @Override protected boolean usesGlassPageHeader () { return true; }
+  @Override protected boolean usesSettingsCards () { return true; }
   public static final int MODE_STICKERS = 0;
   public static final int MODE_STICKERS_ARCHIVED = 1;
   public static final int MODE_MASKS = 2;

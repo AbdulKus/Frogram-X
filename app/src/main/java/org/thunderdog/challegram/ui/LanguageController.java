@@ -49,6 +49,8 @@ import me.vkryl.core.StringUtils;
 import me.vkryl.core.collection.IntList;
 
 public class LanguageController extends RecyclerViewController<LanguageController.Args> implements View.OnClickListener, EditLanguageController.Delegate {
+  @Override protected boolean usesGlassPageHeader () { return true; }
+  @Override protected boolean usesSettingsCards () { return true; }
   public static class Args {
     public TdApi.LanguagePackInfo languageInfo;
     public Delegate delegate;

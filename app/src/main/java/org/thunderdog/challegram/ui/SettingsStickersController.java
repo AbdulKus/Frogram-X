@@ -42,6 +42,7 @@ import me.vkryl.android.widget.FrameLayoutFix;
 import me.vkryl.core.StringUtils;
 
 public class SettingsStickersController extends ViewPagerController<SettingsController> implements SettingsController.StickerSetLoadListener {
+  @Override protected boolean usesSettingsCards () { return true; }
   public static final int TYPE_STICKER = 0;
   public static final int TYPE_EMOJI = 1;
 

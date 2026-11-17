@@ -47,6 +47,8 @@ import me.vkryl.android.animator.FactorAnimator;
 import me.vkryl.android.widget.FrameLayoutFix;
 
 public abstract class EditBaseController<T> extends ViewController<T> implements FactorAnimator.Target, MaterialEditText.EnterKeyListener, DoneListener {
+  @Override protected boolean usesGlassPageHeader () { return true; }
+  @Override protected boolean usesSettingsCards () { return true; }
   public EditBaseController (Context context, Tdlib tdlib) {
     super(context, tdlib);
   }
@@ -64,7 +66,7 @@ public abstract class EditBaseController<T> extends ViewController<T> implements
   protected RecyclerView.ItemAnimator itemAnimator;
 
   protected @ColorId int getRecyclerBackgroundColorId () {
-    return ColorId.filling;
+    return ColorId.background;
   }
 
   protected final DoneButton getDoneButton () {
@@ -124,7 +126,7 @@ public abstract class EditBaseController<T> extends ViewController<T> implements
   }
 
   protected RecyclerView onCreateRecyclerView () {
-    RecyclerView recyclerView = (RecyclerView) Views.inflate(context(), R.layout.recycler, contentView);
+    RecyclerView recyclerView = (RecyclerView) Views.inflate(context(), R.layout.recycler_custom, contentView);
     recyclerView.setItemAnimator(itemAnimator = new CustomItemAnimator(AnimatorUtils.DECELERATE_INTERPOLATOR, 180l));
     recyclerView.setHasFixedSize(true);
     recyclerView.setLayoutManager(new org.thunderdog.challegram.navigation.GlassLayoutManager(context, recyclerView));

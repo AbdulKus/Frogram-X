@@ -125,6 +125,8 @@ import me.vkryl.core.lambda.RunnableInt;
 import tgx.td.Td;
 
 public class ThemeListController extends RecyclerViewController<ThemeListController.Args> implements Menu, View.OnClickListener, ClipboardManager.OnPrimaryClipChangedListener, View.OnLongClickListener {
+  @Override protected boolean usesGlassPageHeader () { return true; }
+  @Override protected boolean usesSettingsCards () { return true; }
   public static class Args {
     private final ThemeInfo theme;
     private int specificSectionId;

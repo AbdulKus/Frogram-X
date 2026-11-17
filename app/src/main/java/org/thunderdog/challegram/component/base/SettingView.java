@@ -495,13 +495,24 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
 
   private boolean profileInformationStyle;
 
-  /** Opt-in geometry for normal profile cards, retaining the standard text sizes. */
+  private boolean isInformationRow () {
+    return type == TYPE_INFO || type == TYPE_INFO_COMPACT || type == TYPE_INFO_SUPERCOMPACT || type == TYPE_INFO_MULTILINE;
+  }
+
+  private boolean isTwoLineCard () {
+    return isInformationRow() && (type != TYPE_INFO_SUPERCOMPACT || !StringUtils.isEmpty(swapDataAndName ? itemData : itemName));
+  }
+
+  /** Shared compact profile/settings geometry, retaining the standard text sizes. */
   public void setProfileInformationStyle (boolean enabled) {
-    if (profileInformationStyle == enabled) return;
+    boolean changed = profileInformationStyle != enabled;
     profileInformationStyle = enabled;
     if (getLayoutParams() != null && type != TYPE_INFO_MULTILINE) {
-      getLayoutParams().height = Screen.dp(enabled ? (type == TYPE_SETTING ? 56f : 68f) : (type == TYPE_SETTING ? 55f : 76f));
+      int originalHeight = type == TYPE_INFO ? 76 : type == TYPE_INFO_COMPACT ? 64 : 55;
+      int height = Screen.dp(enabled ? (isTwoLineCard() ? 68f : 56f) : originalHeight);
+      if (getLayoutParams().height != height) { getLayoutParams().height = height; changed = true; }
     }
+    if (!changed) return;
     buildLayout();
     requestLayout();
     invalidate();
@@ -617,7 +628,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
       pTop = Screen.dp(21f + 13f);
     }
 
-    if (profileInformationStyle) pTop = Screen.dp(type == TYPE_SETTING ? 34f : 30f);
+    if (profileInformationStyle) pTop = Screen.dp(isTwoLineCard() ? 30f : 34f);
 
     if (swapDataAndName) {
       displayItemData = itemName;
@@ -660,7 +671,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
       if (type == TYPE_INFO_MULTILINE && text != null && text.getLineCount() > 1) {
         // Keep a long bio's icon beside its first two lines, not halfway down the bio.
         centerY = bodyTop() + text.getLineHeight();
-      } else if (displayItemData != null && displayItemName != null && type != TYPE_SETTING) {
+      } else if (displayItemData != null && displayItemName != null && isInformationRow()) {
         centerY = (pDataTop + Paints.getTextPaint16().ascent() + pTop + Paints.getRegularTextPaint(13f).descent()) / 2f;
       }
       pIconTop = centerY - Screen.dp(28f) / 2f;

@@ -64,12 +64,13 @@ public final class GlassPageContent extends FrameLayoutFix implements RootFrameL
   }
 
   private void updateInset (int inset) {
-    int next = HeaderView.getSize(false) + inset;
+    boolean supportsMargins = getLayoutParams() instanceof ViewGroup.MarginLayoutParams;
+    int next = supportsMargins ? HeaderView.getSize(false) + inset : 0;
     if (overflow != next) {
       overflow = next;
       // These cancel: the original content keeps its previous screen position
       // and viewport height. Only this wrapper extends to the window's top.
-      Views.setTopMargin(this, -next);
+      if (supportsMargins) Views.setTopMargin(this, -next);
       setPadding(0, next, 0, 0);
       invalidation.run();
     }
