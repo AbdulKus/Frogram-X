@@ -188,6 +188,7 @@ public class SharedMembersController extends SharedBaseController<DoubleTextWrap
   @Override
   protected void onCreateView (Context context, MediaRecyclerView recyclerView, SettingsAdapter adapter) {
     super.onCreateView(context, recyclerView, adapter);
+    if (managementCards) recyclerView.setSettingsCardTopClearance(false);
     groupId = ChatId.toBasicGroupId(chatId);
     if (groupId != 0) {
       tdlib.cache().subscribeToGroupUpdates(groupId, this);

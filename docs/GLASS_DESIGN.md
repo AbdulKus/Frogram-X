@@ -119,6 +119,9 @@ This is the reference for new and existing floating UI. Shared implementation:
   profile groups. Chat/message lists and modal option sheets keep their layouts.
   Group management uses those same settings cards, including its editable fields
   and action rows; retain the profile header and its own scroll geometry.
+  Both the base list and its participant pages preserve their original padding:
+  never add standalone settings-page clearance to these synchronized lists.
+  Check repeated drags through the pinning boundary and idle stability after release.
   Allowed reactions use independent rounded tiles in the four-column grid, with
   equal 8dp horizontal gaps/outer clearance and 8dp row gaps. Full-width controls
   keep their normal groups. Never combine the legacy grid filling/spacing with

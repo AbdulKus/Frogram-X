@@ -28,6 +28,10 @@ import me.vkryl.android.animator.Animated;
 public class CustomRecyclerView extends RecyclerView implements Animated {
   private org.thunderdog.challegram.widget.SettingsCards settingsCards;
   private boolean settingsCardsEnabled;
+  private boolean settingsCardTopClearance = true;
+
+  public void setSettingsCardTopClearance (boolean enabled) { settingsCardTopClearance = enabled; }
+  public boolean hasSettingsCardTopClearance () { return settingsCardTopClearance; }
 
   public org.thunderdog.challegram.widget.SettingsCards getSettingsCards () { return settingsCards; }
   public void enableSettingsCards () { settingsCardsEnabled = true; }

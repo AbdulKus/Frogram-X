@@ -2073,6 +2073,9 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       }
     });
     buildCells();
+    // These lists share a scroll origin with the participant pager. Cards must
+    // not insert the independent settings page's additional top padding.
+    if (isEditing()) baseRecyclerView.setSettingsCardTopClearance(false);
     baseRecyclerView.setAdapter(baseAdapter);
     if (isEditing()) org.thunderdog.challegram.widget.SettingsCards.install(baseRecyclerView, this);
 
