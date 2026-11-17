@@ -47,7 +47,7 @@ public class Regression {
  static class Adapter {int type=9;int getItemCount(){return 4;}int getItemViewType(int p){return type;}ListItem getItem(int p){return new ListItem();}}
  static class Screen {static int dp(float v){return (int)v;}}
  static class GlassStyle {static final float RADIUS_DP=26;}
- static class Cards {Adapter adapter=new Adapter();RectF bounds=new RectF();float[] radii=new float[8];Path clip=new Path();boolean partAt(int p){return true;}PRODUCTION}
+ static class Cards {Adapter adapter=new Adapter();RectF bounds=new RectF();float[] radii=new float[8];Path clip=new Path();boolean reactionTile(int position){return false;} boolean partAt(int p){return true;}PRODUCTION}
  public static void main(String[] args){
   Cards cards=new Cards();View row=new View();RecyclerView list=new RecyclerView();Canvas hardware=new Canvas();hardware.hardware=true;
   check(cards.clipChild(hardware,row,list)&&hardware.rejected==0&&hardware.clips==1);

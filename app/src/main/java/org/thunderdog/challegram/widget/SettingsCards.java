@@ -104,6 +104,7 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
       case ListItem.TYPE_SESSION_WITH_AVATAR:
       case ListItem.TYPE_USER:
       case ListItem.TYPE_USER_SMALL:
+      case ListItem.TYPE_CHAT_BETTER:
       case ListItem.TYPE_CHAT_SMALL:
       case ListItem.TYPE_CHAT_SMALL_SELECTABLE:
       case ListItem.TYPE_STICKER_SET:
@@ -199,8 +200,23 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
     }
   }
 
+  private boolean reactionTile (int position) {
+    return position >= 0 && position < adapter.getItemCount() && adapter.getItemViewType(position) == ListItem.TYPE_REACTION_CHECKBOX;
+  }
+
   @Override public void getItemOffsets (@NonNull Rect out, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
     int position = parent.getChildAdapterPosition(view);
+    if (reactionTile(position) && parent.getLayoutManager() instanceof androidx.recyclerview.widget.GridLayoutManager) {
+      androidx.recyclerview.widget.GridLayoutManager grid = (androidx.recyclerview.widget.GridLayoutManager) parent.getLayoutManager();
+      int count = grid.getSpanCount();
+      int column = grid.getSpanSizeLookup().getSpanIndex(position, count);
+      int gap = Screen.dp(GlassStyle.SIDE_DP);
+      out.left = gap - column * gap / count;
+      out.right = (column + 1) * gap / count;
+      if (parent.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) { int left = out.left; out.left = out.right; out.right = left; }
+      out.top = out.bottom = Screen.dp(4f);
+      return;
+    }
     if (partAt(position)) out.left = out.right = Screen.dp(GlassStyle.SIDE_DP);
     else if (position >= 0 && position < adapter.getItemCount()) {
       switch (adapter.getItemViewType(position)) {
@@ -227,8 +243,8 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
     // shown by HWUI below an unclipped ancestor. Let HWUI cull those child nodes.
     if (!canvas.isHardwareAccelerated() && canvas.quickReject(bounds, Canvas.EdgeType.AA)) return false;
     float radius = Math.min(Screen.dp(GlassStyle.RADIUS_DP), view.getHeight() / 2f);
-    java.util.Arrays.fill(radii, 0, 4, partAt(position - 1) ? 0 : radius);
-    java.util.Arrays.fill(radii, 4, 8, partAt(position + 1) ? 0 : radius);
+    java.util.Arrays.fill(radii, 0, 4, !reactionTile(position) && partAt(position - 1) ? 0 : radius);
+    java.util.Arrays.fill(radii, 4, 8, !reactionTile(position) && partAt(position + 1) ? 0 : radius);
     clip.reset();
     clip.addRoundRect(bounds, radii, Path.Direction.CW);
     canvas.clipPath(clip);
@@ -245,7 +261,7 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
     for (int i = 0; i < parent.getChildCount(); i++) {
       View row = parent.getChildAt(i);
       int position = parent.getChildAdapterPosition(row);
-      if (partAt(position)) surface.draw(canvas, row, !partAt(position - 1), !partAt(position + 1), foreground);
+      if (partAt(position)) surface.draw(canvas, row, reactionTile(position) || !partAt(position - 1), reactionTile(position) || !partAt(position + 1), foreground);
     }
   }
   @Override public void onDraw (@NonNull Canvas canvas, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) { drawSurfaces(canvas, parent, false); }

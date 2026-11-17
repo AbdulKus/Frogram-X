@@ -123,8 +123,8 @@ public class ReactionCheckboxSettingsView extends LinearLayout implements ThemeI
   }
 
   public void recolor () {
-    captionTextView.setTextColor(Theme.getColor(ColorId.text));
-    captionTextView.setHighlightColor(Theme.getColor(ColorId.text));
+    captionTextView.setTextColor(Theme.getColor(ColorId.glassTextSecondary));
+    captionTextView.setHighlightColor(Theme.getColor(ColorId.glassActive));
   }
 
   public void attach () {

@@ -2074,6 +2074,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     });
     buildCells();
     baseRecyclerView.setAdapter(baseAdapter);
+    if (isEditing()) org.thunderdog.challegram.widget.SettingsCards.install(baseRecyclerView, this);
 
     // Binding data
     if (headerCell != null) {
@@ -5548,6 +5549,10 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   private CharSequence lastUsernames;
 
   private int calculateHeight (int position, int width, ListItem item) {
+    if (isEditing()) {
+      int fixed = org.thunderdog.challegram.widget.SettingsCards.fixedHeight(item.getViewType());
+      if (fixed >= 0) return fixed;
+    }
     if (!isEditing() && isProfileCardPart(item.getViewType())) width -= Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) * 2;
     final int itemId = item.getId();
     switch (item.getViewType()) {
@@ -5886,25 +5891,25 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     if (controllers.isEmpty()) {
       switch (mode) {
         case Mode.EDIT_CHANNEL: {
-          controllers.add(new SharedMembersController(context, tdlib)
+          controllers.add(new SharedMembersController(context, tdlib).setManagementCards()
             .setSpecificFilter(new TdApi.SupergroupMembersFilterAdministrators()));
-          controllers.add(new SharedMembersController(context, tdlib)
+          controllers.add(new SharedMembersController(context, tdlib).setManagementCards()
             .setSpecificFilter(new TdApi.SupergroupMembersFilterBanned()));
           TdApi.SupergroupFullInfo supergroupFull = tdlib.cache().supergroupFull(supergroup.id);
           if (supergroupFull != null && supergroupFull.canGetMembers) {
-            controllers.add(new SharedMembersController(context, tdlib)
+            controllers.add(new SharedMembersController(context, tdlib).setManagementCards()
               .setSpecificFilter(new TdApi.SupergroupMembersFilterRecent()));
           }
           break;
         }
         case Mode.EDIT_SUPERGROUP:
         case Mode.EDIT_GROUP: {
-          controllers.add(new SharedMembersController(context, tdlib)
+          controllers.add(new SharedMembersController(context, tdlib).setManagementCards()
             .setSpecificFilter(new TdApi.SupergroupMembersFilterAdministrators()));
           if (mode == Mode.EDIT_SUPERGROUP ? TD.isAdmin(supergroup.status) : TD.isCreator(group.status)) {
-            controllers.add(new SharedMembersController(context, tdlib)
+            controllers.add(new SharedMembersController(context, tdlib).setManagementCards()
               .setSpecificFilter(new TdApi.SupergroupMembersFilterRestricted()));
-            controllers.add(new SharedMembersController(context, tdlib)
+            controllers.add(new SharedMembersController(context, tdlib).setManagementCards()
               .setSpecificFilter(new TdApi.SupergroupMembersFilterBanned()));
           }
           break;

@@ -54,6 +54,15 @@ public class SharedMembersController extends SharedBaseController<DoubleTextWrap
     super(context, tdlib);
   }
 
+  private boolean managementCards;
+
+  public SharedMembersController setManagementCards () {
+    managementCards = true;
+    return this;
+  }
+
+  @Override protected boolean usesSettingsCards () { return managementCards; }
+
   private boolean forceAdmins;
 
   public void setForceAdmins (boolean forceAdmins) {

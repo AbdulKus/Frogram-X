@@ -259,11 +259,7 @@ public class EditEnabledReactionsController extends EditBaseController<EditEnabl
       }
     });
 
-    GridSpacingItemDecoration decoration = new GridSpacingItemDecoration(4, Screen.dp(3f), true, true, true);
-    decoration.setNeedDraw(true, ListItem.TYPE_REACTION_CHECKBOX);
-    decoration.setDrawColorId(ColorId.filling);
-    decoration.setSpanSizeLookup(manager.getSpanSizeLookup());
-    recyclerView.addItemDecoration(decoration);
+    // SettingsCards owns tile spacing and surfaces alongside the full-width controls.
     recyclerView.setItemAnimator(null);
     recyclerView.setLayoutManager(manager);
     recyclerView.setAdapter(adapter);

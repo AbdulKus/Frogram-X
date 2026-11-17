@@ -117,6 +117,12 @@ This is the reference for new and existing floating UI. Shared implementation:
   background without adding borders or shadow seams between joined rows. Dark
   themes retain the quiet existing filling. This separation also applies to
   profile groups. Chat/message lists and modal option sheets keep their layouts.
+  Group management uses those same settings cards, including its editable fields
+  and action rows; retain the profile header and its own scroll geometry.
+  Allowed reactions use independent rounded tiles in the four-column grid, with
+  equal 8dp horizontal gaps/outer clearance and 8dp row gaps. Full-width controls
+  keep their normal groups. Never combine the legacy grid filling/spacing with
+  card decorations; mirror tile insets in RTL and use semantic glass captions.
   Editable settings headers use glass text/hint/icon roles too; never carry
   white legacy header text or placeholder glyphs onto light glass. Tabbed settings
   pages share the floating shell and capsule feedback. Invalidate the list itself
