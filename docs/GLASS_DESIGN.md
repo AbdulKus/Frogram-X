@@ -77,7 +77,10 @@ This is the reference for new and existing floating UI. Shared implementation:
 - Normal profile information/action rows form rounded groups with 8dp side
   margins and 26dp outer corners. Use a quiet accent-derived filling, 14% accent
   press feedback and inset separators at 10% glass text opacity. Profile values
-  use 18sp, descriptions 17sp, captions 15sp and icons 28dp. Use 88dp information
+  retain their original 16sp, descriptions 15sp and captions 13sp; icons use
+  28dp. Centre icons beside the first two text lines (value and caption for
+  short fields, the first two body lines for a long description), rather than
+  aligning them to the first line. Use 88dp information
   rows (grow multiline rows), with one aligned text column 64dp from the card
   start and 20dp end padding. Measure text with those same sizes and insets. Leave settings and
   profile editing screens unchanged. Clip group corners and press feedback together.

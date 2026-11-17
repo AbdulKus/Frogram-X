@@ -495,7 +495,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
 
   private boolean profileInformationStyle;
 
-  /** Opt-in typography/geometry for normal profile cards; other settings stay unchanged. */
+  /** Opt-in geometry for normal profile cards, retaining the standard text sizes. */
   public void setProfileInformationStyle (boolean enabled) {
     if (profileInformationStyle == enabled) return;
     profileInformationStyle = enabled;
@@ -507,10 +507,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
     invalidate();
   }
 
-  private float primaryTextSize () { return profileInformationStyle ? 18f : 16f; }
-  private float secondaryTextSize () { return profileInformationStyle ? 15f : 13f; }
-  private TextPaint primaryPaint (int color) { return profileInformationStyle ? Paints.getRegularTextPaint(18f, color) : Paints.getTextPaint16(color); }
-  private float bodyTop () { return pDataTop - Screen.dp(profileInformationStyle ? 16f : 13f); }
+  private float bodyTop () { return pDataTop - Screen.dp(13f); }
 
   private boolean swapDataAndName;
 
@@ -620,7 +617,7 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
       pTop = Screen.dp(21f + 13f);
     }
 
-    if (profileInformationStyle) pTop = Screen.dp(type == TYPE_SETTING ? 38f : 36f);
+    if (profileInformationStyle) pTop = Screen.dp(type == TYPE_SETTING ? 38f : 40f);
 
     if (swapDataAndName) {
       displayItemData = itemName;
@@ -633,9 +630,9 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
     if (type == TYPE_INFO || type == TYPE_INFO_COMPACT || type == TYPE_INFO_SUPERCOMPACT || type == TYPE_INFO_MULTILINE) {
       pDataLeft = pLeft;
       pDataTop = pTop;
-      pTop = pTop + Screen.dp(profileInformationStyle ? 26f : 20f);
+      pTop = pTop + Screen.dp(20f);
       if (displayItemData != null) {
-        setDisplayItemData(displayItemData, availWidth, primaryPaint(Theme.textAccentColor()));
+        setDisplayItemData(displayItemData, availWidth, Paints.getTextPaint16());
       }
       if (text != null) {
         text.get(lastTextAvailWidth = (int) availWidth);
@@ -643,22 +640,31 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
         lastTextAvailWidth = 0;
       }
       if (displayItemName != null) {
-        setDisplayItemName(displayItemName, availWidth, Paints.getRegularTextPaint(secondaryTextSize()), secondaryTextSize());
+        setDisplayItemName(displayItemName, availWidth, Paints.getRegularTextPaint(13f), 13f);
       }
     } else {
       if (displayItemData != null) {
-        setDisplayItemData(displayItemData, availWidth, primaryPaint(Theme.textAccentColor()));
+        setDisplayItemData(displayItemData, availWidth, Paints.getTextPaint16());
         pDataLeft = totalWidth - paddingRight - displayItemDataWidth;
         pDataTop = pTop;
       }
       if (displayItemName != null) {
-        setDisplayItemName(displayItemName, availWidth, primaryPaint(Theme.textAccentColor()), primaryTextSize());
+        setDisplayItemName(displayItemName, availWidth, Paints.getTextPaint16(), 16f);
       }
     }
 
     pIconTop = (flags & FLAG_CENTER_ICON) != 0 && icon != null ?  (totalHeight / 2f - icon.getMinimumHeight() / 2f) : Screen.dp(type == TYPE_INFO || type == TYPE_INFO_COMPACT || type == TYPE_INFO_MULTILINE ? 20f : 16f);
     pIconLeft = Screen.dp(18f);
-    if (profileInformationStyle) pIconTop = type == TYPE_SETTING ? (totalHeight - Screen.dp(28f)) / 2f : Screen.dp(18f);
+    if (profileInformationStyle) {
+      float centerY = totalHeight / 2f;
+      if (type == TYPE_INFO_MULTILINE && text != null && text.getLineCount() > 1) {
+        // Keep a long bio's icon beside its first two lines, not halfway down the bio.
+        centerY = bodyTop() + text.getLineHeight();
+      } else if (displayItemData != null && displayItemName != null && type != TYPE_SETTING) {
+        centerY = (pDataTop + Paints.getTextPaint16().ascent() + pTop + Paints.getRegularTextPaint(13f).descent()) / 2f;
+      }
+      pIconTop = centerY - Screen.dp(28f) / 2f;
+    }
   }
 
   private boolean subscribedToEmojiUpdates;
@@ -938,10 +944,10 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
         if ((flags & FLAG_DATA_SUBTITLE) != 0) {
           subtitleColor = ColorUtils.alphaColor(Theme.getSubtitleAlpha(), subtitleColor);
         }
-        drawText(c, displayItemName, displayItemNameLayout, pLeft, pTop, (int) (pTop - Screen.dp(profileInformationStyle ? 14f : 12f)), Paints.getRegularTextPaint(secondaryTextSize(), subtitleColor), rtl, width, displayItemNameWidth, displayItemNameText, subtitleColorSet, emojiStatusHelper);
+        drawText(c, displayItemName, displayItemNameLayout, pLeft, pTop, (int) (pTop - Screen.dp(12f)), Paints.getRegularTextPaint(13f, subtitleColor), rtl, width, displayItemNameWidth, displayItemNameText, subtitleColorSet, emojiStatusHelper);
       }
       if (displayItemData != null) {
-        drawText(c, displayItemData, displayItemDataLayout, pDataLeft, pDataTop,  (int) (pDataTop - Screen.dp(profileInformationStyle ? 17f : 15f)), primaryPaint(dataColor), rtl, width, displayItemDataWidth, null, null, emojiStatusHelper);
+        drawText(c, displayItemData, displayItemDataLayout, pDataLeft, pDataTop,  (int) (pDataTop - Screen.dp(15f)), Paints.getTextPaint16(dataColor), rtl, width, displayItemDataWidth, null, null, emojiStatusHelper);
       }
     } else if (type == TYPE_INFO_MULTILINE) {
       if (displayItemName != null) {
@@ -949,8 +955,8 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
         if ((flags & FLAG_DATA_SUBTITLE) != 0) {
           subtitleColor = ColorUtils.alphaColor(Theme.getSubtitleAlpha(), subtitleColor);
         }
-        float top = profileInformationStyle ? bodyTop() + text.getHeight() + Screen.dp(24f) : (int) pDataTop - Screen.dp(13f) + text.getHeight() + Screen.dp(17f);
-        drawText(c, displayItemName, displayItemNameLayout, pLeft, profileInformationStyle ? top : (int) pDataTop - Screen.dp(13f) + text.getHeight() + Screen.dp(15f), (int) (top - Screen.dp(profileInformationStyle ? 14f : 12f)), Paints.getRegularTextPaint(secondaryTextSize(), subtitleColor), rtl, width, displayItemNameWidth, displayItemNameText, subtitleColorSet, emojiStatusHelper);
+        float top = bodyTop() + text.getHeight() + Screen.dp(17f);
+        drawText(c, displayItemName, displayItemNameLayout, pLeft, profileInformationStyle ? top : (int) pDataTop - Screen.dp(13f) + text.getHeight() + Screen.dp(15f), (int) (top - Screen.dp(12f)), Paints.getRegularTextPaint(13f, subtitleColor), rtl, width, displayItemNameWidth, displayItemNameText, subtitleColorSet, emojiStatusHelper);
       }
       if (text != null) {
         if (rtl) {
@@ -961,10 +967,10 @@ public class SettingView extends FrameLayoutFix implements FactorAnimator.Target
       }
     } else {
       if (displayItemData != null) {
-        drawText(c, displayItemData, displayItemDataLayout, pDataLeft, pDataTop, (int) (pDataTop - Screen.dp(15)), primaryPaint(dataColor), rtl, width, displayItemDataWidth, null, null, emojiStatusHelper);
+        drawText(c, displayItemData, displayItemDataLayout, pDataLeft, pDataTop, (int) (pDataTop - Screen.dp(15)), Paints.getTextPaint16(dataColor), rtl, width, displayItemDataWidth, null, null, emojiStatusHelper);
       }
       if (displayItemName != null) {
-        drawText(c, displayItemName, displayItemNameLayout, pLeft, pTop, (int) (pTop - Screen.dp(15f)), primaryPaint(dataColor), rtl, width, displayItemNameWidth, displayItemNameText, this, emojiStatusHelper);
+        drawText(c, displayItemName, displayItemNameLayout, pLeft, pTop, (int) (pTop - Screen.dp(15f)), Paints.getTextPaint16(dataColor), rtl, width, displayItemNameWidth, displayItemNameText, this, emojiStatusHelper);
       }
     }
     if (progressComponent != null) {

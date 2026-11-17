@@ -2471,7 +2471,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       currentAbout = text;
       if (text != null) {
         // TODO: custom emoji support
-        aboutWrapper = new TextWrapper(tdlib, text, Paints.robotoStyleProvider(isEditing() ? 15f : 17f), TextColorSets.Regular.NORMAL, new TdlibUi.UrlOpenParameters().sourceChat(getChatId()), null);
+        aboutWrapper = new TextWrapper(tdlib, text, Paints.robotoStyleProvider(15f), TextColorSets.Regular.NORMAL, new TdlibUi.UrlOpenParameters().sourceChat(getChatId()), null);
         aboutWrapper.addTextFlags(Text.FLAG_CUSTOM_LONG_PRESS | (Lang.rtl() ? Text.FLAG_ALIGN_RIGHT : 0));
         aboutWrapper.prepare(getTextWidth(Screen.currentWidth()));
       } else {
@@ -5546,7 +5546,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
           } else {
             CharSequence sequence = getUsernameName();
             if (!StringUtils.equalsOrBothEmpty(sequence, lastUsernames) || lastUsernameWidth != availWidth) {
-              Text text = new Text.Builder(tdlib, sequence, null, availWidth, Paints.robotoStyleProvider(isEditing() ? 13f : 15f), TextColorSets.Regular.NORMAL, null).build();
+              Text text = new Text.Builder(tdlib, sequence, null, availWidth, Paints.robotoStyleProvider(13f), TextColorSets.Regular.NORMAL, null).build();
               lastUsernameAddHeight = text.getHeight() - text.getLineHeight();
               lastUsernameWidth = availWidth;
               lastUsernames = sequence;
@@ -5556,7 +5556,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
         } else if (itemId == R.id.btn_description) {
           if (aboutWrapper != null) {
             aboutWrapper.get(getTextWidth(width));
-            return isEditing() ? Math.max(aboutWrapper.getHeight() + Screen.dp(21f + 13f) - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f)) : Math.max(aboutWrapper.getHeight() + Screen.dp(64f), Screen.dp(88f));
+            return isEditing() ? Math.max(aboutWrapper.getHeight() + Screen.dp(21f + 13f) - Screen.dp(13f) + Screen.dp(12f) + Screen.dp(25), Screen.dp(76f)) : Math.max(aboutWrapper.getHeight() + Screen.dp(71f), Screen.dp(88f));
           }
           return Screen.dp(isEditing() ? 76f : 88f);
         }
