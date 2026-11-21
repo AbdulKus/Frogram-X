@@ -49,8 +49,8 @@ public final class SettingsCards extends RecyclerView.ItemDecoration {
         SettingsCards cards = new SettingsCards(adapter);
         list.setSettingsCards(cards);
         list.addItemDecoration(cards);
-        if (list.hasSettingsCardTopClearance() && (adapter.getItems().isEmpty() || adapter.getItemViewType(0) != ListItem.TYPE_EMPTY_OFFSET) && list.getPaddingTop() < Screen.dp(12f)) {
-          list.setPadding(list.getPaddingLeft(), Screen.dp(12f), list.getPaddingRight(), list.getPaddingBottom());
+        if (list.hasSettingsCardTopClearance() && (adapter.getItems().isEmpty() || adapter.getItemViewType(0) != ListItem.TYPE_EMPTY_OFFSET) && list.getPaddingTop() < Screen.dp(GlassStyle.PAGE_CLEARANCE_DP)) {
+          list.setPadding(list.getPaddingLeft(), Screen.dp(GlassStyle.PAGE_CLEARANCE_DP), list.getPaddingRight(), list.getPaddingBottom());
         }
         for (int i = 0; i < list.getChildCount(); i++) {
           View child = list.getChildAt(i);

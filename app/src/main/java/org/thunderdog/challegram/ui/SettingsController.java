@@ -169,12 +169,16 @@ public class SettingsController extends ViewController<Void> implements
 
   @Override
   protected int getHeaderHeight () {
-    return (int) (Size.getHeaderPortraitSize() + Size.getHeaderSizeDifference(true) * contentView.getScrollFactor());
+    return hasHeaderPhoto() ? (int) (Size.getHeaderPortraitSize() + Size.getHeaderSizeDifference(true) * contentView.getScrollFactor()) : Size.getHeaderPortraitSize();
   }
 
   @Override
   protected int getMaximumHeaderHeight () {
-    return Size.getHeaderBigPortraitSize(true);
+    return hasHeaderPhoto() ? Size.getHeaderBigPortraitSize(true) : Size.getHeaderPortraitSize();
+  }
+
+  private boolean hasHeaderPhoto () {
+    return headerCell != null && headerCell.hasAvatarPhoto();
   }
 
   @Override
@@ -493,6 +497,15 @@ public class SettingsController extends ViewController<Void> implements
     this.contentView.setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     this.adapter = new SettingsAdapter(this) {
       @Override
+      public void onBindViewHolder (SettingHolder holder, int position) {
+        super.onBindViewHolder(holder, position);
+        if (getItemViewType(position) == ListItem.TYPE_EMPTY_OFFSET) {
+          holder.itemView.getLayoutParams().height = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP)
+            + getMaximumHeaderHeight() - Size.getHeaderPortraitSize();
+        }
+      }
+
+      @Override
       public void setValuedSetting (ListItem item, SettingView view, boolean isUpdate) {
         boolean hasError = false;
         final int itemId = item.getId();
@@ -739,6 +752,11 @@ public class SettingsController extends ViewController<Void> implements
     processUserFull(tdlib.myUserFull());
 
     this.contentView.setAdapter(adapter);
+    headerCell.getAvatarReceiver().setPhotoAvailabilityListener(() -> {
+      if (isDestroyed()) return;
+      adapter.notifyItemChanged(0);
+      contentView.postUpdate();
+    });
 
     tdlib.cache().addMyUserListener(this);
     setMyUserId(tdlib.myUserId());

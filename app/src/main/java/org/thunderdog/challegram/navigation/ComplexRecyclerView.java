@@ -125,7 +125,7 @@ public class ComplexRecyclerView extends CustomRecyclerView implements Runnable 
     int diff = Size.getHeaderBigPortraitSize(true) - target.getMaximumHeaderHeight();
     float t = view == null ? Size.getHeaderSizeDifference(true) : -view.getTop() + GlassPageContent.viewportInset(this) + diff;
     float factor = 1f - t / (float) Size.getHeaderSizeDifference(true);
-    scrollFactor = MathUtils.clamp(factor);
+    scrollFactor = Math.min(getMaxFactor(), MathUtils.clamp(factor));
     if ((flags & FLAG_FORCE) == 0) {
       headerView.setScaleFactor(scrollFactor, scrollFactor, scrollFactor, true);
       if (floatingButton != null && target.getFloatingButtonId() != 0) {

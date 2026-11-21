@@ -1010,7 +1010,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   @Override
   protected int getHeaderHeight () {
-    if (isEditing()) {
+    if (isEditing() || !hasHeaderPhoto()) {
       return super.getHeaderHeight();
     } else {
       return (int) (Size.getHeaderPortraitSize() + Size.getHeaderSizeDifference(true) * ((ComplexRecyclerView) baseRecyclerView).getScrollFactor());
@@ -1019,7 +1019,11 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   @Override
   protected int getMaximumHeaderHeight () {
-    return isEditing() ? super.getMaximumHeaderHeight() : Size.getHeaderBigPortraitSize(true);
+    return hasHeaderPhoto() ? Size.getHeaderBigPortraitSize(true) : Size.getHeaderPortraitSize();
+  }
+
+  private boolean hasHeaderPhoto () {
+    return headerCell != null && headerCell.hasAvatarPhoto();
   }
 
   @Override
@@ -1822,7 +1826,10 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     baseAdapter = new SettingsAdapter(this) {
       @Override public void onBindViewHolder (SettingHolder holder, int position) {
         super.onBindViewHolder(holder, position);
-        if (!isEditing() && getItemViewType(position) == ListItem.TYPE_EMPTY_OFFSET) holder.itemView.setBackground(null);
+        if (getItemViewType(position) == ListItem.TYPE_EMPTY_OFFSET) {
+          holder.itemView.setBackground(null);
+          holder.itemView.getLayoutParams().height = headerSpacerHeight();
+        }
         if (!isEditing() && isProfileCardRow(getItemViewType(position)) &&
             !(holder.itemView.getBackground() instanceof org.thunderdog.challegram.widget.ProfileCardBackground)) {
           holder.itemView.setBackground(new org.thunderdog.challegram.widget.ProfileCardBackground());
@@ -2100,6 +2107,12 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
     // Binding data
     if (headerCell != null) {
+      headerCell.getAvatarReceiver().setPhotoAvailabilityListener(() -> {
+        if (isDestroyed()) return;
+        baseAdapter.notifyItemChanged(0);
+        ((ComplexRecyclerView) baseRecyclerView).postUpdate();
+        onItemsHeightProbablyChanged();
+      });
       headerCell.setShowLock(mode == Mode.SECRET);
       setHeaderMute(false);
       setHeaderText();
@@ -4033,6 +4046,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private void buildEditCells () {
     ArrayList<ListItem> items = new ArrayList<>();
+    items.add(new ListItem(ListItem.TYPE_EMPTY_OFFSET));
 
     if (tdlib.canChangeInfo(chat) || TD.canEditBot(user)) {
       @StringRes int titleRes, descRes;
@@ -5570,7 +5584,13 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   private int lastUsernameWidth, lastUsernameAddHeight;
   private CharSequence lastUsernames;
 
+  private int headerSpacerHeight () {
+    return Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP)
+      + getMaximumHeaderHeight() - Size.getHeaderPortraitSize();
+  }
+
   private int calculateHeight (int position, int width, ListItem item) {
+    if (item.getViewType() == ListItem.TYPE_EMPTY_OFFSET) return headerSpacerHeight();
     if (isEditing()) {
       if (item.getViewType() == ListItem.TYPE_DESCRIPTION) width -= Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) * 2;
       int fixed = org.thunderdog.challegram.widget.SettingsCards.fixedHeight(item.getViewType());

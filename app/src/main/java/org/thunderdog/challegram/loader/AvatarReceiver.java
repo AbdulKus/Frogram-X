@@ -672,11 +672,25 @@ public class AvatarReceiver implements Receiver, ChatListener, TdlibCache.UserDa
 
   // Implementation
 
+  private Runnable photoAvailabilityListener;
+
+  public void setPhotoAvailabilityListener (@Nullable Runnable listener) {
+    photoAvailabilityListener = listener;
+  }
+
+  public boolean hasRequestedPhoto () {
+    return requestedProfilePhoto != null || requestedChatPhotoInfo != null || requestedChatPhoto != null;
+  }
+
   private void updateState (AvatarPlaceholder.Metadata placeholder, TdApi.ProfilePhoto profilePhoto, TdApi.ChatPhotoInfo chatPhotoInfo, TdApi.ChatPhoto chatPhoto, @Options int options) {
+    boolean hadPhoto = hasRequestedPhoto();
     this.requestedPlaceholder = placeholder;
     this.requestedProfilePhoto = profilePhoto;
     this.requestedChatPhotoInfo = chatPhotoInfo;
     this.requestedChatPhoto = chatPhoto;
+    if (photoAvailabilityListener != null && hadPhoto != hasRequestedPhoto()) {
+      photoAvailabilityListener.run();
+    }
   }
 
   @Nullable

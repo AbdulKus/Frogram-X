@@ -781,6 +781,10 @@ public class ComplexHeaderView extends BaseView implements RtlCheckListener, Sti
   private int floatingPhotoTop = -1;
   private final android.graphics.Path floatingCardClip = new android.graphics.Path();
   private final android.graphics.Path floatingPhotoClip = new android.graphics.Path();
+  public boolean hasAvatarPhoto () {
+    return receiver.hasRequestedPhoto();
+  }
+
   public void setFloatingCard (boolean enabled) { floatingCard = enabled; invalidate(); }
 
   private boolean glassTextColors;
