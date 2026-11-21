@@ -433,7 +433,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       int buttonColorId = getHeaderIconColorId();
       if (!isEditing()) header.addButton(realMenu, R.id.btn_openChat, R.drawable.baseline_chat_bubble_24, buttonColorId, this, Screen.dp(49f)).setContentDescription(Lang.getString(R.string.OpenChat));
 
-      if (mode == Mode.SECRET || mode == Mode.USER) {
+      if (hasProfileCallButton()) {
         callButton = header.addButton(realMenu, R.id.menu_btn_call, R.drawable.baseline_phone_24, buttonColorId, this, Screen.dp(48f));
         callButton.setAlpha(userFull != null && (userFull.canBeCalled || userFull.hasPrivateCalls) ? 1f : 0f);
       }
@@ -2198,17 +2198,17 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private int calculateMenuWidth () {
     int totalWidth = isEditing() ? 0 : Screen.dp(49f);
-    if (mode == Mode.SECRET || mode == Mode.USER) {
+    if (hasProfileCallButton()) {
       totalWidth += Screen.dp(48f);
     }
     if (mode == Mode.SECRET && tdlib.canChangeMessageAutoDeleteTime(chat.id)) {
       totalWidth += Screen.dp(StopwatchHeaderButton.WIDTH);
     }
     final int menuId = getMenuId();
-    if (menuId == R.id.menu_profile) {
+    if (menuId == R.id.menu_profile || menuId == R.id.menu_profile_bot) {
       if (canManageChat())
         totalWidth += Screen.dp(49f);
-      if (canAddAnyKindOfMembers())
+      if (menuId == R.id.menu_profile && canAddAnyKindOfMembers())
         totalWidth += Screen.dp(49f);
       totalWidth += Screen.dp(49f);
     } else if (menuId == R.id.menu_profile_manage) {
@@ -2219,6 +2219,10 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       totalWidth += Screen.dp(49f);
     }
     return totalWidth;
+  }
+
+  private boolean hasProfileCallButton () {
+    return mode == Mode.SECRET || (mode == Mode.USER && !TD.isBot(user));
   }
 
   @Override
@@ -2684,7 +2688,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private void checkUserButtons () {
-    if (headerView != null && !isEditing()) {
+    if (headerView != null && hasProfileCallButton()) {
       headerView.updateButtonAlpha(getMenuId(), R.id.menu_btn_call, userFull.canBeCalled || userFull.hasPrivateCalls ? 1f : 0f);
     }
   }

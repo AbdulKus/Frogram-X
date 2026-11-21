@@ -65,6 +65,8 @@ This is the reference for new and existing floating UI. Shared implementation:
 - Without a photo, keep the round placeholder, name and status in the compact
   header. The list only reserves the standard page clearance. Real photos keep
   the expanded spacer and continuous collapse.
+  Bot profile actions occupy adjacent slots. Reserve title space for the chat,
+  overflow and available edit actions.
 - A player enters below the main card, with its reserved page row offset by
   12dp; translate its input coordinates by the same amount. Clip it below that card during expansion
   so it cannot cut off the avatar or cover the title. Fade its controls in only
