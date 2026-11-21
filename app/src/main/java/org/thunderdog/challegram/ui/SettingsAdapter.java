@@ -2090,7 +2090,7 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingHolder> impleme
     return top;
   }
 
-  private int measureItemHeight (int position) {
+  int measureItemHeight (int position) {
     int type = getItemViewType(position);
     if (cardStyle) {
       int fixed = org.thunderdog.challegram.widget.SettingsCards.fixedHeight(type);

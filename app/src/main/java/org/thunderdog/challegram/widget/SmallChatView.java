@@ -47,12 +47,25 @@ public class SmallChatView extends BaseView implements AttachDelegate, TooltipOv
 
   private DoubleTextWrapper chat;
   private boolean cardStyle;
+  private boolean memberCard;
+
+  public void setMemberCardStyle () {
+    if (memberCard) return;
+    memberCard = true;
+    if (!cardStyle) {
+      setCardStyle();
+    } else {
+      if (chat != null) chat.setCardStyle(true);
+      layoutReceiver();
+      invalidate();
+    }
+  }
 
   public void setCardStyle () {
     if (cardStyle) return;
     cardStyle = true;
     getLayoutParams().height = Screen.dp(68f);
-    if (chat != null) chat.setCardStyle();
+    if (chat != null) chat.setCardStyle(memberCard);
     layoutReceiver();
     requestLayout();
   }
@@ -69,8 +82,8 @@ public class SmallChatView extends BaseView implements AttachDelegate, TooltipOv
 
   private void layoutReceiver () {
     int viewHeight = Screen.dp(cardStyle ? 68f : 62f);
-    int radius = Screen.dp(cardStyle ? 28f : 50f) / 2;
-    int left = Screen.dp(cardStyle ? 18f : 11f);
+    int radius = Screen.dp(cardStyle && !memberCard ? 28f : 50f) / 2;
+    int left = Screen.dp(cardStyle && !memberCard ? 18f : 11f);
     int right = left + radius * 2;
     int viewWidth = getMeasuredWidth();
     if (viewWidth == 0)
@@ -120,7 +133,7 @@ public class SmallChatView extends BaseView implements AttachDelegate, TooltipOv
     }
 
     this.chat = chat;
-    if (chat != null && cardStyle) chat.setCardStyle();
+    if (chat != null && cardStyle) chat.setCardStyle(memberCard);
     if (chat != null) {
       setPreviewChatId(null, chat.getChatId(), null);
     } else {

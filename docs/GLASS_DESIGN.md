@@ -130,6 +130,13 @@ This is the reference for new and existing floating UI. Shared implementation:
   Profile attachment content starts 4dp closer to its island; keep date labels visible.
   Base and participant lists use one handoff range; reserve the base scroll tail
   independently of member counts, including when switching to empty or short tabs.
+  Member tabs in group/channel information and management use the shared cards
+  with 50dp avatars and a 72dp text column. At the end of a short member list,
+  keep 4dp between the pinned tab panel and the first visible row or heading.
+  Without tabs, use the standard page clearance. Calculate the available scroll
+  from the styled row heights and the viewport after its system insets.
+  Short attachment lists also stop below the pinned panel. Longer lists can
+  use the full scroll range behind the glass.
   Allowed reactions use independent rounded tiles in the four-column grid, with
   equal 8dp horizontal gaps/outer clearance and 8dp row gaps. Full-width controls
   keep their normal groups. Never combine the legacy grid filling/spacing with

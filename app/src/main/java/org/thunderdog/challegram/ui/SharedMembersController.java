@@ -61,7 +61,7 @@ public class SharedMembersController extends SharedBaseController<DoubleTextWrap
     return this;
   }
 
-  @Override protected boolean usesSettingsCards () { return managementCards; }
+  @Override protected boolean usesSettingsCards () { return managementCards || parent != null; }
 
   private boolean forceAdmins;
 
@@ -188,7 +188,7 @@ public class SharedMembersController extends SharedBaseController<DoubleTextWrap
   @Override
   protected void onCreateView (Context context, MediaRecyclerView recyclerView, SettingsAdapter adapter) {
     super.onCreateView(context, recyclerView, adapter);
-    if (managementCards) recyclerView.setSettingsCardTopClearance(false);
+    if (usesSettingsCards()) recyclerView.setSettingsCardTopClearance(false);
     groupId = ChatId.toBasicGroupId(chatId);
     if (groupId != 0) {
       tdlib.cache().subscribeToGroupUpdates(groupId, this);
@@ -237,6 +237,7 @@ public class SharedMembersController extends SharedBaseController<DoubleTextWrap
 
   @Override
   protected void modifyChatViewIfNeeded (ListItem item, SmallChatView chatView, @Nullable CheckBoxView checkBox, boolean isUpdate) {
+    if (usesSettingsCards()) chatView.setMemberCardStyle();
     DoubleTextWrapper user = (DoubleTextWrapper) item.getData();
     if (user == null || user.getMember() == null) {
       return;

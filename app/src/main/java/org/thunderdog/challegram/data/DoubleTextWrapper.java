@@ -94,10 +94,14 @@ public class DoubleTextWrapper implements MessageSourceProvider, UserProvider, T
   private int horizontalPadding = Screen.dp(72f) + Screen.dp(11f);
   private boolean cardStyle;
 
-  public void setCardStyle () {
-    if (cardStyle) return;
+  private int cardTextStart = Screen.dp(64f);
+
+  public void setCardStyle (boolean memberCard) {
+    int start = Screen.dp(memberCard ? 72f : 64f);
+    if (cardStyle && cardTextStart == start) return;
     cardStyle = true;
-    horizontalPadding = Screen.dp(64f + 20f);
+    cardTextStart = start;
+    horizontalPadding = start + Screen.dp(20f);
     if (currentWidth > 0) { buildTitle(); buildSubtitle(); }
   }
   private boolean forceSingleLine, allowSavedMessages;
@@ -597,7 +601,7 @@ public class DoubleTextWrapper implements MessageSourceProvider, UserProvider, T
   }
 
   public <T extends View & DrawableProvider> void draw (T view, Receiver receiver, Canvas c, ComplexReceiver emojiStatusReceiver) {
-    int left = Screen.dp(cardStyle ? Lang.rtl() ? 20f : 64f : 72f);
+    int left = cardStyle ? (Lang.rtl() ? Screen.dp(20f) : cardTextStart) : Screen.dp(72f);
     int viewWidth = view.getMeasuredWidth();
 
     final float anonymousFactor = isAnonymous.getFloatValue();
@@ -663,13 +667,13 @@ public class DoubleTextWrapper implements MessageSourceProvider, UserProvider, T
       if (forceSingleLine) {
         titleY = view.getMeasuredHeight() / 2 - trimmedTitle.getHeight() / 2;
       }
-      if (cardStyle) trimmedTitle.draw(c, Lang.rtl() ? viewWidth - Screen.dp(64f) - trimmedTitle.getWidth() : left,
-        viewWidth - Screen.dp(Lang.rtl() ? 64f : 20f), 0, titleY);
+      if (cardStyle) trimmedTitle.draw(c, Lang.rtl() ? viewWidth - cardTextStart - trimmedTitle.getWidth() : left,
+        viewWidth - (Lang.rtl() ? cardTextStart : Screen.dp(20f)), 0, titleY);
       else trimmedTitle.draw(c, left, titleY);
       offset += trimmedTitle.getWidth();
     }
     if (emojiStatusDrawable != null) {
-      int statusX = cardStyle && Lang.rtl() ? viewWidth - Screen.dp(64f + 6f) - offset - emojiStatusDrawable.getWidth(Screen.dp(6f)) : left + offset + Screen.dp(6f);
+      int statusX = cardStyle && Lang.rtl() ? viewWidth - cardTextStart - Screen.dp(6f) - offset - emojiStatusDrawable.getWidth(Screen.dp(6f)) : left + offset + Screen.dp(6f);
       emojiStatusDrawable.draw(c, statusX, titleY, 1f, emojiStatusReceiver);
       offset += emojiStatusDrawable.getWidth(Screen.dp(6f));
     }
@@ -679,8 +683,8 @@ public class DoubleTextWrapper implements MessageSourceProvider, UserProvider, T
     }
 
     if (!forceSingleLine && trimmedSubtitle != null) {
-      if (cardStyle) trimmedSubtitle.draw(c, Lang.rtl() ? viewWidth - Screen.dp(64f) - trimmedSubtitle.getWidth() : left,
-        viewWidth - Screen.dp(Lang.rtl() ? 64f : 20f), 0, Screen.dp(36f), isOnline ? TextColorSets.Regular.NEUTRAL : null);
+      if (cardStyle) trimmedSubtitle.draw(c, Lang.rtl() ? viewWidth - cardTextStart - trimmedSubtitle.getWidth() : left,
+        viewWidth - (Lang.rtl() ? cardTextStart : Screen.dp(20f)), 0, Screen.dp(36f), isOnline ? TextColorSets.Regular.NEUTRAL : null);
       else trimmedSubtitle.draw(c, left, Screen.dp(33f), isOnline ? TextColorSets.Regular.NEUTRAL : null);
     }
 

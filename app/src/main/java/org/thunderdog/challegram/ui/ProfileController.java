@@ -1055,19 +1055,24 @@ public class ProfileController extends ViewController<ProfileController.Args> im
         boolean isUnknown = position == -1; // || holder.getItemViewType() == SettingItem.TYPE_SMART_EMPTY || holder.getItemViewType() == SettingItem.TYPE_PROGRESS;
 
         if (position == 0 || isUnknown) { // Full top height
-          top = contentTop();
+          top = contentTop(baseController);
         }
 
-        if (needTabs() && (position == itemCount - 1 || isUnknown) && !(view instanceof ProgressComponentView || view instanceof EmptySmartView)) {
-          final int itemsHeight = isUnknown ? view.getMeasuredHeight() : baseController.calculateItemsHeight() - SettingHolder.measureHeightForType(ListItem.TYPE_HEADER);
-          final int parentHeight = parent.getMeasuredHeight() - getShadowBottomHeight();
-          bottom = isEditing() ? Math.max(0, parent.getMeasuredHeight() - baseController.calculateItemsHeight() - (contentTop() - maxItemsScrollY())) :
-            Math.max(0, parentHeight - itemsHeight - getHiddenContentHeight() - getPagerTopViewHeight());
+        if ((needTabs() || baseController instanceof SharedMembersController) &&
+            (position == itemCount - 1 || isUnknown) && !(view instanceof ProgressComponentView || view instanceof EmptySmartView)) {
+          int itemsHeight = isUnknown ? view.getMeasuredHeight() : baseController.calculateItemsHeight();
+          int viewport = parent.getMeasuredHeight() - parent.getPaddingTop() - parent.getPaddingBottom();
+          int contentTop = contentTop(baseController);
+          int pinnedStart = contentTop - maxItemsScrollY();
+          if (!(baseController instanceof SharedMembersController)) {
+            pinnedStart = Math.max(pinnedStart, pinnedTabsTop() + getItemsBound() + Screen.dp(4f));
+          }
+          bottom = profileListScrollTail(viewport, itemsHeight, pinnedStart);
         }
 
         outRect.set(0, top, 0, bottom);
       } else {
-        outRect.set(0, contentTop(), 0, 0);
+        outRect.set(0, contentTop(baseController), 0, 0);
       }
     }
   }
@@ -1451,8 +1456,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private void setTopTranslationY (float y) {
     // Keep the secondary island below the compact header with the shared 6dp gap.
-    float pinned = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
-    y = Math.max(y, pinned);
+    y = Math.max(y, pinnedTabsTop());
     if (topWrap.getTranslationY() != y) {
       topWrap.setTranslationY(y);
       float headerHeight = HeaderView.getSize(true);
@@ -1482,7 +1486,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     if (isEditing()) {
       int top = managementPanelTop() - calculateBaseScrollY();
       actualTopWrapY = currentTopWrapY = top;
-      setExpanded(top <= managementPinnedTop());
+      setExpanded(top <= pinnedTabsTop());
       setTopTranslationY(top);
       return;
     }
@@ -5670,10 +5674,6 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     return SettingHolder.measureHeightForType(ListItem.TYPE_FAKE_PAGER_TOPVIEW);
   }
 
-  private static int getHiddenContentHeight () {
-    return SettingHolder.measureHeightForType(ListItem.TYPE_SHADOW_TOP) + SettingHolder.measureHeightForType(ListItem.TYPE_HEADER);
-  }
-
   private static int getShadowBottomHeight () {
     return SettingHolder.measureHeightForType(ListItem.TYPE_SHADOW_BOTTOM);
   }
@@ -5793,10 +5793,12 @@ public class ProfileController extends ViewController<ProfileController.Args> im
           baseRecyclerView.stopScroll();
           if (currentPositionOffset == 0f) {
             int i = ((LinearLayoutManager) recyclerView.getLayoutManager()).findFirstVisibleItemPosition();
-            int contentMaxTop = contentTop();
+            ViewController<?> current = findCurrentCachedController();
+            if (!(current instanceof SharedBaseController<?>) || current.getValue() != recyclerView) return;
+            int contentMaxTop = contentTop((SharedBaseController<?>) current);
             if (i == 0) {
               View view = recyclerView.getLayoutManager().findViewByPosition(0);
-              checkBaseScrollY(view != null ? contentMaxTop - view.getTop() : 0);
+              checkBaseScrollY(view != null ? contentMaxTop - (view.getTop() - recyclerView.getPaddingTop()) : 0);
             } else {
               checkBaseScrollY(contentMaxTop);
             }
@@ -5875,11 +5877,11 @@ public class ProfileController extends ViewController<ProfileController.Args> im
   }
 
   private int maxItemsScrollY () {
-    if (isEditing()) return Math.max(0, managementPanelTop() - managementPinnedTop());
+    if (isEditing()) return Math.max(0, managementPanelTop() - pinnedTabsTop());
     return getTopItemsHeight() - getShadowBottomHeight() - getPagerTopViewHeight();
   }
 
-  private int managementPinnedTop () {
+  private int pinnedTabsTop () {
     return Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
   }
 
@@ -5900,8 +5902,21 @@ public class ProfileController extends ViewController<ProfileController.Args> im
     return getPagerTopViewHeight() + getTopViewTopPadding() + Screen.dp(6f);
   }
 
-  private int contentTop () {
-    if (isEditing()) return managementPanelTop() + getPagerTopViewHeight() + getTopViewTopPadding() + Screen.dp(6f + 4f);
+  private static int profileListScrollTail (int viewport, int itemsHeight, int pinnedStart) {
+    return Math.max(0, viewport - itemsHeight - pinnedStart);
+  }
+
+  private int contentTop (SharedBaseController<?> page) {
+    if (page instanceof SharedMembersController) {
+      // Card styling hides the leading shadow but its row still has a height.
+      int shadow = page.adapter.getItemCount() > 0 && page.adapter.getItemViewType(0) == ListItem.TYPE_SHADOW_TOP
+        ? SettingHolder.measureHeightForType(ListItem.TYPE_SHADOW_TOP) : 0;
+      if (!needTabs()) {
+        return maxItemsScrollY() + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP) - shadow;
+      }
+      int panelTop = isEditing() ? managementPanelTop() : maxItemsScrollY() + pinnedTabsTop();
+      return panelTop + getItemsBound() + Screen.dp(4f) - shadow;
+    }
     // Date headers start below the complete panel instead of underneath its glass.
     return getTopItemsHeight() + getTopViewTopPadding() * 2 - ShadowView.simpleTopShadowHeight() - Screen.dp(4f);
   }

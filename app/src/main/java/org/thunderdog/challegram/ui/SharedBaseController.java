@@ -169,6 +169,7 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
   protected void onBottomInsetChanged (int extraBottomInset, int extraBottomInsetWithoutIme, boolean isImeInset) {
     super.onBottomInsetChanged(extraBottomInset, extraBottomInsetWithoutIme, isImeInset);
     Views.applyBottomInset(recyclerView, extraBottomInset);
+    if (recyclerView != null && parent != null) recyclerView.invalidateItemDecorations();
   }
 
   private FrameLayoutFix savedPage;
@@ -385,7 +386,7 @@ public abstract class SharedBaseController <T extends MessageSourceProvider> ext
           break;
         }
         default: {
-          scrollY += SettingHolder.measureHeightForType(item.getViewType());
+          scrollY += adapter.measureItemHeight(i);
           break;
         }
       }
