@@ -104,6 +104,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
   private View preview;
   private ViewController<?> previewItem, baseItem;
   private boolean glassNavigationActive;
+  private boolean keepGlassHeaderIdentity;
   private float glassOutgoingAlpha = 1f, glassIncomingAlpha;
   private final java.util.IdentityHashMap<View, GlassContentSnapshot> glassNavigationSnapshots = new java.util.IdentityHashMap<>();
 
@@ -125,9 +126,10 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
     return location[1] + button.getHeight();
   }
 
-  void setGlassNavigationActive (boolean active) {
+  void setGlassNavigationActive (boolean active, boolean keepIdentity) {
     if (glassNavigationActive == active) return;
     glassNavigationActive = active;
+    keepGlassHeaderIdentity = active && keepIdentity;
     glassNavigationSnapshots.clear();
     glassNavigationBounds.setEmpty();
     if (active) {
@@ -159,6 +161,14 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
 
   @Override protected boolean drawChild (Canvas canvas, View child, long drawingTime) {
     if (glassNavigationActive && (child == title || child == preview || child == menu || child == menuPreview)) {
+      if (keepGlassHeaderIdentity && (child == title || child == preview)) {
+        if (child != title) return true;
+        int save = canvas.save();
+        clipGlassNavigationForeground(canvas, child);
+        boolean drawn = super.drawChild(canvas, child, drawingTime);
+        canvas.restoreToCount(save);
+        return drawn;
+      }
       float visibility = child == title && child == preview ? Math.max(glassOutgoingAlpha, glassIncomingAlpha) :
         child == title ? glassOutgoingAlpha : child == preview || child == menuPreview ? glassIncomingAlpha :
         useMenuSwitch ? glassOutgoingAlpha : Math.max(glassOutgoingAlpha, glassIncomingAlpha);

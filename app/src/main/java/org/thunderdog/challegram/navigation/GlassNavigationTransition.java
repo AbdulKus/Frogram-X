@@ -14,6 +14,9 @@ import android.view.ViewTreeObserver;
 
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.tool.Screen;
+import org.thunderdog.challegram.ui.MessagesController;
+import org.thunderdog.challegram.ui.ProfileController;
+import org.thunderdog.challegram.unsorted.Size;
 import org.thunderdog.challegram.util.GlassNavigationMotion;
 import org.thunderdog.challegram.widget.ChatGlassDrawable;
 
@@ -302,7 +305,20 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     observer = getViewTreeObserver();
     observer.addOnPreDrawListener(this);
     setVisibility(VISIBLE);
-    header.setGlassNavigationActive(true);
+    header.setGlassNavigationActive(true, keepsCompactChatIdentity(left, right));
+  }
+
+  private static boolean keepsCompactChatIdentity (ViewController<?> chat, ViewController<?> profile) {
+    if (!(chat instanceof MessagesController) || !(profile instanceof ProfileController) ||
+        ((MessagesController) chat).getMessageThread() != null || chat.getChatId() == 0 ||
+        chat.getChatId() != profile.getChatId() || chat.inTransformMode() || profile.inTransformMode() ||
+        chat.getHeaderHeight() != Size.getHeaderPortraitSize() || profile.getHeaderHeight() != Size.getHeaderPortraitSize()) {
+      return false;
+    }
+    View chatTitle = chat.getCustomHeaderCell();
+    View profileTitle = profile.getCustomHeaderCell();
+    return chatTitle instanceof ComplexHeaderView && profileTitle instanceof ComplexHeaderView &&
+      !((ComplexHeaderView) chatTitle).hasAvatarPhoto() && !((ComplexHeaderView) profileTitle).hasAvatarPhoto();
   }
 
   public boolean isActive () { return from != null; }
@@ -437,7 +453,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     from = to = null;
     prepared = false;
     geometry = null;
-    header.setGlassNavigationActive(false);
+    header.setGlassNavigationActive(false, false);
     setVisibility(INVISIBLE);
   }
 

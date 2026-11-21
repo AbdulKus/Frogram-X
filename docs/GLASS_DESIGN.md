@@ -166,6 +166,9 @@ This is the reference for new and existing floating UI. Shared implementation:
 - Horizontal page navigation uses the same stationary glass-shell morph as
   main-to-chat. Cross-fade the header contents inside the changing rounded shell.
   Expanded avatar headers keep their live hardware foreground during navigation.
+  A compact chat and its own photo-free profile keep the outgoing avatar,
+  title and status fully visible through the slide and through gesture reversal.
+  The profile and chat actions can still dissolve independently.
   Reversing an Android back gesture must reveal the avatar, name and status while
   the finger is still down, including at zero progress; never wait for cancellation
   to finish or reuse an empty foreground snapshot.
@@ -175,6 +178,10 @@ This is the reference for new and existing floating UI. Shared implementation:
   photos must be clipped to the shell on intermediate frames and endpoints.
   Reserved pages also paint their status-area background while sliding, so
   the outgoing page cannot expose black window strips beneath the status fade.
+
+- The composer glass follows the laid-out input in the same frame. On line
+  wrap and deletion, the surface grows or shrinks from the top and its bottom
+  stays aligned with the input. Reply and keyboard offsets share that geometry.
 
 ## Required visual checks
 

@@ -690,7 +690,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
       // Reserve the reply row once; animate the drawable inset, never the View height.
       float inputTop = bottomWrap.getY() + composer.getTop();
       int reserve = replyBarView != null ? replyBarView.getLayoutParams().height + Math.max(0, composer.getTop()) : 0;
-      Views.setLayoutHeight(composerGlassView, composer.getHeight() + reserve);
+      int height = composer.getHeight() + reserve;
+      // This decorative sibling follows the laid-out text in the same frame.
+      // Requesting a new layout here draws the new top with the old height first.
+      if (composerGlassView.getHeight() != height) {
+        composerGlassView.layout(composerGlassView.getLeft(), composerGlassView.getTop(),
+          composerGlassView.getRight(), composerGlassView.getTop() + height);
+        if (inputGlass != null) inputGlass.setBounds(0, 0, composerGlassView.getWidth(), height);
+      }
       composerGlassView.setTranslationY(inputTop - reserve);
       if (inputGlass != null) {
         inputGlass.setTopInset(Math.max(0f, top - (inputTop - reserve)));
