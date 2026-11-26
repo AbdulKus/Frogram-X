@@ -1090,7 +1090,7 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   protected SearchEditTextDelegate genSearchHeader (HeaderView headerView) {
-    HeaderEditText view = useGraySearchHeader() ? headerView.genGreySearchHeader(this) : headerView.genSearchHeader(useLightSearchHeader(), this);
+    HeaderEditText view = (useGraySearchHeader() || usesGlassPageHeader()) ? headerView.genGreySearchHeader(this) : headerView.genSearchHeader(useLightSearchHeader(), this);
     return new SearchEditTextDelegate() {
       @NonNull
       @Override

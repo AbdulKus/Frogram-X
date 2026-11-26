@@ -132,6 +132,11 @@ public class Drawables {
   public static void draw (Canvas c, Drawable d, float x, float y, @Nullable Paint paint) {
     if (d == null)
       return;
+    if (!c.isHardwareAccelerated() && org.thunderdog.challegram.util.GlassRenderState.isActive() &&
+        ((Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && d instanceof android.graphics.drawable.VectorDrawable) ||
+          d instanceof androidx.vectordrawable.graphics.drawable.VectorDrawableCompat)) {
+      return;
+    }
     Rect bounds = d.getBounds();
     int minWidth = d.getMinimumWidth();
     int minHeight = d.getMinimumHeight();

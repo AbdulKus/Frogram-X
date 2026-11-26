@@ -623,6 +623,14 @@ public class MessagesController extends ViewController<MessagesController.Argume
   private int getFloatingPlayerInset () {
     return hasFloatingPlayer() ? FloatingPlayerGeometry.inset(floatingPlayerOffset, HeaderView.getPlayerSize(), Screen.dp(12f)) : 0;
   }
+
+  public int getPipTopInset () {
+    int base = HeaderView.getSize(true);
+    int bar = useFloatingChatHeader() ? getTopBarSurfaceHeight() : (topBar != null ? topBar.getTotalVisualHeight() : 0);
+    int player = hasFloatingPlayer() ? getFloatingPlayerInset() : Math.round(floatingPlayerOffset);
+    int pad = useFloatingChatHeader() && player == 0 ? Screen.dp(6f) : 0;
+    return base + bar + player + pad;
+  }
   private int floatingOverlayTop, glassControlsColor;
   public static int getGlassIconColorId () { return ColorId.glassIcon; }
 
@@ -2208,8 +2216,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
       pagerHeaderView.getTopView().setShowLabelOnActiveOnly(!Settings.instance().needReduceMotion());
       addThemeInvalidateListener(pagerHeaderView.getTopView());
       fparams = (FrameLayoutFix.LayoutParams) pagerHeaderView.getRecyclerView().getLayoutParams();
-      fparams.leftMargin = Screen.dp(56f);
-      fparams.rightMargin = Screen.dp(56f);
+      fparams.leftMargin = Screen.dp(Lang.rtl() ? 66f : 64f);
+      fparams.rightMargin = Screen.dp(Lang.rtl() ? 64f : 66f);
       pagerHeaderView.getTopView().setOnItemClickListener(this);
       addThemeInvalidateListener(pagerHeaderView.getTopView());
 
@@ -4365,7 +4373,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     } else if (id == R.id.menu_share) {
       header.addButton(menu, R.id.menu_btn_share, R.drawable.baseline_share_arrow_24, getHeaderIconColorId(), this, Screen.dp(52f));
     } else if (id == R.id.menu_clear) {
-      header.addClearButton(menu, this).setColorId(ColorId.headerLightIcon);
+      header.addClearButton(menu, this).setColorId(useFloatingChatHeader() ? getSearchHeaderIconColorId() : ColorId.headerLightIcon);
     } else if (id == R.id.menu_search) {
       header.addSearchButton(menu, this);
     } else if (id == R.id.menu_chat) {

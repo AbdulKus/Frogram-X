@@ -109,6 +109,7 @@ import org.thunderdog.challegram.ui.MessagesController;
 import org.thunderdog.challegram.ui.TranslationControllerV2;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.util.EmojiStatusHelper;
+import org.thunderdog.challegram.util.GlassRenderState;
 import org.thunderdog.challegram.util.LanguageDetector;
 import org.thunderdog.challegram.util.NonBubbleEmojiLayout;
 import org.thunderdog.challegram.util.ReactionsCounterDrawable;
@@ -2037,7 +2038,8 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
         drawBubble(c, Paints.fillingPaint(Utils.alphaColor((1f - lineFactor) * .2f, 0xff000000)), false);
         c.restore();
       }*/
-      if (lineFactor != 1f) {
+      final boolean glassPass = !c.isHardwareAccelerated() && GlassRenderState.isActive();
+      if (!glassPass && lineFactor != 1f) {
         drawBubbleShadow(c, 1f - lineFactor);
       }
       if (lineFactor != 0f) {
@@ -2063,7 +2065,7 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
     }
 
     if (hasBubble) {
-      if (needBubbleCornerFix()) {
+      if (!(!c.isHardwareAccelerated() && GlassRenderState.isActive()) && needBubbleCornerFix()) {
         int padding = getBubbleContentPadding();
         drawCornerFixes(c, this, 1f,
           bubblePathRect.left + padding, bubblePathRect.top + padding, bubblePathRect.right - padding, bubblePathRect.bottom - padding,
@@ -2480,8 +2482,10 @@ public abstract class TGMessage implements InvalidateContentProvider, TdlibDeleg
       drawTranslate(view, c);
     }
 
-    startSetReactionAnimationIfReady();
-    highlightUnreadReactionsIfNeeded();
+    if (!(!c.isHardwareAccelerated() && GlassRenderState.isActive())) {
+      startSetReactionAnimationIfReady();
+      highlightUnreadReactionsIfNeeded();
+    }
     if (isHiddenFactor > 0f) {
       drawHiddenMessage(view, c, isHiddenFactor);
     }

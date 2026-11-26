@@ -40,6 +40,7 @@ import org.thunderdog.challegram.tool.DrawAlgorithms;
 import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.PorterDuffPaint;
 import org.thunderdog.challegram.tool.UI;
+import org.thunderdog.challegram.util.GlassRenderState;
 
 import me.vkryl.android.AnimatorUtils;
 import me.vkryl.core.ColorUtils;
@@ -49,6 +50,7 @@ import me.vkryl.core.StringUtils;
 @SuppressWarnings("unchecked")
 public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListener, Receiver, ImageFile.CropStateChangeListener {
   private static boolean ANIMATION_ENABLED;
+  private static final int GLASS_THUMB_MAX_SIZE = 48;
 
   private static ImageHandler handler;
 
@@ -58,6 +60,8 @@ public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListe
   private final @Nullable View view;
   private ReceiverUpdateListener updateListener;
   private Bitmap bitmap;
+  private Bitmap glassThumb;
+  private Bitmap glassThumbSource;
   private float alpha = 1f, progress;
 
   private boolean isDetached, needProgress, animationDisabled;
@@ -758,6 +762,8 @@ public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListe
   private void setBitmap (Bitmap bitmap) {
     if (this.bitmap != bitmap) {
       this.bitmap = bitmap;
+      this.glassThumb = null;
+      this.glassThumbSource = null;
       if (bitmapShader != null) {
         bitmapShader = null;
         if (roundPaint != null) {
@@ -1160,18 +1166,65 @@ public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListe
     }
   }
 
+  private @Nullable Bitmap getGlassBitmap () {
+    Bitmap source = this.bitmap;
+    if (!U.isValidBitmap(source)) {
+      return null;
+    }
+    int bw = source.getWidth();
+    int bh = source.getHeight();
+    if (bw <= GLASS_THUMB_MAX_SIZE && bh <= GLASS_THUMB_MAX_SIZE) {
+      return source;
+    }
+    if (glassThumb != null && glassThumbSource == source && !glassThumb.isRecycled()) {
+      return glassThumb;
+    }
+    float ratio = Math.min((float) GLASS_THUMB_MAX_SIZE / (float) bw, (float) GLASS_THUMB_MAX_SIZE / (float) bh);
+    int tw = Math.max(1, Math.round(bw * ratio));
+    int th = Math.max(1, Math.round(bh * ratio));
+    glassThumbSource = source;
+    glassThumb = Bitmap.createScaledBitmap(source, tw, th, true);
+    return glassThumb;
+  }
+
+  private static final Rect glassSrcRect = new Rect();
+
+  private static void mapToGlassThumb (Bitmap thumb, Bitmap source, Rect src, Rect out) {
+    if (thumb == source) {
+      out.set(src);
+      return;
+    }
+    int sw = Math.max(1, source.getWidth());
+    int sh = Math.max(1, source.getHeight());
+    int tw = thumb.getWidth();
+    int th = thumb.getHeight();
+    int l = MathUtils.clamp((int) Math.floor(src.left * (double) tw / sw), 0, Math.max(0, tw - 1));
+    int t = MathUtils.clamp((int) Math.floor(src.top * (double) th / sh), 0, Math.max(0, th - 1));
+    int r = MathUtils.clamp((int) Math.ceil(src.right * (double) tw / sw), l + 1, tw);
+    int b = MathUtils.clamp((int) Math.ceil(src.bottom * (double) th / sh), t + 1, th);
+    out.set(l, t, r, b);
+  }
+
   @Override
   public void draw (Canvas c) {
     if (!U.isValidBitmap(bitmap)) {
       return;
     }
 
-    Paint paint = getBitmapPaint();
-    if (roundPaint != null) {
-      roundPaint.setColorFilter(paint.getColorFilter());
+    final boolean glassPass = !c.isHardwareAccelerated() && GlassRenderState.isActive();
+    final Bitmap drawBmp = glassPass ? getGlassBitmap() : bitmap;
+    if (!U.isValidBitmap(drawBmp)) {
+      return;
     }
-    if (repeatPaint != null) {
-      repeatPaint.setColorFilter(paint.getColorFilter());
+
+    Paint paint = getBitmapPaint();
+    if (!glassPass) {
+      if (roundPaint != null) {
+        roundPaint.setColorFilter(paint.getColorFilter());
+      }
+      if (repeatPaint != null) {
+        repeatPaint.setColorFilter(paint.getColorFilter());
+      }
     }
 
     final int rotation = getVisualRotation();
@@ -1180,26 +1233,45 @@ public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListe
         c.save();
         c.rotate(rotation, left + (right - left) / 2f, top + (bottom - top) / 2f);
       }
-      float scaleType = file.getScaleType();
+      float scaleType = file != null ? file.getScaleType() : ImageFile.FIT_CENTER;
       boolean hasScale = scaleType == ImageFile.CENTER_CROP || scaleType == ImageFile.FIT_CENTER;
       if (hasScale) {
         c.save();
         c.clipRect(left, top, right, bottom);
       }
-      drawRoundRect(c, roundRect, radius, radius, roundPaint);
+      if (glassPass) {
+        mapToGlassThumb(drawBmp, bitmap, bitmapRect, glassSrcRect);
+        try {
+          c.drawBitmap(drawBmp, glassSrcRect, roundRect, paint);
+        } catch (Throwable t) {
+          Log.e(Log.TAG_IMAGE_LOADER, "Unable to draw bitmap", t);
+          Tracer.onOtherError(t);
+        }
+      } else {
+        drawRoundRect(c, roundRect, radius, radius, roundPaint);
+      }
       if (rotation != 0) {
         c.restore();
       }
       if (hasScale) {
         c.restore();
       }
-    } else if (file.getScaleType() == ImageFile.CENTER_REPEAT) {
-      c.save();
-      c.drawRect(left, top, right, bottom, repeatPaint);
-      c.restore();
+    } else if (file != null && file.getScaleType() == ImageFile.CENTER_REPEAT) {
+      if (glassPass) {
+        try {
+          c.drawBitmap(drawBmp, null, drawRegion, paint);
+        } catch (Throwable t) {
+          Log.e(Log.TAG_IMAGE_LOADER, "Unable to draw bitmap", t);
+          Tracer.onOtherError(t);
+        }
+      } else {
+        c.save();
+        c.drawRect(left, top, right, bottom, repeatPaint);
+        c.restore();
+      }
     } else {
-      PaintState paintState = file.getPaintState();
-      float scaleType = file.getScaleType();
+      PaintState paintState = glassPass || file == null ? null : file.getPaintState();
+      float scaleType = file != null ? file.getScaleType() : ImageFile.FIT_CENTER;
       final boolean needSwapMirrorAxis = needSwapMirrorAxis();
       final boolean needMirrorHorizontally = displayCrop != null && (needSwapMirrorAxis ? displayCrop.needMirrorVertically() : displayCrop.needMirrorHorizontally());
       final boolean needMirrorVertically = displayCrop != null && (needSwapMirrorAxis ? displayCrop.needMirrorHorizontally() : displayCrop.needMirrorVertically());
@@ -1254,12 +1326,19 @@ public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListe
             c.rotate(degrees, cx, cy);
             c.scale(scale, scale, cx, cy);
 
-            drawBitmap(c, bitmap, 0, 0, needMirrorHorizontally, needMirrorVertically, paint);
+            if (drawBmp == bitmap) {
+              drawBitmap(c, bitmap, 0, 0, needMirrorHorizontally, needMirrorVertically, paint);
+            } else {
+              glassSrcRect.set(0, 0, drawBmp.getWidth(), drawBmp.getHeight());
+              rect.set(0, 0, bitmap.getWidth(), bitmap.getHeight());
+              drawBitmap(c, drawBmp, glassSrcRect, rect, needMirrorHorizontally, needMirrorVertically, paint);
+            }
             if (paintState != null) {
               paintState.draw(c, 0, 0, bitmap.getWidth(), bitmap.getHeight());
             }
           } else {
-            drawBitmap(c, bitmap, bitmapRect, rect, needMirrorHorizontally, needMirrorVertically, paint);
+            mapToGlassThumb(drawBmp, bitmap, bitmapRect, glassSrcRect);
+            drawBitmap(c, drawBmp, glassSrcRect, rect, needMirrorHorizontally, needMirrorVertically, paint);
             if (paintState != null) {
               c.clipRect(rect);
               DrawAlgorithms.drawPainting(c, bitmap, bitmapRect, rect, paintState);
@@ -1267,7 +1346,12 @@ public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListe
           }
         } else {
           c.concat(bitmapMatrix);
-          drawBitmap(c, bitmap, 0, 0, needMirrorHorizontally, needMirrorVertically, paint);
+          if (drawBmp == bitmap) {
+            drawBitmap(c, bitmap, 0, 0, needMirrorHorizontally, needMirrorVertically, paint);
+          } else {
+            glassSrcRect.set(0, 0, drawBmp.getWidth(), drawBmp.getHeight());
+            drawBitmap(c, drawBmp, glassSrcRect, bitmapRect, needMirrorHorizontally, needMirrorVertically, paint);
+          }
           if (paintState != null) {
             c.clipRect(0, 0, bitmap.getWidth(), bitmap.getHeight());
             paintState.draw(c, 0, 0, bitmap.getWidth(), bitmap.getHeight());
@@ -1276,7 +1360,8 @@ public class ImageReceiver implements Watcher, ValueAnimator.AnimatorUpdateListe
 
         c.restore();
       } else {
-        drawBitmap(c, bitmap, bitmapRect, drawRegion, needMirrorHorizontally, needMirrorVertically, paint);
+        mapToGlassThumb(drawBmp, bitmap, bitmapRect, glassSrcRect);
+        drawBitmap(c, drawBmp, glassSrcRect, drawRegion, needMirrorHorizontally, needMirrorVertically, paint);
         if (paintState != null) {
           c.save();
           c.clipRect(drawRegion);

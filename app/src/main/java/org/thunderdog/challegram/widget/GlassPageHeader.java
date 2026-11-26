@@ -62,8 +62,9 @@ public final class GlassPageHeader {
 
   public ChatGlassDrawable layoutPlayer (int width, int top, int bottom) {
     if (player == null) player = createSurface();
-    int side = Screen.dp(GlassStyle.SIDE_DP), edge = Screen.dp(GlassStyle.HEADER_EDGE_DP);
-    player.setBounds(side, top + edge, width - side, bottom - edge);
+    int side = Screen.dp(GlassStyle.SIDE_DP);
+    player.setRadius(Screen.dp(18f));
+    player.setBounds(side, top, Math.max(side, width - side), Math.max(top, bottom));
     return player;
   }
 

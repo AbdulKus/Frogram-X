@@ -63,6 +63,7 @@ import org.thunderdog.challegram.tool.Paints;
 import org.thunderdog.challegram.tool.Screen;
 import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.util.DrawableProvider;
+import org.thunderdog.challegram.util.TabLabelGeometry;
 import org.thunderdog.challegram.util.text.Counter;
 import org.thunderdog.challegram.util.text.IconSpan;
 import org.thunderdog.challegram.util.text.Text;
@@ -1241,7 +1242,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
               } else {
                 stringX = cx + horizontalPadding;
               }
-              int stringY = viewHeight / 2 - item.ellipsizedStringLayout.getHeight() / 2;
+              int stringY = getLabelTop(viewHeight, item.ellipsizedStringLayout);
               drawLabel(c, item, stringX, stringY, color, itemSelectionFactor);
               item.counter.draw(c, cx + itemWidth - horizontalPadding - item.counter.getWidth() / 2f, viewHeight / 2f, Gravity.CENTER, textAlpha, backgroundAlpha, imageAlpha, item.provider, ColorId.NONE);
             } else if (item.imageReceiver != null) {
@@ -1257,7 +1258,7 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
               item.counter.draw(c, cx + itemWidth - horizontalPadding - item.counter.getWidth() / 2f, viewHeight / 2f, Gravity.CENTER, textAlpha, backgroundAlpha, imageAlpha, item.provider, ColorId.NONE);
               if (item.isAnimating() && item.oldItem != null && item.oldItem.ellipsizedStringLayout != null) {
                 int stringX = cx + horizontalPadding + Screen.dp(ICON_SIZE) + itemSpacing;
-                int stringY = viewHeight / 2 - item.oldItem.ellipsizedStringLayout.getHeight() / 2;
+                int stringY = getLabelTop(viewHeight, item.oldItem.ellipsizedStringLayout);
                 drawLabel(c, item, stringX, stringY, color, itemSelectionFactor);
               }
             } else {
@@ -1274,14 +1275,14 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
             } else {
               stringX = cx + itemWidth / 2 - contentWidth / 2;
             }
-            int stringY = viewHeight / 2 - item.ellipsizedStringLayout.getHeight() / 2;
+            int stringY = getLabelTop(viewHeight, item.ellipsizedStringLayout);
             drawLabel(c, item, stringX, stringY, color, itemSelectionFactor);
           } else if (item.iconRes != 0) {
             Drawable drawable = item.getIcon();
             Drawables.draw(c, drawable, cx + itemWidth / 2 - drawable.getMinimumWidth() / 2, viewHeight / 2 - drawable.getMinimumHeight() / 2, Paints.getPorterDuffPaint(color));
             if (item.isAnimating() && item.oldItem != null && item.oldItem.ellipsizedStringLayout != null) {
               int stringX = cx + horizontalPadding + Screen.dp(ICON_SIZE) + itemSpacing;
-              int stringY = viewHeight / 2 - item.oldItem.ellipsizedStringLayout.getHeight() / 2;
+              int stringY = getLabelTop(viewHeight, item.oldItem.ellipsizedStringLayout);
               drawLabel(c, item, stringX, stringY, color, itemSelectionFactor);
             }
           }
@@ -1346,6 +1347,21 @@ public class ViewPagerTopView extends FrameLayoutFix implements RtlCheckListener
   {
     labelFadingEdgePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
     labelFadingEdgePaint.setShader(new LinearGradient(0, 0, 1, 0, Color.BLACK, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+  }
+
+  private final Rect tempTextBounds = new Rect();
+  private final Paint.FontMetrics tempFontMetrics = new Paint.FontMetrics();
+
+  private int getLabelTop (int viewHeight, Layout layout) {
+    if (layout.getLineCount() != 1) {
+      return viewHeight / 2 - layout.getHeight() / 2;
+    }
+    TextPaint paint = layout.getPaint();
+    paint.getFontMetrics(tempFontMetrics);
+    paint.getTextBounds("H", 0, 1, tempTextBounds);
+    float capHeight = tempTextBounds.height();
+    boolean allCaps = TabLabelGeometry.isAllCaps(layout.getText());
+    return TabLabelGeometry.verticalTop(viewHeight, layout.getHeight(), layout.getLineBaseline(0), tempFontMetrics.ascent, tempFontMetrics.descent, capHeight, allCaps);
   }
 
   private void drawLabel (Canvas c, Item item, float x, float y, int color, float itemSelectionFactor) {

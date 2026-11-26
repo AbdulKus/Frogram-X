@@ -172,6 +172,34 @@ public class SettingsController extends ViewController<Void> implements
     return hasHeaderPhoto() ? (int) (Size.getHeaderPortraitSize() + Size.getHeaderSizeDifference(true) * contentView.getScrollFactor()) : Size.getHeaderPortraitSize();
   }
 
+  private int playerInset;
+
+  private int headerSpacerHeight () {
+    return Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP)
+      + getMaximumHeaderHeight() - Size.getHeaderPortraitSize() + playerInset;
+  }
+
+  @Override
+  protected boolean applyPlayerOffset (float factor, float top) {
+    int next = org.thunderdog.challegram.util.FloatingPlayerGeometry.inset(top, HeaderView.getPlayerSize(), Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP));
+    if (playerInset == next) return false;
+    playerInset = next;
+    if (contentView != null && adapter != null && adapter.getItemCount() > 0 && adapter.getItemViewType(0) == ListItem.TYPE_EMPTY_OFFSET) {
+      View first = contentView.getLayoutManager() != null ? contentView.getLayoutManager().findViewByPosition(0) : null;
+      if (first != null && first.getLayoutParams() != null) {
+        int expected = headerSpacerHeight();
+        if (first.getLayoutParams().height != expected) {
+          first.getLayoutParams().height = expected;
+          first.requestLayout();
+        }
+      } else {
+        adapter.notifyItemChanged(0);
+      }
+    }
+    onGlassPageContentInvalidated();
+    return true;
+  }
+
   @Override
   protected int getMaximumHeaderHeight () {
     return hasHeaderPhoto() ? Size.getHeaderBigPortraitSize(true) : Size.getHeaderPortraitSize();
@@ -500,8 +528,7 @@ public class SettingsController extends ViewController<Void> implements
       public void onBindViewHolder (SettingHolder holder, int position) {
         super.onBindViewHolder(holder, position);
         if (getItemViewType(position) == ListItem.TYPE_EMPTY_OFFSET) {
-          holder.itemView.getLayoutParams().height = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP)
-            + getMaximumHeaderHeight() - Size.getHeaderPortraitSize();
+          holder.itemView.getLayoutParams().height = headerSpacerHeight();
         }
       }
 

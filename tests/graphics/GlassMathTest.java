@@ -140,7 +140,17 @@ public final class GlassMathTest {
       check(!spring.isMoving() && spring.value == 0f, "return does not reconnect");
       spring.target = -50; spring.step(4f); check(Float.isFinite(spring.value), "long frame");
       spring.reset(0f); check(!spring.isMoving(), "callback would continue after close");
+      spring.setVelocity(1800f); check(spring.isMoving(), "spring with initial velocity reported idle");
+      for (int i = 0; i < fps * 2; i++) spring.step(1f / fps);
+      check(!spring.isMoving() && spring.value == 0f, "spring with initial velocity failed to settle");
     }
-    System.out.println("Player geometry: 5 densities, 5005 frames, interrupted open/close; glass sampling: phase stability, RGB averaging, overscan edge; blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; thread post: forward/return, stationary frames and edge jitter; spring: 30/60/90/120 Hz, return and teardown passed");
+    int collapsedHeader = 168, expandedHeader = 432, playerSize = 108, offset = 36;
+    check(FloatingPlayerGeometry.barBottom(collapsedHeader, playerSize, 1f, 1f) == collapsedHeader + playerSize, "collapsed bar bottom mismatch");
+    check(FloatingPlayerGeometry.barBottom(expandedHeader, playerSize, 1f, 1f) == expandedHeader + playerSize, "expanded header hid floating player");
+    check(FloatingPlayerGeometry.pagePlayerAlpha(expandedHeader, expandedHeader + playerSize, playerSize, 0f) == 1f, "expanded header zeroed page player alpha");
+    check(FloatingPlayerGeometry.pagePlayerTop(expandedHeader, expandedHeader + playerSize, playerSize, 0f, offset) == expandedHeader + offset, "expanded page player top overlap");
+    check(FloatingPlayerGeometry.pagePlayerBottom(expandedHeader + playerSize, playerSize, 0f, offset) == expandedHeader + playerSize + offset, "expanded page player bottom mismatch");
+    check(FloatingPlayerGeometry.pagePlayerAlpha(expandedHeader, expandedHeader + playerSize / 2, playerSize, 0f) == 0f, "half-open player faded in prematurely");
+    System.out.println("Player geometry: 5 densities, 5005 frames, interrupted open/close, expanded header; glass sampling: phase stability, RGB averaging, overscan edge; blur: " + cases + " sizes, solid colors, reuse; cache: 20 reopens, resize, unchanged/changed frames; thread post: forward/return, stationary frames and edge jitter; spring: 30/60/90/120 Hz, return, velocity, and teardown passed");
   }
 }

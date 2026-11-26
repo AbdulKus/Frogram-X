@@ -61,8 +61,8 @@ final class GlassContentSnapshot {
       hardware = null;
       prepareSoftwareForeground();
     }
-    int blurWidth = Math.max(1, Math.round(paddedWidth / (float) Screen.dp(2f)));
-    int blurHeight = Math.max(1, Math.round(paddedHeight / (float) Screen.dp(2f)));
+    int blurWidth = Math.max(1, Math.round(paddedWidth / (float) Screen.dp(3.5f)));
+    int blurHeight = Math.max(1, Math.round(paddedHeight / (float) Screen.dp(3.5f)));
     if (blurred == null || blurred.getWidth() != blurWidth || blurred.getHeight() != blurHeight) {
       blurred = Bitmap.createBitmap(blurWidth, blurHeight, Bitmap.Config.ARGB_8888);
     } else {

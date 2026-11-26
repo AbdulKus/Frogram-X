@@ -2415,6 +2415,7 @@ public class HeaderView extends FrameLayoutFix implements View.OnClickListener, 
 
     item.executeAnimationReadyListeners();
     updateControlInsets(item, null, 0f);
+    UI.getContext(getContext()).getRoundVideoController().checkLayout();
   }
 
   private float currentX, currentY;

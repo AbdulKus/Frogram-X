@@ -25,10 +25,12 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.TextureView;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -50,12 +52,12 @@ import org.thunderdog.challegram.U;
 import org.thunderdog.challegram.component.chat.MessageOverlayView;
 import org.thunderdog.challegram.component.chat.MessageViewGroup;
 import org.thunderdog.challegram.component.chat.MessagesManager;
-import org.thunderdog.challegram.component.preview.FlingDetector;
 import org.thunderdog.challegram.config.Config;
 import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.data.TGMessage;
 import org.thunderdog.challegram.data.TGMessageVideo;
 import org.thunderdog.challegram.loader.ImageFile;
+import org.thunderdog.challegram.navigation.HeaderFilling;
 import org.thunderdog.challegram.navigation.HeaderView;
 import org.thunderdog.challegram.navigation.NavigationController;
 import org.thunderdog.challegram.navigation.ViewController;
@@ -70,8 +72,12 @@ import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.tool.Views;
 import org.thunderdog.challegram.ui.MessagesController;
 import org.thunderdog.challegram.unsorted.Settings;
+import org.thunderdog.challegram.util.DampedSpring;
+import org.thunderdog.challegram.util.FloatingPlayerGeometry;
+import org.thunderdog.challegram.util.PipSpringMath;
 import org.thunderdog.challegram.v.MessagesRecyclerView;
 import org.thunderdog.challegram.widget.CircleFrameLayout;
+import org.thunderdog.challegram.widget.GlassStyle;
 import org.thunderdog.challegram.widget.GlassVideoSnapshot;
 import org.thunderdog.challegram.widget.ImageReceiverView;
 import org.thunderdog.challegram.widget.RectFrameLayout;
@@ -498,6 +504,9 @@ public class RoundVideoController extends BasePlaybackController implements
       pipPlayerView.addView(pipProgressView);
 
       pipParentView.addView(pipPlayerView);
+      if (pipParentView.getMeasuredHeight() > 0) {
+        updatePipLayoutParams(isRightGravity(Settings.instance().getPipGravity()), pipVerticalFraction);
+      }
     }
 
     if (pipParentView.getParent() == null) {
@@ -605,7 +614,7 @@ public class RoundVideoController extends BasePlaybackController implements
           case MODE_DISMISS:
           case MODE_HIDE: {
             final float scale = HIDE_SCALE + (1f - HIDE_SCALE) * factor;
-            view.setScaleY(scale);
+            view.setScaleX(scale);
             view.setScaleY(scale);
             view.setTranslationX(fromTranslateX + (toTranslateX - fromTranslateX) * (1f - factor));
             break;
@@ -747,6 +756,9 @@ public class RoundVideoController extends BasePlaybackController implements
 
       Log.i(Log.TAG_VIDEO, "inPipMode -> %b, animated: %b", inPipMode, animated);
 
+      if (inPipMode) {
+        updatePipTopMargin();
+      }
       checkPlayingThroughPip();
       checkMainVisible(animated);
 
@@ -822,30 +834,86 @@ public class RoundVideoController extends BasePlaybackController implements
     updatePipStyles();
   }
 
+  private float pipVerticalFraction = isBottomGravity(Settings.instance().getPipGravity()) ? 1f : 0f;
+
+  private int getPipTopMargin () {
+    int topMargin = HeaderView.getSize(true);
+    NavigationController navigation = context.navigation();
+    HeaderView headerView = navigation != null ? navigation.getHeaderView() : null;
+    if (headerView != null) {
+      ViewController<?> current = navigation.getCurrentStackItem();
+      if (current instanceof MessagesController) {
+        topMargin = ((MessagesController) current).getPipTopInset();
+      } else {
+        HeaderFilling filling = headerView.getFilling();
+        if (filling != null) {
+          int playerOffset = filling.getVisiblePlayerOffset();
+          if (filling.isGlassPageHeader()) {
+            topMargin = Math.max(topMargin, filling.getPlayerBottom()) + FloatingPlayerGeometry.gap(playerOffset, HeaderView.getPlayerSize(), Screen.dp(GlassStyle.PLAYER_OFFSET_DP));
+          } else if (current != null && current.hasFloatingHeader()) {
+            topMargin += FloatingPlayerGeometry.inset(playerOffset, HeaderView.getPlayerSize(), Screen.dp(12f));
+          } else {
+            topMargin = Math.max(topMargin, filling.getBottom());
+          }
+        }
+      }
+    }
+    return topMargin + getPlayerPipMargin();
+  }
+
   private FrameLayoutFix.LayoutParams newPlayerParams () {
     int pipSize = getPlayerPipSize();
 
     int gravity = Settings.instance().getPipGravity();
 
     FrameLayoutFix.LayoutParams params = FrameLayoutFix.newParams(pipSize, pipSize, gravity);
-    params.topMargin = HeaderView.getSize(true) + HeaderView.getPlayerSize() + getPlayerPipMargin();
+    params.topMargin = getPipTopMargin();
     params.rightMargin = params.bottomMargin = params.leftMargin = getPlayerPipMargin();
 
     return params;
   }
 
-  private void applyPipGravity (int gravity) {
+  private boolean updatePipLayoutParams (boolean rightEdge, float verticalFraction) {
+    if (pipPlayerView == null) {
+      return false;
+    }
+    FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) pipPlayerView.getLayoutParams();
+    int minTop = getPipTopMargin();
+    int parentHeight = pipParentView != null ? pipParentView.getMeasuredHeight() : 0;
+    final int nextGravity;
+    final int nextTopMargin;
+    if (parentHeight > 0) {
+      nextGravity = (rightEdge ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP;
+      nextTopMargin = PipSpringMath.verticalMargin(minTop, parentHeight, getPlayerPipSize(), params.bottomMargin, verticalFraction);
+    } else {
+      nextGravity = (rightEdge ? Gravity.RIGHT : Gravity.LEFT) | (verticalFraction >= 0.5f ? Gravity.BOTTOM : Gravity.TOP);
+      nextTopMargin = minTop;
+    }
+    if (params.gravity != nextGravity || params.topMargin != nextTopMargin) {
+      params.gravity = nextGravity;
+      params.topMargin = nextTopMargin;
+      pipPlayerView.setLayoutParams(params);
+      return true;
+    }
+    return false;
+  }
+
+  private void updatePipTopMargin () {
+    if (pipPlayerView == null || pipParentView == null || pipParentView.isInteracting()) {
+      return;
+    }
+    FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) pipPlayerView.getLayoutParams();
+    updatePipLayoutParams(isRightGravity(params.gravity), pipVerticalFraction);
+  }
+
+  private void applyPipPosition (boolean rightEdge, float verticalFraction) {
+    pipVerticalFraction = MathUtils.clamp(verticalFraction);
+    int savedGravity = (rightEdge ? Gravity.RIGHT : Gravity.LEFT) | (pipVerticalFraction >= 0.5f ? Gravity.BOTTOM : Gravity.TOP);
+    Settings.instance().setPipGravity(savedGravity);
     if (pipPlayerView != null) {
       pipTranslateX = 0f;
       pipTranslateY = 0f;
-
-      FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) pipPlayerView.getLayoutParams();
-      if (isRightGravity(params.gravity) != isRightGravity(gravity) || isBottomGravity(params.gravity) != isBottomGravity(gravity)) {
-        params.gravity = gravity;
-        pipPlayerView.setLayoutParams(params);
-        Settings.instance().setPipGravity(gravity);
-      }
-
+      updatePipLayoutParams(rightEdge, pipVerticalFraction);
       updatePipStyles();
     }
   }
@@ -1419,8 +1487,11 @@ public class RoundVideoController extends BasePlaybackController implements
   }
 
   public void checkLayout () {
-    if (object != null && targetView != null) {
-      checkCurrentViewVisible(true, false);
+    if (object != null) {
+      updatePipTopMargin();
+      if (targetView != null) {
+        checkCurrentViewVisible(true, false);
+      }
     }
   }
 
@@ -1672,75 +1743,112 @@ public class RoundVideoController extends BasePlaybackController implements
 
   // PiP parent
 
-  private static class InterceptPipLayout extends FrameLayoutFix implements FactorAnimator.Target, FlingDetector.Callback {
-    private FlingDetector detector;
+  private static class InterceptPipLayout extends FrameLayoutFix {
+    private static final float LOOKAHEAD_X_SEC = 0.14f;
+    private static final float LOOKAHEAD_Y_SEC = 0.10f;
+
+    private final DampedSpring springX = new DampedSpring();
+    private final DampedSpring springY = new DampedSpring();
+    private VelocityTracker velocityTracker;
+    private boolean springRunning;
+    private long lastSpringTime;
+    private boolean targetRightEdge;
+    private float targetDockX, targetDockY;
+
+    private final Runnable springRunnable = new Runnable() {
+      @Override
+      public void run () {
+        if (!springRunning || context == null || context.pipPlayerView == null || !context.inPipMode) {
+          springRunning = false;
+          return;
+        }
+        long now = SystemClock.uptimeMillis();
+        float dt = lastSpringTime == 0 ? 1f / 60f : (now - lastSpringTime) / 1000f;
+        lastSpringTime = now;
+        boolean movingX = springX.step(dt);
+        boolean movingY = springY.step(dt);
+        setPlayerTranslate(
+          springX.value - context.pipPlayerView.getLeft(),
+          springY.value - context.pipPlayerView.getTop()
+        );
+        if (movingX || movingY) {
+          postOnAnimation(this);
+        } else {
+          springRunning = false;
+          commitSpringPosition();
+        }
+      }
+    };
+
     public InterceptPipLayout (@NonNull Context context) {
       super(context);
-      detector = new FlingDetector(context, this);
+    }
+
+    public boolean isInteracting () {
+      return isDragging || springRunning;
     }
 
     @Override
-    public boolean onFling (float velocityX, float velocityY) {
-      float maxVelocity = Math.max(Math.abs(velocityX), Math.abs(velocityY));
-
-      if (hasTarget && isDragging && context.pipPlayerView != null && context.pipPlayerView.getParent() != null && maxVelocity > Screen.dp(10f)) {
-        CircleFrameLayout playerView = context.pipPlayerView;
-        ViewGroup parent = (ViewGroup) playerView.getParent();
-        int sourceGravity = calculateCurrentGravity();
-
-        FrameLayoutFix.LayoutParams sourceParams = (LayoutParams) parent.getLayoutParams();
-
-        float x = playerView.getLeft() + playerView.getTranslationX();// + playerView.getMeasuredWidth() / 2;
-        // float y = playerView.getTop() + playerView.getTranslationY();// + playerView.getMeasuredHeight() / 2;
-
-        float rectWidth = parent.getMeasuredWidth();
-        // float rectHeight = parent.getMeasuredHeight();
-
-        final float checkFactor = 1.1f;
-        float checkLeft = sourceParams.leftMargin * checkFactor;
-        float checkRight = rectWidth - (sourceParams.rightMargin + playerView.getMeasuredWidth()) * checkFactor;
-
-        double degrees = velocityX != 0 || velocityY != 0 ? Math.toDegrees(Math.atan2(velocityY, velocityX)) : 0;
-
-        int gravity = 0;
-        boolean dismiss = false;
-
-        // 0 degrees is right
-        // 180 is left
-        // -180..0 are top
-        // 0..180 are bottom
-        if (degrees <= -30 && degrees >= -180 + 30) {
-          gravity |= Gravity.TOP;
-        } else if (degrees >= 30 && degrees <= 180 - 30) {
-          gravity |= Gravity.BOTTOM;
-        } else {
-          gravity |= sourceGravity & Gravity.VERTICAL_GRAVITY_MASK;
-        }
-
-        if (Math.abs(degrees) >= 180 - 75) {
-          gravity |= Gravity.LEFT;
-          dismiss = x < checkLeft && maxVelocity > Screen.dp(20f);
-        } else if (Math.abs(degrees) <= 75) {
-          gravity |= Gravity.RIGHT;
-          dismiss = x > checkRight && maxVelocity > Screen.dp(20f);
-        } else {
-          gravity |= sourceGravity & Gravity.HORIZONTAL_GRAVITY_MASK;
-        }
-
-        dropIntercept(false, false);
-        if (dismiss) {
-          context.dismissPlayer();
-        } else {
-          animateGravity(gravity, maxVelocity);
-        }
-
-        return true;
+    protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+      super.onSizeChanged(w, h, oldw, oldh);
+      if (h > 0 && context != null) {
+        post(() -> {
+          if (context != null) {
+            context.updatePipTopMargin();
+          }
+        });
       }
-
-      return false;
     }
 
-    private FactorAnimator positionAnimator;
+    @Override
+    protected void onDetachedFromWindow () {
+      super.onDetachedFromWindow();
+      stopSpring();
+      recycleVelocityTracker();
+    }
+
+    private void startSpring () {
+      lastSpringTime = SystemClock.uptimeMillis();
+      if (!springRunning) {
+        springRunning = true;
+        postOnAnimation(springRunnable);
+      }
+    }
+
+    private void stopSpring () {
+      if (springRunning) {
+        springRunning = false;
+        removeCallbacks(springRunnable);
+      }
+    }
+
+    private void recycleVelocityTracker () {
+      if (velocityTracker != null) {
+        velocityTracker.recycle();
+        velocityTracker = null;
+      }
+    }
+
+    private float computeVerticalFraction (float dockY) {
+      if (context == null || context.pipPlayerView == null) {
+        return 0f;
+      }
+      int parentHeight = getMeasuredHeight();
+      if (parentHeight <= 0) {
+        return context.pipVerticalFraction;
+      }
+      LayoutParams params = (LayoutParams) context.pipPlayerView.getLayoutParams();
+      float minY = context.getPipTopMargin();
+      float maxY = Math.max(minY, parentHeight - getPlayerPipSize() - params.bottomMargin);
+      return PipSpringMath.verticalFraction(dockY, minY, maxY);
+    }
+
+    private void commitSpringPosition () {
+      if (context == null || context.pipPlayerView == null) {
+        return;
+      }
+      context.applyPipPosition(targetRightEdge, computeVerticalFraction(targetDockY));
+    }
 
     public int calculateCurrentGravity () {
       CircleFrameLayout playerView = context.pipPlayerView;
@@ -1753,21 +1861,15 @@ public class RoundVideoController extends BasePlaybackController implements
         return params.gravity;
       }
 
-      float actualCenterX = playerView.getLeft() + playerView.getTranslationX() + playerView.getMeasuredWidth() / 2;
-      float actualCenterY = playerView.getTop() + playerView.getTranslationY() + playerView.getMeasuredHeight() / 2;
+      float actualCenterX = playerView.getLeft() + playerView.getTranslationX() + playerView.getMeasuredWidth() / 2f;
+      float actualCenterY = playerView.getTop() + playerView.getTranslationY() + playerView.getMeasuredHeight() / 2f;
 
       ViewGroup parent = (ViewGroup) playerView.getParent();
 
-      int gravity;
-
-      if (actualCenterX < parent.getMeasuredWidth() / 2) {
-        gravity = Gravity.LEFT;
-      } else {
-        gravity = Gravity.RIGHT;
-      }
+      int gravity = actualCenterX < parent.getMeasuredWidth() / 2f ? Gravity.LEFT : Gravity.RIGHT;
 
       int topOffset = params.topMargin - getPlayerPipMargin();
-      if (actualCenterY < topOffset + (parent.getMeasuredHeight() - topOffset) / 2) {
+      if (actualCenterY < topOffset + (parent.getMeasuredHeight() - topOffset) / 2f) {
         gravity |= Gravity.TOP;
       } else {
         gravity |= Gravity.BOTTOM;
@@ -1776,104 +1878,83 @@ public class RoundVideoController extends BasePlaybackController implements
       return gravity;
     }
 
-    public void dropIntercept (boolean animated, boolean applyPosition) { // If false, do nothing
+    public void dropIntercept (boolean animated, boolean applyPosition) {
+      float velocityX = 0f, velocityY = 0f;
+      if (velocityTracker != null) {
+        velocityTracker.computeCurrentVelocity(1000, Screen.dp(3200f));
+        velocityX = velocityTracker.getXVelocity();
+        velocityY = velocityTracker.getYVelocity();
+        recycleVelocityTracker();
+      }
+
       if (animated && hasTarget && context.pipPlayerView != null) {
-        LayoutParams params = (LayoutParams) context.pipPlayerView.getLayoutParams();
-        int gravity = params.gravity;
-        boolean dismissed = false;
-        if (applyPosition) {
-          gravity = calculateCurrentGravity();
-          if (context.getPipDismissAlpha() <= .6f) {
-            context.dismissPlayer();
-            dismissed = true;
-          }
-        }
-        if (!dismissed) {
-          animateGravity(gravity, -1);
-        }
+        settleFromCurrent(applyPosition, velocityX, velocityY);
       }
 
       startX = -1; startY = -1;
       hasTarget = false;
+      hadSpringOnDown = false;
     }
 
-    private float fromX, fromY, toX, toY;
-    private int toGravity;
-
-    private void animateGravity (int gravity, float velocity) {
+    private void settleFromCurrent (boolean applyPosition, float velocityX, float velocityY) {
       CircleFrameLayout playerView = context.pipPlayerView;
-
       if (playerView == null) {
         return;
       }
-
-      this.toGravity = gravity;
-      if (positionAnimator == null) {
-        positionAnimator = new FactorAnimator(0, this, AnimatorUtils.DECELERATE_INTERPOLATOR, 180l, 0f);
-      } else {
-        positionAnimator.forceFactor(0f);
+      int parentWidth = getMeasuredWidth();
+      int parentHeight = getMeasuredHeight();
+      if (parentWidth <= 0 || parentHeight <= 0) {
+        return;
       }
 
-      this.fromX = playerView.getTranslationX();
-      this.fromY = playerView.getTranslationY();
+      LayoutParams params = (LayoutParams) playerView.getLayoutParams();
+      int pipSize = getPlayerPipSize();
+      float currentX = playerView.getLeft() + playerView.getTranslationX();
+      float currentY = playerView.getTop() + playerView.getTranslationY();
 
-      ViewGroup parent = (ViewGroup) playerView.getParent();
-      int parentWidth = parent.getMeasuredWidth();
-      int parentHeight = parent.getMeasuredHeight();
-
-      FrameLayoutFix.LayoutParams params = (FrameLayoutFix.LayoutParams) playerView.getLayoutParams();
-
-      float targetLeft;
-      if (isRightGravity(gravity)) {
-        targetLeft = parentWidth - getPlayerPipSize() - params.rightMargin;
-      } else {
-        targetLeft = params.leftMargin;
-      }
-      float targetTop;
-      if (isBottomGravity(gravity)) {
-        targetTop = parentHeight - getPlayerPipSize() - params.bottomMargin;
-      } else {
-        targetTop = params.topMargin;
+      if (applyPosition && PipSpringMath.shouldDismiss(currentX, pipSize, parentWidth, params.leftMargin, context.getPipDismissAlpha(), velocityX, Screen.dp(900f))) {
+        context.dismissPlayer();
+        return;
       }
 
-      this.toX = targetLeft - playerView.getLeft();
-      this.toY = targetTop - playerView.getTop();
+      float minX = params.leftMargin;
+      float maxX = Math.max(minX, parentWidth - pipSize - params.rightMargin);
+      float minY = context.getPipTopMargin();
+      float maxY = Math.max(minY, parentHeight - pipSize - params.bottomMargin);
 
-      positionAnimator.animateTo(1f);
+      if (applyPosition) {
+        targetRightEdge = PipSpringMath.pickRightEdge(currentX, velocityX, pipSize, parentWidth, LOOKAHEAD_X_SEC);
+        targetDockX = PipSpringMath.dockX(targetRightEdge, minX, maxX);
+        targetDockY = PipSpringMath.clampTargetY(currentY, velocityY, minY, maxY, LOOKAHEAD_Y_SEC);
+      } else {
+        targetRightEdge = isRightGravity(params.gravity);
+        targetDockX = PipSpringMath.dockX(targetRightEdge, minX, maxX);
+        targetDockY = PipSpringMath.verticalMargin((int) minY, parentHeight, pipSize, params.bottomMargin, context.pipVerticalFraction);
+        velocityX = 0f;
+        velocityY = 0f;
+      }
+
+      springX.reset(currentX);
+      springX.setVelocity(velocityX);
+      springX.target = targetDockX;
+
+      springY.reset(currentY);
+      springY.setVelocity(velocityY);
+      springY.target = targetDockY;
+
+      startSpring();
     }
 
     public void forceApplyPosition () {
       if (context.pipPlayerView != null) {
         setDragging(false, false, false);
-        if (positionAnimator != null && positionAnimator.isAnimating()) {
-          positionAnimator.cancel();
-          context.applyPipGravity(toGravity);
+        if (springRunning) {
+          stopSpring();
+          commitSpringPosition();
         } else {
-          context.applyPipGravity(calculateCurrentGravity());
-        }
-      }
-    }
-
-    @Override
-    public void onFactorChanged (int id, float factor, float fraction, FactorAnimator callee) {
-      switch (id) {
-        case 0: {
-          float x = fromX + (toX - fromX) * factor;
-          float y = fromY + (toY - fromY) * factor;
-
-          setPlayerTranslate(x, y);
-
-          break;
-        }
-      }
-    }
-
-    @Override
-    public void onFactorChangeFinished (int id, float finalFactor, FactorAnimator callee) {
-      switch (id) {
-        case 0: {
-          context.applyPipGravity(toGravity);
-          break;
+          int gravity = calculateCurrentGravity();
+          float currentY = context.pipPlayerView.getTop() + context.pipPlayerView.getTranslationY();
+          context.applyPipPosition(isRightGravity(gravity), computeVerticalFraction(currentY));
         }
       }
     }
@@ -1886,9 +1967,6 @@ public class RoundVideoController extends BasePlaybackController implements
           float viewLeft = view.getLeft() + view.getTranslationX();
           float viewTop = view.getTop() + view.getTranslationY();
           if (x >= viewLeft && x <= viewLeft + view.getMeasuredWidth() && y >= viewTop && y <= viewTop + view.getMeasuredHeight()) {
-            if (positionAnimator != null && positionAnimator.isAnimating()) {
-              positionAnimator.cancel();
-            }
             return (CircleFrameLayout) view;
           }
         }
@@ -1898,6 +1976,7 @@ public class RoundVideoController extends BasePlaybackController implements
 
     private float startX = -1, startY = -1;
     private boolean isDragging;
+    private boolean hadSpringOnDown;
 
     private void setDragging (boolean isDragging, boolean animated, boolean applyPosition) {
       if (this.isDragging != isDragging) {
@@ -1924,16 +2003,29 @@ public class RoundVideoController extends BasePlaybackController implements
 
     @Override
     public boolean onInterceptTouchEvent (MotionEvent ev) {
-      // Log.i("onInterceptTouchEvent %s", ev);
-      switch (ev.getAction()) {
+      switch (ev.getActionMasked()) {
         case MotionEvent.ACTION_DOWN: {
           startX = ev.getX();
           startY = ev.getY();
           hasTarget = findPlayerUnder(startX, startY) != null;
-          detector.onTouchEvent(ev);
+          if (hasTarget) {
+            hadSpringOnDown = springRunning;
+            stopSpring();
+            if (velocityTracker == null) {
+              velocityTracker = VelocityTracker.obtain();
+            } else {
+              velocityTracker.clear();
+            }
+            velocityTracker.addMovement(ev);
+          } else {
+            hadSpringOnDown = false;
+          }
           return false;
         }
         case MotionEvent.ACTION_MOVE: {
+          if (hasTarget && velocityTracker != null) {
+            velocityTracker.addMovement(ev);
+          }
           float x = ev.getX();
           float y = ev.getY();
           if (hasTarget && context.pipPlayerView != null && !isDragging && Math.max(Math.abs(x - startX), Math.abs(y - startY)) > Screen.getTouchSlop()) {
@@ -1947,13 +2039,31 @@ public class RoundVideoController extends BasePlaybackController implements
           break;
         }
         case MotionEvent.ACTION_CANCEL: {
-          setDragging(false, true, false);
-          detector.onTouchEvent(ev);
+          if (isDragging || hadSpringOnDown) {
+            setDragging(false, true, false);
+            if (!isDragging && hadSpringOnDown && context.pipPlayerView != null) {
+              settleFromCurrent(false, 0f, 0f);
+              hadSpringOnDown = false;
+            }
+          } else {
+            hasTarget = false;
+            recycleVelocityTracker();
+          }
           return false;
         }
         case MotionEvent.ACTION_UP: {
-          setDragging(false, true, true);
-          detector.onTouchEvent(ev);
+          if (isDragging) {
+            setDragging(false, true, true);
+          } else if (hadSpringOnDown && hasTarget && context.pipPlayerView != null) {
+            settleFromCurrent(true, 0f, 0f);
+            hasTarget = false;
+            hadSpringOnDown = false;
+            recycleVelocityTracker();
+          } else {
+            hasTarget = false;
+            hadSpringOnDown = false;
+            recycleVelocityTracker();
+          }
           return false;
         }
       }
@@ -1962,12 +2072,12 @@ public class RoundVideoController extends BasePlaybackController implements
 
     @Override
     public boolean onTouchEvent (MotionEvent event) {
-      // Log.i("onTouchEvent %s", event);
-      switch (event.getAction()) {
+      switch (event.getActionMasked()) {
         case MotionEvent.ACTION_MOVE: {
           if (isDragging && hasTarget) {
-            detector.onTouchEvent(event);
-
+            if (velocityTracker != null) {
+              velocityTracker.addMovement(event);
+            }
             float x = event.getX();
             float y = event.getY();
             float diffX = x - dragStartX;
@@ -1977,17 +2087,19 @@ public class RoundVideoController extends BasePlaybackController implements
           break;
         }
         case MotionEvent.ACTION_CANCEL: {
-          detector.onTouchEvent(event);
           setDragging(false, true, false);
           break;
         }
-        case MotionEvent.ACTION_UP:
-          detector.onTouchEvent(event);
+        case MotionEvent.ACTION_UP: {
+          if (velocityTracker != null) {
+            velocityTracker.addMovement(event);
+          }
           setDragging(false, true, true);
           break;
+        }
       }
 
-      return false;
+      return isDragging;
     }
   }
 

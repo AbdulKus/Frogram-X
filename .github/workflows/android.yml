@@ -54,6 +54,8 @@ jobs:
             app/src/main/java/org/thunderdog/challegram/util/GlassBlur.java \
             app/src/main/java/org/thunderdog/challegram/util/GlassPalette.java \
             app/src/main/java/org/thunderdog/challegram/util/FloatingPlayerGeometry.java \
+            app/src/main/java/org/thunderdog/challegram/util/PipSpringMath.java \
+            app/src/main/java/org/thunderdog/challegram/util/TabLabelGeometry.java \
             app/src/main/java/org/thunderdog/challegram/util/GlassFrameCache.java \
             app/src/main/java/org/thunderdog/challegram/util/GlassSampling.java \
             app/src/main/java/org/thunderdog/challegram/util/ChatViewport.java \
@@ -62,12 +64,14 @@ jobs:
             app/src/main/java/org/thunderdog/challegram/util/AnchoredMenuGeometry.java \
             app/src/main/java/org/thunderdog/challegram/util/ThreadHeaderVisibility.java \
             app/src/main/java/org/thunderdog/challegram/util/DampedSpring.java \
-            tests/graphics/GlassMathTest.java tests/graphics/ChatViewportTest.java tests/graphics/GlassNavigationTest.java tests/graphics/AnchoredMenuTest.java tests/graphics/GlassPaletteTest.java
+            tests/graphics/GlassMathTest.java tests/graphics/ChatViewportTest.java tests/graphics/GlassNavigationTest.java tests/graphics/AnchoredMenuTest.java tests/graphics/GlassPaletteTest.java tests/graphics/PipSpringTest.java tests/graphics/TabLabelGeometryTest.java
           java -cp "$RUNNER_TEMP/glass-tests" GlassMathTest
           java -cp "$RUNNER_TEMP/glass-tests" ChatViewportTest
           java -cp "$RUNNER_TEMP/glass-tests" GlassNavigationTest
           java -cp "$RUNNER_TEMP/glass-tests" AnchoredMenuTest
           java -cp "$RUNNER_TEMP/glass-tests" GlassPaletteTest
+          java -cp "$RUNNER_TEMP/glass-tests" PipSpringTest
+          java -cp "$RUNNER_TEMP/glass-tests" TabLabelGeometryTest
 
       - name: Test message history and speech resampling
         run: |

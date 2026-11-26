@@ -5,6 +5,8 @@ public final class DampedSpring {
   public float value, target;
   private float velocity;
   public void reset (float value) { this.value = this.target = value; velocity = 0f; }
+  public void setVelocity (float velocity) { this.velocity = velocity; }
+  public float getVelocity () { return velocity; }
   public boolean isMoving () { return Math.abs(target - value) > .05f || Math.abs(velocity) > .05f; }
   public boolean step (float seconds) {
     seconds = Math.max(0f, Math.min(.064f, seconds));

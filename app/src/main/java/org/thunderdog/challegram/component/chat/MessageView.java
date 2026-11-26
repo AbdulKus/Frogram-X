@@ -178,6 +178,9 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
 
   @Override
   public void performDestroy () {
+    glassBitmapDirty = true;
+    glassCanvas = null;
+    glassBitmap = null;
     cancelPendingMessageClick();
     avatarReceiver.destroy();
     avatarsReceiver.performDestroy();
@@ -217,8 +220,17 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
     flags |= FLAG_USE_COMPLEX_RECEIVER;
   }
 
+  private void invalidateGlassContent () {
+    if (glassBitmap == null) {
+      glassBitmapDirty = true;
+    } else {
+      glassContentInvalidated = true;
+    }
+  }
+
   @Override
   public void invalidate () {
+    invalidateGlassContent();
     super.invalidate();
     if (msg != null && msg.needViewGroup()) {
       msg.invalidateOverlay();
@@ -226,7 +238,17 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   @Override
+  public void invalidate (android.graphics.Rect dirty) {
+    invalidateGlassContent();
+    super.invalidate(dirty);
+    if (msg != null && msg.needViewGroup()) {
+      msg.invalidateOverlay();
+    }
+  }
+
+  @Override
   public void invalidate (int l, int t, int r, int b) {
+    invalidateGlassContent();
     super.invalidate(l, t, r, b);
     if (msg != null && msg.needViewGroup()) {
       msg.invalidateOverlay();
@@ -259,12 +281,14 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
 
   public void invalidateReplyReceiver (long chatId, long messageId) {
     if (msg != null && msg.getChatId() == chatId && msg.getId() == messageId) {
+      glassBitmapDirty = true;
       msg.requestReply(replyReceiver, replyTextMediaReceiver);
     }
   }
 
   public void invalidateReplyReceiver () {
     if (msg != null) {
+      glassBitmapDirty = true;
       msg.requestReply(replyReceiver, replyTextMediaReceiver);
     }
   }
@@ -293,6 +317,8 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   public void setMessage (TGMessage message) {
+    glassBitmapDirty = true;
+    glassContentInvalidated = false;
     if (this.msg != message) {
       cancelPendingMessageClick();
     }
@@ -350,6 +376,7 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
 
   public void invalidatePreviewReceiver (long chatId, long messageId) {
     if (msg != null && chatId == msg.getChatId() && messageId == msg.getId() && previewReceiver != null) {
+      glassBitmapDirty = true;
       msg.requestPreview(previewReceiver);
     }
   }
@@ -367,11 +394,13 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
     if (msg != null && chatId == msg.getChatId()) {
       if ((flags & FLAG_USE_COMPLEX_RECEIVER) != 0) {
         if (msg.isDescendantOrSelf(messageId)) {
+          glassBitmapDirty = true;
           msg.requestMediaContent(complexReceiver, true, arg);
           msg.requestTextMedia(textMediaReceiver);
           msg.requestAuthorTextMedia(emojiStatusReceiver);
         }
       } else if (messageId == msg.getId()) {
+        glassBitmapDirty = true;
         if (gifReceiver != null && msg.needGifReceiver()) {
           msg.requestGif(gifReceiver);
         }
@@ -430,6 +459,60 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
       parent = parent.getParent();
     }
     return this;
+  }
+
+  private android.graphics.Bitmap glassBitmap;
+  private Canvas glassCanvas;
+  private final android.graphics.Paint glassBitmapPaint = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+  private final android.graphics.RectF glassBitmapDst = new android.graphics.RectF();
+  private boolean glassBitmapDirty = true;
+  private boolean glassContentInvalidated;
+  private long lastGlassBitmapTime;
+
+  @Override
+  protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+    super.onSizeChanged(w, h, oldw, oldh);
+    glassBitmapDirty = true;
+  }
+
+  public void drawForGlass (Canvas c) {
+    if (msg == null) return;
+    if (c.isHardwareAccelerated()) {
+      onDraw(c);
+      return;
+    }
+    int width = getMeasuredWidth();
+    int height = getMeasuredHeight();
+    if (width <= 0 || height <= 0) return;
+    float scale = Math.min(1f, 120f / width);
+    if (height * scale > 360f) scale = Math.max(1f / height, 360f / height);
+    int targetW = Math.max(1, Math.round(width * scale));
+    int targetH = Math.max(1, Math.round(height * scale));
+    long now = android.os.SystemClock.uptimeMillis();
+    boolean sizeChanged = glassBitmap == null || glassBitmap.getWidth() != targetW || glassBitmap.getHeight() != targetH;
+    boolean needRedraw = sizeChanged || glassBitmapDirty || (glassContentInvalidated && now - lastGlassBitmapTime >= 150L);
+    if (needRedraw) {
+      if (sizeChanged) {
+        glassBitmap = android.graphics.Bitmap.createBitmap(targetW, targetH, android.graphics.Bitmap.Config.ARGB_8888);
+        glassCanvas = new Canvas(glassBitmap);
+      } else {
+        glassBitmap.eraseColor(0);
+      }
+      glassBitmapDirty = false;
+      glassContentInvalidated = false;
+      lastGlassBitmapTime = now;
+      org.thunderdog.challegram.util.GlassRenderState.begin();
+      try {
+        int save = glassCanvas.save();
+        glassCanvas.scale(targetW / (float) width, targetH / (float) height);
+        onDraw(glassCanvas);
+        glassCanvas.restoreToCount(save);
+      } finally {
+        org.thunderdog.challegram.util.GlassRenderState.end();
+      }
+    }
+    glassBitmapDst.set(0, 0, width, height);
+    c.drawBitmap(glassBitmap, null, glassBitmapDst, glassBitmapPaint);
   }
 
   @Override
@@ -517,6 +600,9 @@ public class MessageView extends SparseDrawableView implements Destroyable, Draw
   }
 
   public void onDetachedFromRecyclerView () {
+    glassBitmapDirty = true;
+    glassCanvas = null;
+    glassBitmap = null;
     cancelPendingMessageClick();
     if (isAttached) {
       isAttached = false;

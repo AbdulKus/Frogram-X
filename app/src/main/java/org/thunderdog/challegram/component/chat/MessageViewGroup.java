@@ -81,14 +81,103 @@ public class MessageViewGroup extends ViewGroup implements Destroyable, AttachDe
   private MessagesManager manager;
   private VideoPlayerView videoPlayerView;
   private MessageOverlayView overlayView;
+  private android.graphics.Bitmap glassBitmap;
+  private Canvas glassCanvas;
+  private final android.graphics.Paint glassBitmapPaint = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+  private final android.graphics.RectF glassBitmapDst = new android.graphics.RectF();
+  private boolean glassBitmapDirty = true;
+  private boolean glassContentInvalidated;
+  private long lastGlassBitmapTime;
 
   public MessageViewGroup (Context context) {
     super(context);
     setLayoutParams(new RecyclerView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
   }
 
+  private void invalidateGlassBitmap () {
+    glassBitmapDirty = true;
+  }
+
+  private void invalidateGlassContent () {
+    if (glassBitmap == null) {
+      glassBitmapDirty = true;
+    } else {
+      glassContentInvalidated = true;
+    }
+  }
+
+  @Override public void invalidate () {
+    invalidateGlassContent();
+    super.invalidate();
+  }
+
+  @Override public void invalidate (Rect dirty) {
+    invalidateGlassContent();
+    super.invalidate(dirty);
+  }
+
+  @Override public void invalidate (int l, int t, int r, int b) {
+    invalidateGlassContent();
+    super.invalidate(l, t, r, b);
+  }
+
+  @Override public void onDescendantInvalidated (@NonNull View child, @NonNull View target) {
+    invalidateGlassContent();
+    super.onDescendantInvalidated(child, target);
+  }
+
+  @Override @SuppressWarnings("deprecation")
+  public android.view.ViewParent invalidateChildInParent (int[] location, Rect dirty) {
+    invalidateGlassContent();
+    return super.invalidateChildInParent(location, dirty);
+  }
+
+  @Override protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+    super.onSizeChanged(w, h, oldw, oldh);
+    invalidateGlassBitmap();
+  }
+
   public void drawForGlass (Canvas canvas) {
     if (messageView == null || messageView.getMessage() == null) return;
+    if (canvas.isHardwareAccelerated()) {
+      drawGlassContents(canvas);
+      return;
+    }
+    int width = getMeasuredWidth();
+    int height = getMeasuredHeight();
+    if (width <= 0 || height <= 0) return;
+    float scale = Math.min(1f, 120f / width);
+    if (height * scale > 360f) scale = Math.max(1f / height, 360f / height);
+    int targetW = Math.max(1, Math.round(width * scale));
+    int targetH = Math.max(1, Math.round(height * scale));
+    long now = android.os.SystemClock.uptimeMillis();
+    boolean sizeChanged = glassBitmap == null || glassBitmap.getWidth() != targetW || glassBitmap.getHeight() != targetH;
+    boolean needRedraw = sizeChanged || glassBitmapDirty || (glassContentInvalidated && now - lastGlassBitmapTime >= 150L);
+    if (needRedraw) {
+      if (sizeChanged) {
+        glassBitmap = android.graphics.Bitmap.createBitmap(targetW, targetH, android.graphics.Bitmap.Config.ARGB_8888);
+        glassCanvas = new Canvas(glassBitmap);
+      } else {
+        glassBitmap.eraseColor(0);
+      }
+      glassBitmapDirty = false;
+      glassContentInvalidated = false;
+      lastGlassBitmapTime = now;
+      org.thunderdog.challegram.util.GlassRenderState.begin();
+      try {
+        int save = glassCanvas.save();
+        glassCanvas.scale(targetW / (float) width, targetH / (float) height);
+        drawGlassContents(glassCanvas);
+        glassCanvas.restoreToCount(save);
+      } finally {
+        org.thunderdog.challegram.util.GlassRenderState.end();
+      }
+    }
+    glassBitmapDst.set(0, 0, width, height);
+    canvas.drawBitmap(glassBitmap, null, glassBitmapDst, glassBitmapPaint);
+  }
+
+  private void drawGlassContents (Canvas canvas) {
     messageView.getMessage().drawBackground(messageView, canvas);
     messageView.onDraw(canvas);
     if (overlayView != null && overlayView.getParent() == this) overlayView.onDraw(canvas);
@@ -261,6 +350,10 @@ public class MessageViewGroup extends ViewGroup implements Destroyable, AttachDe
 
   @Override
   public void performDestroy () {
+    glassBitmapDirty = true;
+    glassContentInvalidated = false;
+    glassCanvas = null;
+    glassBitmap = null;
     messageView.performDestroy();
     videoPlayerView.performDestroy();
   }
@@ -273,11 +366,17 @@ public class MessageViewGroup extends ViewGroup implements Destroyable, AttachDe
 
   @Override
   public void detach () {
+    glassBitmapDirty = true;
+    glassContentInvalidated = false;
+    glassCanvas = null;
+    glassBitmap = null;
     messageView.onDetachedFromRecyclerView();
     videoPlayerView.detach();
   }
 
   public void setMessage (TGMessage message) {
+    glassBitmapDirty = true;
+    glassContentInvalidated = false;
     messageView.setMessage(message);
     overlayView.setMessage(message);
     videoPlayerView.setVisibility(TD.isSelfDestructTypeImmediately(message.getMessage()) ? GONE:  VISIBLE);
@@ -293,6 +392,8 @@ public class MessageViewGroup extends ViewGroup implements Destroyable, AttachDe
   }
 
   public void invalidateContent (TGMessage message) {
+    glassBitmapDirty = true;
+    glassContentInvalidated = false;
     requestVideo(message);
   }
 }

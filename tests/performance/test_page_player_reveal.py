@@ -12,14 +12,16 @@ ROOT = Path(__file__).resolve().parents[2]
 class PagePlayerRevealTest(unittest.TestCase):
     def test_reveal_and_touch_follow_the_visible_player(self):
         source = (ROOT / 'app/src/main/java/org/thunderdog/challegram/navigation/HeaderFilling.java').read_text()
-        methods = '\n'.join(method(source, name) for name in ['private float pagePlayerAlpha (', 'public boolean needClickAt (', 'public boolean onTouchEvent ('])
+        methods = '\n'.join(method(source, name) for name in ['private float pagePlayerAlpha (', 'private boolean isFloatingPlayerContext (', 'public boolean needClickAt (', 'public boolean onTouchEvent ('])
         code = FIXTURE.replace('PRODUCTION_METHODS', methods.replace('@Override', ''))
         with tempfile.TemporaryDirectory(prefix='frogram-player-reveal-') as directory:
             path = Path(directory) / 'PlayerRevealTest.java'
             path.write_text(code)
             style = (ROOT / 'app/src/main/java/org/thunderdog/challegram/widget/GlassStyle.java').read_text()
             (Path(directory) / 'GlassStyle.java').write_text(style)
-            sources = [str(path), str(Path(directory) / 'GlassStyle.java')]
+            geometry = (ROOT / 'app/src/main/java/org/thunderdog/challegram/util/FloatingPlayerGeometry.java').read_text()
+            (Path(directory) / 'FloatingPlayerGeometry.java').write_text(geometry)
+            sources = [str(path), str(Path(directory) / 'GlassStyle.java'), str(Path(directory) / 'FloatingPlayerGeometry.java')]
             result = subprocess.run([shutil.which('javac'), '-d', directory, *sources], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([shutil.which('java'), '-cp', directory, path.stem], capture_output=True, text=True)
@@ -37,7 +39,7 @@ FIXTURE = '''public class PlayerRevealTest {
  static class ViewController<T> {boolean glass=true;boolean usesGlassPageHeader(){return glass;}boolean hasFloatingPlayer(){return false;}}
  static class Navigation {ViewController<?> owner=new ViewController<>();boolean animating;ViewController<?> getCurrentStackItem(){return owner;}boolean isAnimating(){return animating;}}
  static class Filling {
-  int playerTop,playerBottom;float fillingBottom=100,hideFactor,dropShadowAlpha=1,showFactor=1,touchDownX,touchDownY;
+  int width=1080,playerTop,playerBottom;float fillingBottom=100,hideFactor,dropShadowAlpha=1,showFactor=1,playerAllowance=1,touchDownX,touchDownY;
   boolean showOngoingBar=true,handlingFloatingPlayerTouch;Navigation navigationController=new Navigation();
   Helper helper=new Helper();View headerView=new View();Filling(){helper.filling=this;}
   PRODUCTION_METHODS
@@ -51,6 +53,9 @@ FIXTURE = '''public class PlayerRevealTest {
   }
   check(last==1,"compact player did not become opaque");
   check(f.needClickAt(new View(),15,118),"visible player stopped accepting input");
+  f.playerAllowance=0;check(!f.needClickAt(new View(),15,118),"zero allowance player remains clickable");
+  f.playerAllowance=1;
+  check(!f.needClickAt(new View(),5,118)&&!f.needClickAt(new View(),1075,118),"floating player accepts clicks outside pill margins");
   check(!f.needClickAt(new View(),15,99)&&!f.needClickAt(new View(),15,137),"player accepts input outside its visible row");
   f.playerTop=100;f.playerBottom=136;
   MotionEvent touch=new MotionEvent(136);

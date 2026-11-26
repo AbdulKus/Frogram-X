@@ -335,6 +335,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       try {
         if (!from.prepare(this) || !to.prepare(this)) return true;
         prepared = true;
+        lastBackdropUpdate = SystemClock.uptimeMillis();
         geometry = new GlassNavigationMotion.Geometry(from.bounds.bottom, to.bounds.bottom);
       } catch (RuntimeException | OutOfMemoryError error) {
         android.util.Log.w("GlassNavigation", "Foreground capture unavailable", error);
@@ -350,7 +351,7 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
       from.captureForeground(this, outgoing, outgoing);
       to.captureForeground(this, geometry.incoming(progress), GlassNavigationMotion.incomingBottom(progress));
       long now = SystemClock.uptimeMillis();
-      if (now - lastBackdropUpdate >= 32L || progress == 0f || progress == 1f) {
+      if (now - lastBackdropUpdate >= 96L || progress == 1f) {
         from.refreshBackdrop();
         to.refreshBackdrop();
         lastBackdropUpdate = now;
@@ -394,12 +395,16 @@ public final class GlassNavigationTransition extends View implements ViewTreeObs
     // Settled surfaces draw their background first, then this status fade in
     // View.onDraw. Keep that same order where the fade overlaps the glass.
     canvas.drawRect(0, 0, getWidth(), org.thunderdog.challegram.util.StatusBarScrim.height(header.getEffectiveTopOffset()), status);
-    save = canvas.save();
-    canvas.clipPath(clip);
-    from.draw(canvas, from.top, GlassNavigationMotion.outgoing(progress));
-    to.draw(canvas, to.top, geometry.incoming(progress));
-    canvas.restoreToCount(save);
-    from.drawBottom(canvas, GlassNavigationMotion.outgoing(progress));
+    float outgoing = GlassNavigationMotion.outgoing(progress);
+    float incoming = geometry.incoming(progress);
+    if (outgoing > 0f || incoming > 0f) {
+      save = canvas.save();
+      canvas.clipPath(clip);
+      from.draw(canvas, from.top, outgoing);
+      to.draw(canvas, to.top, incoming);
+      canvas.restoreToCount(save);
+    }
+    from.drawBottom(canvas, outgoing);
     to.drawBottom(canvas, GlassNavigationMotion.incomingBottom(progress));
     Scene playerScene = !from.playerBounds.isEmpty() ? from : to;
     float playerAlpha = from.sharedHeader || to.sharedHeader ? blend(from.playerAlpha(), to.playerAlpha(), factor) : Math.max(from.playerAlpha(), to.playerAlpha());

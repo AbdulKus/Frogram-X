@@ -221,6 +221,19 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     return Math.round(HeaderView.getPlayerSize() * showFactor);
   }
 
+  public int getVisiblePlayerOffset () {
+    return Math.round(HeaderView.getPlayerSize() * showFactor * playerAllowance);
+  }
+
+  public int getPlayerBottom () {
+    return playerBottom;
+  }
+
+  public boolean isGlassPageHeader () {
+    ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
+    return current != null && current.usesGlassPageHeader();
+  }
+
   public void setCollapsed (boolean collapsed) {
     if (collapsed) {
       if (showFactor != 0f) {
@@ -279,6 +292,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   public void layout (int height, float factor) { // Called during the navigation animation
     height += getTopOffset();
 
+    boolean heightChanged = this.height != height;
     this.height = height;
 
     if (showFactor != 0f) {
@@ -286,6 +300,10 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     } else {
       fillingBottom = shadowTop = playerBottom = height;
       playerTop = playerBottom - Size.getHeaderPlayerSize();
+    }
+
+    if (heightChanged) {
+      UI.getContext(headerView.getContext()).getRoundVideoController().checkLayout();
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -326,7 +344,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   }
 
   private void layoutOngoingBar () {
-    playerBottom = height + (int) ((float) HeaderView.getPlayerSize() * (showFactor - MathUtils.clamp((float) (height - HeaderView.getSize(true)) / (float) Size.getHeaderSizeDifference(false))) * playerAllowance);
+    playerBottom = org.thunderdog.challegram.util.FloatingPlayerGeometry.barBottom(height, HeaderView.getPlayerSize(), showFactor, playerAllowance);
     playerTop = playerBottom - HeaderView.getPlayerSize();
 
     fillingBottom = height;
@@ -386,7 +404,11 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   // Drawing
 
   private boolean hasVisibleOngoingBar () {
-    return showFactor != 0f && hideFactor != 1f && dropShadowAlpha != 0f;
+    return hasVisibleOngoingBar(isFloatingPlayerContext());
+  }
+
+  private boolean hasVisibleOngoingBar (boolean floating) {
+    return showFactor != 0f && hideFactor != 1f && (floating ? playerAllowance != 0f : dropShadowAlpha != 0f);
   }
 
   @Override
@@ -398,14 +420,20 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     ViewController<?> surfaceOwner = navigationController != null ? navigationController.getCurrentStackItem() : null;
     if (surfaceOwner != null && surfaceOwner.hasFloatingHeader() &&
         surfaceOwner.drawHeaderBackground(c, headerView, width, (int) fillingBottom, color)) {
-      if (surfaceOwner.usesGlassPageHeader() && hasVisibleOngoingBar() && pagePlayerAlpha() > 0f) {
-        int hide = (int) (HeaderView.getPlayerSize() * hideFactor);
+      if (surfaceOwner.usesGlassPageHeader() && hasVisibleOngoingBar(true) && pagePlayerAlpha() > 0f) {
+        int size = HeaderView.getPlayerSize();
         int offset = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP);
-        int top = Math.max((int) fillingBottom, playerTop - hide) + offset, bottom = playerBottom - hide + offset;
+        int top = org.thunderdog.challegram.util.FloatingPlayerGeometry.pagePlayerTop((int) fillingBottom, playerBottom, size, hideFactor, offset);
+        int bottom = org.thunderdog.challegram.util.FloatingPlayerGeometry.pagePlayerBottom(playerBottom, size, hideFactor, offset);
         if (bottom > top) {
           int save = c.saveLayerAlpha(0, top, width, bottom, Math.round(255f * pagePlayerAlpha()));
-          c.clipRect(0, top, width, bottom);
           surfaceOwner.drawGlassPagePlayer(c, width, top, bottom);
+          int side = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP);
+          float radius = Screen.dp(18f);
+          if (pagePlayerClip == null) pagePlayerClip = new Path();
+          pagePlayerClip.reset();
+          pagePlayerClip.addRoundRect(side, top, Math.max(side, width - side), bottom, radius, radius, Path.Direction.CW);
+          c.clipPath(pagePlayerClip);
           c.translate(0, offset);
           drawingFloatingPlayer = true;
           try { drawOngoingBar(c); } finally { drawingFloatingPlayer = false; c.restoreToCount(save); }
@@ -467,35 +495,43 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   private void invalidateOngoingBar () {
     // invalidateSelf();
-    headerView.invalidate(0, playerTop, width, playerBottom);
+    int bottomOffset = isGlassPageHeader() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP) : 0;
+    headerView.invalidate(0, playerTop, width, playerBottom + bottomOffset);
     if (navigationController != null) navigationController.invalidateFloatingPlayers();
   }
 
   private float pagePlayerAlpha () {
-    float visible = (playerBottom - HeaderView.getPlayerSize() * hideFactor - fillingBottom) / HeaderView.getPlayerSize();
-    float progress = MathUtils.clamp((visible - .8f) / .2f);
-    return progress * progress * (3f - 2f * progress);
+    return org.thunderdog.challegram.util.FloatingPlayerGeometry.pagePlayerAlpha((int) fillingBottom, playerBottom, HeaderView.getPlayerSize(), hideFactor);
   }
 
   void preparePagePlayerScene (GlassNavigationTransition.Scene scene, org.thunderdog.challegram.widget.GlassPageHeader surface, int width, int headerBottom) {
-    if (!hasVisibleOngoingBar()) return;
+    if (!hasVisibleOngoingBar(true)) return;
     int size = HeaderView.getPlayerSize();
-    int bottom = headerBottom + (int) (size * (showFactor - MathUtils.clamp((float) (headerBottom - HeaderView.getSize(true)) / Size.getHeaderSizeDifference(false))) * playerAllowance);
-    int hide = (int) (size * hideFactor);
-    float reveal = MathUtils.clamp(((bottom - hide - headerBottom) / (float) size - .8f) / .2f);
-    float alpha = reveal * reveal * (3f - 2f * reveal);
+    int bottom = org.thunderdog.challegram.util.FloatingPlayerGeometry.barBottom(headerBottom, size, showFactor, playerAllowance);
+    float alpha = org.thunderdog.challegram.util.FloatingPlayerGeometry.pagePlayerAlpha(headerBottom, bottom, size, hideFactor);
     if (alpha <= 0f) return;
     int offset = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP);
-    int top = Math.max(headerBottom, bottom - size - hide) + offset;
-    bottom += offset - hide;
+    int top = org.thunderdog.challegram.util.FloatingPlayerGeometry.pagePlayerTop(headerBottom, bottom, size, hideFactor, offset);
+    bottom = org.thunderdog.challegram.util.FloatingPlayerGeometry.pagePlayerBottom(bottom, size, hideFactor, offset);
     scene.headerPlayer(surface.layoutPlayer(width, top, bottom), top, bottom, alpha);
   }
 
+  private Path pagePlayerClip;
   private boolean drawingFloatingPlayer;
   private boolean handlingFloatingPlayerTouch;
 
+  private int floatingSideInset () {
+    return drawingFloatingPlayer || handlingFloatingPlayerTouch ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) : 0;
+  }
+
+  private boolean isFloatingPlayerContext () {
+    if (handlingFloatingPlayerTouch) return true;
+    ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
+    return current != null && current.usesGlassPageHeader();
+  }
+
   public void drawFloatingPlayer (Canvas canvas, int surfaceHeight) {
-    if (!hasVisibleOngoingBar()) return;
+    if (!hasVisibleOngoingBar(true)) return;
     int save = canvas.save();
     drawingFloatingPlayer = true;
     try {
@@ -508,7 +544,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
 
   public boolean onFloatingPlayerTouch (MotionEvent event, int surfaceHeight) {
     if (event.getActionMasked() == MotionEvent.ACTION_DOWN &&
-        (!hasVisibleOngoingBar() || event.getX() < Screen.dp(8f) || event.getX() > width - Screen.dp(8f) ||
+        (!hasVisibleOngoingBar(true) || event.getX() < Screen.dp(8f) || event.getX() > width - Screen.dp(8f) ||
          event.getY() < 0 || event.getY() > surfaceHeight)) return false;
     MotionEvent translated = MotionEvent.obtain(event);
     translated.offsetLocation(0, (playerTop + playerBottom - surfaceHeight) / 2f);
@@ -723,29 +759,35 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
       c.drawRect(rectWidth, playerTop, width, playerBottom, Paints.fillingPaint(Theme.fillingColor()));
     }
 
-    final int playerFillingColor = ColorUtils.alphaColor(dropShadowAlpha, Theme.fillingColor());
+    final float barAlpha = drawingFloatingPlayer ? 1f : dropShadowAlpha;
+    final int playerFillingColor = ColorUtils.alphaColor(barAlpha, Theme.fillingColor());
+    final int sideInset = floatingSideInset();
 
     if (!drawingFloatingPlayer) c.drawRect(0, playerTop, rectWidth, playerBottom, Paints.fillingPaint(playerFillingColor));
     if (seekFactor != 0f) {
-      c.drawRect(0, playerBottom - (Screen.dp(1f) + 1), (int) (width * seekFactor), playerBottom, Paints.fillingPaint(ColorUtils.alphaColor(dropShadowAlpha, Theme.getColor(ColorId.headerBarCallActive))));
+      int barLeft = sideInset;
+      int barRight = Math.max(barLeft, barLeft + (int) ((width - sideInset * 2) * seekFactor));
+      c.drawRect(barLeft, playerBottom - (Screen.dp(1f) + 1), barRight, playerBottom, Paints.fillingPaint(ColorUtils.alphaColor(barAlpha, Theme.getColor(ColorId.headerBarCallActive))));
     }
 
     if (speedCounter != null) {
-      speedCounter.draw(c, getRightButtonCenter(width, 2), (playerBottom + playerTop) / 2f, Gravity.CENTER, 1f);
+      speedCounter.draw(c, getRightButtonCenter(width, 2, sideInset), (playerBottom + playerTop) / 2f, Gravity.CENTER, 1f);
     }
 
     TdApi.File file = TD.getFile(playingMessage);
-    DrawAlgorithms.drawPlayPause(c, getRightButtonCenter(width, 0), playerBottom - Size.getHeaderPlayerSize() / 2, Screen.dp(12f), playPausePath, playPauseDrawFactor, playPauseDrawFactor = playPauseFactor, file != null ? TD.getFileProgress(file) : 1f, ColorUtils.alphaColor(dropShadowAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon)));
+    DrawAlgorithms.drawPlayPause(c, getRightButtonCenter(width, 0, sideInset), playerBottom - Size.getHeaderPlayerSize() / 2, Screen.dp(12f), playPausePath, playPauseDrawFactor, playPauseDrawFactor = playPauseFactor, file != null ? TD.getFileProgress(file) : 1f, ColorUtils.alphaColor(barAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon)));
 
-    Drawables.draw(c, forwardIcon, getRightButtonLeft(width, 1), playerBottom - Size.getHeaderPlayerSize() / 2 - forwardIcon.getMinimumHeight() / 2, !drawingFloatingPlayer && dropShadowAlpha == 1f ? Paints.getIconGrayPorterDuffPaint() : Paints.getPorterDuffPaint(ColorUtils.alphaColor(dropShadowAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon))));
+    Drawables.draw(c, forwardIcon, getRightButtonLeft(width, 1, sideInset), playerBottom - Size.getHeaderPlayerSize() / 2 - forwardIcon.getMinimumHeight() / 2, !drawingFloatingPlayer && barAlpha == 1f ? Paints.getIconGrayPorterDuffPaint() : Paints.getPorterDuffPaint(ColorUtils.alphaColor(barAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon))));
     drawCloseIcon(c, playerTop, width, playerBottom, false);
 
-    drawOngoingText(c, playerTop, rectWidth, playerBottom, Screen.dp(67f), null, 1f, 1f);
+    drawOngoingText(c, playerTop, rectWidth, playerBottom, Screen.dp(67f) + sideInset, null, 1f, 1f);
   }
 
   private void drawCloseIcon (Canvas c, int playerTop, float rectWidth, int playerBottom, boolean alignRight) {
-    float cx = alignRight ? rectWidth - Screen.dp(50f) / 2 : Screen.dp(28f);
-    DrawAlgorithms.drawMark(c, cx, playerTop + (playerBottom - playerTop) / 2, 1f, Screen.dp(9f), Paints.getProgressPaint(ColorUtils.alphaColor(dropShadowAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon)),  Screen.dp(2f)));
+    final float barAlpha = drawingFloatingPlayer ? 1f : dropShadowAlpha;
+    int sideInset = floatingSideInset();
+    float cx = alignRight ? rectWidth - Screen.dp(50f) / 2 - sideInset : Screen.dp(28f) + sideInset;
+    DrawAlgorithms.drawMark(c, cx, playerTop + (playerBottom - playerTop) / 2, 1f, Screen.dp(9f), Paints.getProgressPaint(ColorUtils.alphaColor(barAlpha, Theme.getColor(drawingFloatingPlayer ? ColorId.glassIcon : ColorId.icon)),  Screen.dp(2f)));
   }
 
   // Ongoing bar text
@@ -795,12 +837,27 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   }
 
   private void drawOngoingText (Canvas c, int playerTop, float rectWidth, int playerBottom, int textLeft, TextColorSet theme, float titleAlpha, float textAlpha) {
+    final float barAlpha = drawingFloatingPlayer ? 1f : dropShadowAlpha;
     int textTop = Screen.dp(9f);
+    int save = -1;
+    if (drawingFloatingPlayer) {
+      int sideInset = floatingSideInset();
+      int rightLimit = isCurrentSection(SECTION_CALL)
+        ? width - Screen.dp(12f) - sideInset - micIcon.getMinimumWidth() - Screen.dp(6f)
+        : getRightButtonLeft(width, 2, sideInset) - Screen.dp(6f);
+      if (rightLimit > textLeft) {
+        save = c.save();
+        c.clipRect(textLeft, playerTop, rightLimit, playerBottom);
+      }
+    }
     if (trimmedTitle != null) {
-      trimmedTitle.draw(c, textLeft, playerTop + textTop, theme != null ? theme : drawingFloatingPlayer ? TextColorSets.GLASS_TEXT : null, titleAlpha * dropShadowAlpha);
+      trimmedTitle.draw(c, textLeft, playerTop + textTop, theme != null ? theme : drawingFloatingPlayer ? TextColorSets.GLASS_TEXT : null, titleAlpha * barAlpha);
     }
     if (trimmedSubtitle != null) {
-      trimmedSubtitle.draw(c, textLeft + getTitleWidth(), playerTop + textTop, theme != null ? theme : drawingFloatingPlayer ? TextColorSets.GLASS_SECONDARY : null, textAlpha * dropShadowAlpha);
+      trimmedSubtitle.draw(c, textLeft + getTitleWidth(), playerTop + textTop, theme != null ? theme : drawingFloatingPlayer ? TextColorSets.GLASS_SECONDARY : null, textAlpha * barAlpha);
+    }
+    if (save != -1) {
+      c.restoreToCount(save);
     }
   }
 
@@ -1135,22 +1192,25 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     if (!drawingFloatingPlayer && restoreRect && restorePixels > 0) {
       c.drawRect(rectWidth, playerTop, width, playerBottom, Paints.fillingPaint(backgroundColor));
     }
-    final int playerFillingColor = ColorUtils.alphaColor(dropShadowAlpha, backgroundColor);
+    final float barAlpha = drawingFloatingPlayer ? 1f : dropShadowAlpha;
+    final int playerFillingColor = ColorUtils.alphaColor(barAlpha, backgroundColor);
+    final int sideInset = floatingSideInset();
 
-    c.drawRect(0, playerTop, rectWidth, playerBottom, Paints.fillingPaint(playerFillingColor));
+    final int callFillColor = drawingFloatingPlayer ? ColorUtils.alphaColor(.78f * barAlpha, backgroundColor) : playerFillingColor;
+    c.drawRect(0, playerTop, rectWidth, playerBottom, Paints.fillingPaint(callFillColor));
 
     Paint iconPaint = Paints.whitePorterDuffPaint();
 
     // Mute button
-    iconPaint.setAlpha((int) (255f * dropShadowAlpha * callActiveFactor * (1f - callIncomingFactor)));
-    int cx = width - Screen.dp(12f) - micIcon.getMinimumWidth();
+    iconPaint.setAlpha((int) (255f * barAlpha * callActiveFactor * (1f - callIncomingFactor)));
+    int cx = width - Screen.dp(12f) - sideInset - micIcon.getMinimumWidth();
     int cy = playerTop + Screen.dp(6f);
     Drawables.draw(c, micIcon, cx, cy, iconPaint);
     DrawAlgorithms.drawCross(c, cx + micIcon.getMinimumWidth() / 2, cy + micIcon.getMinimumHeight() / 2, callMuteFactor, ColorUtils.color(iconPaint.getAlpha(), 0xffffff), playerFillingColor);
 
     // Call button
-    iconPaint.setAlpha((int) (255f * dropShadowAlpha));
-    cx = Screen.dp(18f);
+    iconPaint.setAlpha((int) (255f * barAlpha));
+    cx = Screen.dp(18f) + sideInset;
     cy = playerTop + Screen.dp(6f);
 
     float callRotationFactor = callIncomingFactor * callActiveFactor;
@@ -1160,7 +1220,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     }
     Drawables.draw(c, hangIcon, cx, cy, iconPaint);
     if (callActiveFactor != 1f) {
-      DrawAlgorithms.drawCross(c, cx + hangIcon.getMinimumWidth() / 2, cy + hangIcon.getMinimumHeight() / 2 - Screen.dp(2f), 1f - callActiveFactor, ColorUtils.color((int) (255f * dropShadowAlpha), 0xffffff), backgroundColor);
+      DrawAlgorithms.drawCross(c, cx + hangIcon.getMinimumWidth() / 2, cy + hangIcon.getMinimumHeight() / 2 - Screen.dp(2f), 1f - callActiveFactor, ColorUtils.color((int) (255f * barAlpha), 0xffffff), backgroundColor);
     }
     if (callRotationFactor != 0f) {
       c.restore();
@@ -1168,7 +1228,7 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     iconPaint.setAlpha(0xff);
 
     float textAlpha = ((float) 0xe0 / (float) 0xff) * (callFlashFactor <= .5f ? 1f - (callFlashFactor / .5f) : (callFlashFactor - .5f) / .5f);
-    drawOngoingText(c, playerTop, rectWidth, playerBottom, textLeft, TextColorSets.WHITE, 1f, textAlpha);
+    drawOngoingText(c, playerTop, rectWidth, playerBottom, textLeft + sideInset, TextColorSets.WHITE, 1f, textAlpha);
   }
 
   // Show/hide ongoing bar
@@ -1337,8 +1397,19 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
     touchDownX = x;
     touchDownY = y;
     ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
+    if (isFloatingPlayerContext()) {
+      int side = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP);
+      if (x < side || x > width - side) return false;
+    }
+    final boolean floating = isFloatingPlayerContext();
     if (!handlingFloatingPlayerTouch && current != null && current.usesGlassPageHeader() && pagePlayerAlpha() == 0f) return false;
-    return (navigationController == null || !navigationController.isAnimating()) && (showOngoingBar || showFactor != 0f) && dropShadowAlpha != 0f && hideFactor != 1f && !(y < playerTop) && !(y > playerBottom) && (handlingFloatingPlayerTouch || y > fillingBottom);
+    return (navigationController == null || !navigationController.isAnimating()) && (showOngoingBar || showFactor != 0f) && (floating ? playerAllowance != 0f : dropShadowAlpha != 0f) && hideFactor != 1f && !(y < playerTop) && !(y > playerBottom) && (handlingFloatingPlayerTouch || y > fillingBottom);
+  }
+
+  private boolean hasFloatingPlayerUi () {
+    if (isFloatingPlayerContext()) return true;
+    ViewController<?> current = navigationController != null ? navigationController.getCurrentStackItem() : null;
+    return current != null && current.hasFloatingPlayer();
   }
 
   @Override
@@ -1347,7 +1418,9 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
       return false;
     }
     if (BitwiseUtils.hasFlag(ongoingSections, SECTION_AUDIO)) {
-      int rIndex = getRightButtonIndex(width, x);
+      int sideInset = hasFloatingPlayerUi() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) : 0;
+      if (x > width - sideInset) return false;
+      int rIndex = getRightButtonIndex(width, x, sideInset);
       return rIndex == 2;
     }
     return false;
@@ -1386,15 +1459,16 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   @Override
   public void onClickAt (View view, float x, float y) {
     final boolean isAudio = BitwiseUtils.hasFlag(ongoingSections, SECTION_AUDIO);
-    int rIndex = getRightButtonIndex(width, x);
+    final int sideInset = isFloatingPlayerContext() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) : 0;
+    final int rightEdge = width - sideInset;
+    int rIndex = getRightButtonIndex(width, x, sideInset);
 
     int buttonSize = Screen.dp(52f);
-    if (!isAudio && x <= width && x >= width - buttonSize - Screen.dp(24f)) {
-      int index = x >= width - buttonSize ? 0 : (int) (width - x - buttonSize) / Screen.dp(24f) + 1;
-      onRightClick(index);
-    } else if (isAudio && x <= width && rIndex <= 2) {
+    if (!isAudio && x <= rightEdge && x >= rightEdge - buttonSize) {
+      onRightClick(0);
+    } else if (isAudio && x <= rightEdge && rIndex <= 2) {
       onRightClick(rIndex);
-    } else if (x >= 0 && x <= buttonSize) {
+    } else if (x >= sideInset && x <= sideInset + buttonSize) {
       onLeftClick();
     } else {
       onBarClick();
@@ -1511,20 +1585,20 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   private static final int OFFSET = 12;
   private static final int GAP = 8;
 
-  private static int getRightButtonIndex (int width, float x) {
-    return Math.max(0, ((int) (width - x - Screen.dp(OFFSET - GAP / 2f))) / Screen.dp(SIZE + GAP));
+  private static int getRightButtonIndex (int width, float x, int sideInset) {
+    return Math.max(0, ((int) (width - sideInset - x - Screen.dp(OFFSET - GAP / 2f))) / Screen.dp(SIZE + GAP));
   }
 
-  private static int getRightButtonLeft (int width, int index) {
-    return width - Screen.dp(OFFSET + SIZE * (index + 1) + GAP * index);
+  private static int getRightButtonLeft (int width, int index, int sideInset) {
+    return width - sideInset - Screen.dp(OFFSET + SIZE * (index + 1) + GAP * index);
   }
 
-  private static int getRightButtonRight (int width, int index) {
-    return getRightButtonLeft(width, index) + Screen.dp(SIZE);
+  private static int getRightButtonRight (int width, int index, int sideInset) {
+    return getRightButtonLeft(width, index, sideInset) + Screen.dp(SIZE);
   }
 
-  private static int getRightButtonCenter (int width, int index) {
-    return getRightButtonLeft(width, index) + Screen.dp(SIZE / 2f);
+  private static int getRightButtonCenter (int width, int index, int sideInset) {
+    return getRightButtonLeft(width, index, sideInset) + Screen.dp(SIZE / 2f);
   }
 
 
@@ -1562,11 +1636,13 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   }
 
   private void showPlaybackTooltip (CharSequence text) {
+    final int sideInset = hasFloatingPlayerUi() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) : 0;
+    final int bottomOffset = hasFloatingPlayerUi() ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP) : 0;
     ((BaseActivity) headerView.getContext()).tooltipManager()
       .builder(headerView)
       .locate((targetView, outRect) -> {
         final int width = targetView.getMeasuredWidth();
-        outRect.set(getRightButtonLeft(width, 2), 0, getRightButtonRight(width, 2), playerBottom);
+        outRect.set(getRightButtonLeft(width, 2, sideInset), 0, getRightButtonRight(width, 2, sideInset), playerBottom + bottomOffset);
       })
       .maxWidth(300)
       .show(null, text).hideDelayed(3000, TimeUnit.MILLISECONDS);
@@ -1576,6 +1652,9 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
   private PopupLayout playbackSpeedPopup;
 
   private void showPlaybackSpeedPicker (float touchX, float touchY) {
+    final boolean floating = hasFloatingPlayerUi();
+    final int sideInset = floating ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP) : 0;
+    final int yOffset = floating ? Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP) : 0;
     playbackOffsetY = Screen.dp(24) - (playerTop + playerBottom) / 2f + touchY;
 
     Settings.instance().markTutorialAsComplete(Settings.TUTORIAL_PLAYBACK_SPEED_HOLD);
@@ -1588,8 +1667,8 @@ public class HeaderFilling extends Drawable implements TGLegacyAudioManager.Play
         playbackSpeedPopup.hideWindow(true);
       }
     }, TdlibManager.instance().player().getSpeed());
-    playbackSpeedLayout.setTranslationY((playerTop + playerBottom) / 2f - Screen.dp(24 + 8));
-    playbackSpeedLayout.setTranslationX(getRightButtonCenter(0, 2) + Screen.dp( 24 + 8));
+    playbackSpeedLayout.setTranslationY((playerTop + playerBottom) / 2f + yOffset - Screen.dp(24 + 8));
+    playbackSpeedLayout.setTranslationX(getRightButtonCenter(0, 2, sideInset) + Screen.dp( 24 + 8));
     playbackSpeedLayout.processTouchEvent(MotionEvent.ACTION_DOWN, touchX, touchY, playbackOffsetY, true);
 
     playbackSpeedPopup.init(true);

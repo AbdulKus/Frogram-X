@@ -14,7 +14,7 @@ public final class AlphaBlur {
   }
 
   private static void filter (int[] source, int[] target, int width, int height, boolean horizontal) {
-    final int radius = 2, count = radius * 2 + 1;
+    final int radius = 1, count = radius * 2 + 1;
     int length = horizontal ? width : height, lines = horizontal ? height : width;
     int step = horizontal ? 1 : width;
     for (int line = 0; line < lines; line++) {

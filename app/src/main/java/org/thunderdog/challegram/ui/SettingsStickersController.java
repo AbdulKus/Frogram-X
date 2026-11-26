@@ -300,6 +300,24 @@ public class SettingsStickersController extends ViewPagerController<SettingsCont
     searchHeaderCell.getTopView().setOnItemClickListener(this);
     searchHeaderCell.getTopView().setItems(getPagerSections());
     searchHeaderCell.getTopView().setSelectionFactor(lastSelectionFactor);
+    if (hasFloatingHeader()) {
+      searchHeaderCell.getTopView().setGlassSelection(true);
+      searchHeaderCell.getTopView().setSelectionColorId(org.thunderdog.challegram.theme.ColorId.glassActive);
+      searchHeaderCell.getTopView().setTextFromToColorId(org.thunderdog.challegram.theme.ColorId.glassIcon, org.thunderdog.challegram.theme.ColorId.glassActive);
+      searchHeaderCell.setContentInsetY(getHeaderControlsInset());
+      androidx.recyclerview.widget.RecyclerView strip = searchHeaderCell.getRecyclerView();
+      me.vkryl.android.widget.FrameLayoutFix.LayoutParams tabsParams = (me.vkryl.android.widget.FrameLayoutFix.LayoutParams) strip.getLayoutParams();
+      tabsParams.leftMargin = tabsParams.rightMargin = Screen.dp(org.thunderdog.challegram.widget.GlassStyle.SIDE_DP + 4f);
+      strip.setLayoutParams(tabsParams);
+    }
+    addThemeInvalidateListener(searchHeaderCell.getTopView());
+    me.vkryl.android.widget.FrameLayoutFix.LayoutParams editParams = (me.vkryl.android.widget.FrameLayoutFix.LayoutParams) editText.getLayoutParams();
+    int startMargin = Screen.dp(68f) + (hasFloatingHeader() ? Screen.dp(6f) : 0);
+    int endMargin = Screen.dp(49f) + (hasFloatingHeader() ? Screen.dp(10f) : 0);
+    editParams.topMargin = getHeaderControlsInset();
+    editParams.leftMargin = org.thunderdog.challegram.core.Lang.rtl() ? endMargin : startMargin;
+    editParams.rightMargin = org.thunderdog.challegram.core.Lang.rtl() ? startMargin : endMargin;
+    editText.setLayoutParams(editParams);
     searchHeaderCell.addView(editText);
 
     return new SearchEditTextDelegate() {

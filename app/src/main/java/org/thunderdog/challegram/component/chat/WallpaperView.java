@@ -263,6 +263,8 @@ public class WallpaperView extends View implements ThemeChangeListener, ChatStyl
 
   @Override
   public void performDestroy () {
+    glassCacheCanvas = null;
+    glassCache = null;
     receiver.destroy();
     if (preview != null) {
       preview.destroy();
@@ -360,12 +362,18 @@ public class WallpaperView extends View implements ThemeChangeListener, ChatStyl
   public static final int OVERLAY_ALPHA = 0x70;
 
   private Runnable glassInvalidationListener;
+  private android.graphics.Bitmap glassCache;
+  private Canvas glassCacheCanvas;
+  private final android.graphics.Paint glassCachePaint = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+  private final android.graphics.RectF glassCacheDst = new android.graphics.RectF();
+  private boolean glassCacheDirty = true;
 
   public void setGlassInvalidationListener (Runnable listener) {
     glassInvalidationListener = listener;
   }
 
   private void invalidateGlass () {
+    glassCacheDirty = true;
     if (glassInvalidationListener != null) glassInvalidationListener.run();
   }
 
@@ -385,15 +393,63 @@ public class WallpaperView extends View implements ThemeChangeListener, ChatStyl
   }
 
   @Override
+  protected void onSizeChanged (int w, int h, int oldw, int oldh) {
+    super.onSizeChanged(w, h, oldw, oldh);
+    glassCacheDirty = true;
+  }
+
+  @Override
   protected void onDraw (Canvas c) {
     int save = c.save();
     c.clipRect(0, 0, getWidth(), getHeight());
-    drawForGlass(c);
+    drawWallpaperContents(c);
     c.restoreToCount(save);
   }
 
   /** Draw only the wallpaper; do not recursively invalidate its glass consumers. */
   public void drawForGlass (Canvas c) {
+    if (c.isHardwareAccelerated()) {
+      drawWallpaperContents(c);
+      return;
+    }
+    if (!manager.useBubbles()) {
+      c.drawColor(Theme.getColor(ColorId.chatBackground));
+      return;
+    }
+    if (!isAnimatingChanges()) {
+      if (wallpaper == null || wallpaper.isEmpty()) {
+        c.drawColor(getWallpaperBackground(ThemeManager.instance().currentTheme()));
+        return;
+      }
+      if (wallpaper.isFillSolid()) {
+        c.drawColor(wallpaper.getBackgroundColor(getWallpaperBackground(ThemeManager.instance().currentTheme())));
+        return;
+      }
+    }
+    int width = getWidth() > 0 ? getWidth() : getMeasuredWidth();
+    int height = getHeight() > 0 ? getHeight() : getMeasuredHeight();
+    if (width <= 0 || height <= 0) return;
+    float scale = Math.min(1f, 180f / Math.max(1, Math.min(width, height)));
+    int targetW = Math.max(1, Math.round(width * scale));
+    int targetH = Math.max(1, Math.round(height * scale));
+    if (glassCache == null || glassCacheDirty || glassCache.getWidth() != targetW || glassCache.getHeight() != targetH) {
+      if (glassCache == null || glassCache.getWidth() != targetW || glassCache.getHeight() != targetH) {
+        glassCache = android.graphics.Bitmap.createBitmap(targetW, targetH, android.graphics.Bitmap.Config.ARGB_8888);
+        glassCacheCanvas = new Canvas(glassCache);
+      } else {
+        glassCache.eraseColor(0);
+      }
+      glassCacheDirty = false;
+      int save = glassCacheCanvas.save();
+      glassCacheCanvas.scale(targetW / (float) width, targetH / (float) height);
+      drawWallpaperContents(glassCacheCanvas);
+      glassCacheCanvas.restoreToCount(save);
+    }
+    glassCacheDst.set(0, 0, width, height);
+    c.drawBitmap(glassCache, null, glassCacheDst, glassCachePaint);
+  }
+
+  private void drawWallpaperContents (Canvas c) {
     if (manager.useBubbles()) {
       layoutReceivers();
       if (!isAnimatingChanges()) {

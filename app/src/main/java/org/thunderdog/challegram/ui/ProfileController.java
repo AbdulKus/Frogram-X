@@ -390,7 +390,46 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private final AvatarPickerManager avatarPickerManager;
 
+  private int playerInset;
+
   @Override protected boolean usesGlassPageHeader () { return true; }
+
+  @Override
+  protected boolean applyPlayerOffset (float factor, float top) {
+    int next = useDropPlayer()
+      ? org.thunderdog.challegram.util.FloatingPlayerGeometry.inset(top, HeaderView.getPlayerSize(), Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PLAYER_OFFSET_DP))
+      : 0;
+    if (playerInset == next) return false;
+    playerInset = next;
+    cachedItemsWidth = cachedItemsHeight = 0;
+    if (baseAdapter != null && baseRecyclerView != null) {
+      View first = baseRecyclerView.getLayoutManager() != null ? baseRecyclerView.getLayoutManager().findViewByPosition(0) : null;
+      if (first != null && baseAdapter.getItemCount() > 0 && baseAdapter.getItemViewType(0) == ListItem.TYPE_EMPTY_OFFSET && first.getLayoutParams() != null) {
+        int expected = headerSpacerHeight();
+        if (first.getLayoutParams().height != expected) {
+          first.getLayoutParams().height = expected;
+          first.requestLayout();
+        }
+      } else if (baseAdapter.getItemCount() > 0 && baseAdapter.getItemViewType(0) == ListItem.TYPE_EMPTY_OFFSET) {
+        baseAdapter.notifyItemChanged(0);
+      }
+      baseRecyclerView.invalidateItemDecorations();
+    }
+    if (topWrap != null) {
+      checkTopViewPosition();
+    }
+    if (pagerAdapter != null) {
+      for (int i = 0; i < pagerAdapter.getCount(); i++) {
+        ViewController<?> page = pagerAdapter.findCachedControllerByPosition(i);
+        if (page instanceof SharedBaseController) {
+          RecyclerView rv = ((SharedBaseController<?>) page).getRecyclerView();
+          if (rv != null) rv.invalidateItemDecorations();
+        }
+      }
+    }
+    onGlassPageContentInvalidated();
+    return true;
+  }
 
   @Override protected void onGlassPageContentInvalidated () {
     super.onGlassPageContentInvalidated();
@@ -5594,7 +5633,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private int headerSpacerHeight () {
     return Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP)
-      + getMaximumHeaderHeight() - Size.getHeaderPortraitSize();
+      + getMaximumHeaderHeight() - Size.getHeaderPortraitSize() + playerInset;
   }
 
   private int calculateHeight (int position, int width, ListItem item) {
@@ -5878,11 +5917,11 @@ public class ProfileController extends ViewController<ProfileController.Args> im
 
   private int maxItemsScrollY () {
     if (isEditing()) return Math.max(0, managementPanelTop() - pinnedTabsTop());
-    return getTopItemsHeight() - getShadowBottomHeight() - getPagerTopViewHeight();
+    return getTopItemsHeight() - getShadowBottomHeight() - getPagerTopViewHeight() - playerInset;
   }
 
   private int pinnedTabsTop () {
-    return Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP);
+    return Screen.dp(org.thunderdog.challegram.widget.GlassStyle.HEADER_OVERFLOW_DP + org.thunderdog.challegram.widget.GlassStyle.HEADER_EDGE_DP) + playerInset;
   }
 
   private int managementPanelTop () {
@@ -5912,7 +5951,7 @@ public class ProfileController extends ViewController<ProfileController.Args> im
       int shadow = page.adapter.getItemCount() > 0 && page.adapter.getItemViewType(0) == ListItem.TYPE_SHADOW_TOP
         ? SettingHolder.measureHeightForType(ListItem.TYPE_SHADOW_TOP) : 0;
       if (!needTabs()) {
-        return maxItemsScrollY() + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP) - shadow;
+        return maxItemsScrollY() + playerInset + Screen.dp(org.thunderdog.challegram.widget.GlassStyle.PAGE_CLEARANCE_DP) - shadow;
       }
       int panelTop = isEditing() ? managementPanelTop() : maxItemsScrollY() + pinnedTabsTop();
       return panelTop + getItemsBound() + Screen.dp(4f) - shadow;

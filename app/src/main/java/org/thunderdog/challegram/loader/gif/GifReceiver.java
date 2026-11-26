@@ -800,8 +800,9 @@ public class GifReceiver implements GifWatcher, Runnable, Receiver {
           if (Config.DEBUG_GIF_OPTIMIZATION_MODE) {
             c.drawRect(drawRegion, Paints.fillingPaint(debugOptimizationColors[file.getOptimizationMode()]));
           }
-          final boolean inBatch = isInDrawBatch();
-          if (!inBatch || !BitwiseUtils.hasFlag(drawBatchFlags, DRAW_BATCH_DRAWN)) {
+          final boolean glassPass = !c.isHardwareAccelerated() && org.thunderdog.challegram.util.GlassRenderState.isActive();
+          final boolean inBatch = glassPass || isInDrawBatch();
+          if (!inBatch || (!glassPass && !BitwiseUtils.hasFlag(drawBatchFlags, DRAW_BATCH_DRAWN))) {
             gif.applyNext();
             if (inBatch) {
               drawBatchFlags |= DRAW_BATCH_DRAWN;
@@ -827,7 +828,11 @@ public class GifReceiver implements GifWatcher, Runnable, Receiver {
             } else {
               restoreToCount = -1;
             }
-            c.drawRoundRect(croppedClipRegion, radius, radius, shaderPaint(frame.bitmap, paint.getAlpha()));
+            if (glassPass) {
+              c.drawBitmap(frame.bitmap, null, croppedClipRegion, paint);
+            } else {
+              c.drawRoundRect(croppedClipRegion, radius, radius, shaderPaint(frame.bitmap, paint.getAlpha()));
+            }
             if (clip) {
               Views.restore(c, restoreToCount);
             }
@@ -859,7 +864,7 @@ public class GifReceiver implements GifWatcher, Runnable, Receiver {
             rect.set((int) bitmapRect.left, (int) bitmapRect.top, (int) bitmapRect.right, (int) bitmapRect.bottom);
             c.drawBitmap(frame.bitmap, rect, drawRegion, paint);
           }
-          isFirstFrame = frame.no == 0;
+          isFirstFrame = !glassPass && frame.no == 0;
           if (Config.DEBUG_GIF_OPTIMIZATION_MODE) {
             c.drawText("" + file.getRequestedSize(), (int) drawRegion.left, (int) drawRegion.top + Screen.dp(16), Paints.robotoStyleProvider(12f).getFakeBoldPaint());
           }
