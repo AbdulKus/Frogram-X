@@ -910,7 +910,15 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
       (hasGlassStatusBar() ? !Theme.isDark() : Theme.needLightStatusBar());
   }
 
+  @SuppressWarnings("deprecation")
   public void setWindowDecorSystemUiVisibility (int visibility, boolean remember) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      visibility &= ~View.SYSTEM_UI_FLAG_LOW_PROFILE;
+    }
+    lastWindowVisibility = visibility;
+    if (remember) {
+      requestedWindowVisibility = visibility;
+    }
     boolean lightNavigationBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Config.USE_CUSTOM_NAVIGATION_COLOR && !Theme.isDark() && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
     boolean glassHeader = hasGlassStatusBar();
     if (statusBar != null) statusBar.setFloatingHeader(glassHeader);
@@ -919,10 +927,6 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     if (this.isWindowLight != lightNavigationBar) {
       this.isWindowLight = lightNavigationBar;
       updateNavigationBarColor();
-    }
-    lastWindowVisibility = visibility;
-    if (remember) {
-      requestedWindowVisibility = visibility;
     }
   }
 
@@ -938,7 +942,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     int flags = BitwiseUtils.setFlag(this.fullScreenFlags, flag, enabled);
     if (this.fullScreenFlags != flags) {
       this.fullScreenFlags = flags;
-      setFullScreen(flags != 0 && !BitwiseUtils.hasFlag(flags, FULLSCREEN_FLAG_PASSCODE) && !BitwiseUtils.hasFlag(flags, FULLSCREEN_FLAG_HAS_NO_FULLSCREEN_VIEWS));
+      setFullScreen((flags & ~FULLSCREEN_FLAG_HIDE_NAVIGATION) != 0 && !BitwiseUtils.hasFlag(flags, FULLSCREEN_FLAG_PASSCODE) && !BitwiseUtils.hasFlag(flags, FULLSCREEN_FLAG_HAS_NO_FULLSCREEN_VIEWS));
       setHideNavigation(isFullscreen && BitwiseUtils.hasFlag(flags, FULLSCREEN_FLAG_HIDE_NAVIGATION));
       updateNavigationBarColor();
     }
@@ -974,7 +978,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   private int computeUiVisibility () {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && isFullscreen) {
-      int uiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE;
+      int uiVisibility = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ? View.SYSTEM_UI_FLAG_VISIBLE : View.SYSTEM_UI_FLAG_LOW_PROFILE;
       if (hideNavigation) {
         uiVisibility |= View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
       }
@@ -995,7 +999,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
       if (this.isFullscreen != isFullscreen) {
         this.isFullscreen = isFullscreen;
-        this.hideNavigation = BitwiseUtils.hasFlag(fullScreenFlags, FULLSCREEN_FLAG_HIDE_NAVIGATION);
+        this.hideNavigation = isFullscreen && BitwiseUtils.hasFlag(fullScreenFlags, FULLSCREEN_FLAG_HIDE_NAVIGATION);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isFullscreen && (Config.CUTOUT_ENABLED || BitwiseUtils.hasFlag(fullScreenFlags, FULLSCREEN_FLAG_CAMERA))) {
           cutoutIgnored = true;
           Window w = getWindow();
@@ -1395,6 +1399,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   private final NavigationStack.ChangeListener navigationStackChangeListener = stack -> {
     notifyBackPressAvailabilityChanged();
+    updateWindowDecorSystemUiVisibility();
   };
 
   private final OnBackPressedCallback backPressedCallback = new OnBackPressedCallback(false) {

@@ -221,7 +221,7 @@ public class WebViewPreviewLayout extends PreviewLayout {
     context.setScreenFlagEnabled(BaseActivity.SCREEN_FLAG_PLAYING_FULLSCREEN_WEB_VIDEO, inFullscreen);
     if (inFullscreen) {
       context.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-      context.setWindowDecorSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE, false);
+      context.setWindowDecorSystemUiVisibility(Build.VERSION.SDK_INT < Build.VERSION_CODES.R ? View.SYSTEM_UI_FLAG_LOW_PROFILE : View.SYSTEM_UI_FLAG_VISIBLE, false);
     } else {
       context.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
       context.setWindowDecorSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE, false);

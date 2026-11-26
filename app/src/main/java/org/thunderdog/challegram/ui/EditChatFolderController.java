@@ -1342,17 +1342,19 @@ public class EditChatFolderController extends EditBaseController<EditChatFolderC
 
       if (isLast) {
         LinearLayoutManager manager = (LinearLayoutManager) parent.getLayoutManager();
-        int recyclerHeight = recyclerView.getMeasuredHeight() - org.thunderdog.challegram.navigation.GlassPageContent.viewportInset(recyclerView);
+        int availableHeight = Math.max(0, recyclerView.getMeasuredHeight() - recyclerView.getPaddingTop() - recyclerView.getPaddingBottom());
         int emptyHeight;
         if (manager.findFirstVisibleItemPosition() == 0 && manager.findLastVisibleItemPosition() == lastIndex) {
           if (DECORATION_LOGGING_ENABLED) {
             Log.v("fully visible");
           }
           View firstView = manager.findViewByPosition(0);
-          int scrolledBy = firstView != null ? -firstView.getTop() : 0;
           View lastView = manager.findViewByPosition(lastIndex);
-          int lastBottom = lastView != null && lastView.getBottom() != 0 ? lastView.getBottom() : recyclerHeight;
-          emptyHeight = recyclerHeight - lastBottom - scrolledBy;
+          if (firstView != null && lastView != null && lastView.getBottom() != 0) {
+            emptyHeight = availableHeight - (lastView.getBottom() - firstView.getTop());
+          } else {
+            emptyHeight = 0;
+          }
         } else {
           if (DECORATION_LOGGING_ENABLED) {
             Log.v("partially visible");
@@ -1375,7 +1377,7 @@ public class EditChatFolderController extends EditBaseController<EditChatFolderC
             }
             contentHeight += childHeight;
           }
-          emptyHeight = recyclerHeight - contentHeight;
+          emptyHeight = availableHeight - contentHeight;
         }
         int minScrollableHeight = 0;
         if (isDoneVisible()) {

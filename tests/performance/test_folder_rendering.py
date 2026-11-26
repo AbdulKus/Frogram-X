@@ -32,6 +32,38 @@ class FolderRenderingTest(unittest.TestCase):
     def test_chip_touch_coordinates_follow_the_padded_drawing_origin(self):
         self.run_java(TOUCHES, 'ui/SelectChatsController.java', 'public boolean onTouchEvent (')
 
+    def test_folder_editor_bottom_offset_preserves_padded_viewport(self):
+        editor_src = (JAVA / 'ui/EditChatFolderController.java').read_text()
+        decoration = method(editor_src, 'public void getItemOffsets (').replace('@Override', '').replace('@NonNull ', '')
+        with tempfile.TemporaryDirectory(prefix='frogram-folder-offset-') as directory:
+            target = Path(directory) / 'Regression.java'
+            target.write_text(FOLDER_OFFSET.replace('PRODUCTION', decoration))
+            compiled = subprocess.run([shutil.which('javac'), str(target)], capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            ran = subprocess.run([shutil.which('java'), '-cp', directory, 'Regression'], capture_output=True, text=True)
+            self.assertEqual(ran.returncode, 0, ran.stderr)
+
+    def test_interface_chats_card_starts_with_rounded_top_and_omits_empty_card(self):
+        theme_src = (JAVA / 'ui/SettingsThemeController.java').read_text()
+        start = theme_src.index('items.add(new ListItem(ListItem.TYPE_HEADER, 0, 0, R.string.Chats));')
+        end = theme_src.index('items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_chatSwipes', start)
+        end = theme_src.index(';', end) + 1
+        snippet = (
+            theme_src[start:end]
+            .replace('AppInstallationUtil.isAppSideLoaded(UI.getAppContext())', 'sideLoadedValue')
+            .replace('tdlib.canIgnoreSensitiveContentRestriction()', 'canIgnoreSensitive')
+            .replace('tdlib.ignoreSensitiveContentRestrictions()', 'ignoreSensitive')
+            .replace('Settings.instance().needRestrictContent()', 'needRestrict')
+            .replace('Settings.instance().getNewSetting(Settings.SETTING_FLAG_EXPLICIT_DICE)', 'explicitDice')
+        )
+        with tempfile.TemporaryDirectory(prefix='frogram-theme-chats-') as directory:
+            target = Path(directory) / 'Regression.java'
+            target.write_text(THEME_CHATS.replace('PRODUCTION', snippet))
+            compiled = subprocess.run([shutil.which('javac'), str(target)], capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            ran = subprocess.run([shutil.which('java'), '-cp', directory, 'Regression'], capture_output=True, text=True)
+            self.assertEqual(ran.returncode, 0, ran.stderr)
+
 
 CLIPPING = '''import java.util.Arrays;
 public class Regression {
@@ -95,3 +127,103 @@ TOUCHES = '''public class Regression {
   group.delegate=new Object();group.clickHelper.fail=true;try{group.onTouchEvent(event);throw new AssertionError();}catch(IllegalStateException expected){}check(event.x==10&&event.y==14);
  }
 }'''
+
+FOLDER_OFFSET = '''public class Regression {
+ static void check(boolean v,String msg){if(!v)throw new AssertionError(msg);}
+ static final boolean DECORATION_LOGGING_ENABLED=false;
+ static class Log {static void v(String m,Object... args){}}
+ static class Screen {static int dp(float v){return Math.round(v*2.75f);}}
+ static class Rect {int bottom;void setEmpty(){bottom=0;}}
+ static class View {
+  int top,bottom,measuredHeight;
+  View(int t,int b){top=t;bottom=b;measuredHeight=b-t;}
+  int getTop(){return top;}
+  int getBottom(){return bottom;}
+  int getMeasuredHeight(){return measuredHeight;}
+ }
+ static class ListItem {}
+ static class SettingHolder {static int measureHeightForType(ListItem item){return 100;}}
+ static class Adapter {int count=15;int getItemCount(){return count;}ListItem getItem(int i){return new ListItem();}}
+ static class LinearLayoutManager {
+  int firstPos=0,lastPos=14;View firstView,lastView;
+  int findFirstVisibleItemPosition(){return firstPos;}
+  int findLastVisibleItemPosition(){return lastPos;}
+  View findViewByPosition(int i){if(i==0)return firstView;if(i==lastPos)return lastView;return new View(0,100);}
+ }
+ static class RecyclerView {
+  static final int NO_POSITION=-1;
+  static class State {}
+  static class ItemDecoration {}
+  LinearLayoutManager manager;int measuredHeight=2340,paddingTop=345,paddingBottom=66;
+  RecyclerView(LinearLayoutManager m){manager=m;}
+  int getChildAdapterPosition(View v){return manager.lastPos;}
+  LinearLayoutManager getLayoutManager(){return manager;}
+  int getMeasuredHeight(){return measuredHeight;}
+  int getPaddingTop(){return paddingTop;}
+  int getPaddingBottom(){return paddingBottom;}
+ }
+ Adapter adapter=new Adapter();
+ RecyclerView recyclerView;
+ boolean doneVisible=false;
+ boolean isDoneVisible(){return doneVisible;}
+ PRODUCTION
+ public static void main(String[] args){
+  Regression r=new Regression();
+  LinearLayoutManager lm=new LinearLayoutManager();
+  lm.firstView=new View(345,420);
+  lm.lastView=new View(1650,1795); // contentHeight = 1450
+  r.recyclerView=new RecyclerView(lm);
+  Rect out=new Rect();
+  r.getItemOffsets(out,lm.lastView,r.recyclerView,new RecyclerView.State());
+  int decoratedBottom=lm.lastView.getBottom()+out.bottom;
+  int paddedEnd=r.recyclerView.getMeasuredHeight()-r.recyclerView.getPaddingBottom();
+  check(decoratedBottom==paddedEnd,"short list overflowed padded viewport: "+decoratedBottom+" != "+paddedEnd);
+  r.doneVisible=true;
+  lm.firstPos=1; // partially visible long list (> availableHeight)
+  lm.lastPos=29;
+  r.adapter.count=30;
+  r.getItemOffsets(out,lm.lastView,r.recyclerView,new RecyclerView.State());
+  check(out.bottom==Screen.dp(76f),"done button inset missing: "+out.bottom);
+ }
+}'''
+
+THEME_CHATS = '''import java.util.*;
+public class Regression {
+ static void check(boolean v,String msg){if(!v)throw new AssertionError(msg);}
+ static class R {
+  static class string {static final int Chats=1,DisplaySensitiveContent=2,IgnoreRestrictions=3,UseExplicitDice=4,ChatQuickActions=5;}
+  static class id {static final int btn_restrictSensitiveContent=10,btn_ignoreContentRestrictions=11,btn_toggleNewSetting=12,btn_chatSwipes=13;}
+ }
+ static class Settings {static final long SETTING_FLAG_EXPLICIT_DICE=1L;}
+ static class ListItem {
+  static final int TYPE_HEADER=1,TYPE_SHADOW_TOP=2,TYPE_SHADOW_BOTTOM=3,TYPE_SEPARATOR_FULL=4,TYPE_RADIO_SETTING=5,TYPE_VALUED_SETTING_COMPACT=6;
+  int type,id;
+  ListItem(int type){this.type=type;}
+  ListItem(int type,int id,int icon,int str){this.type=type;this.id=id;}
+  ListItem setLongId(long l){return this;}
+ }
+ static List<ListItem> build(boolean sideLoadedValue,boolean canIgnoreSensitive,boolean ignoreSensitive,boolean needRestrict,boolean explicitDice){
+  List<ListItem> items=new ArrayList<>();
+  PRODUCTION
+  return items;
+ }
+ public static void main(String[] args){
+  List<ListItem> none=build(false,false,false,true,false);
+  check(none.size()==3,"empty card leaked: "+none.size());
+  check(none.get(0).type==ListItem.TYPE_HEADER&&none.get(1).type==ListItem.TYPE_SHADOW_TOP&&none.get(2).id==R.id.btn_chatSwipes,"unexpected header/card when hidden");
+
+  for(int mask=1;mask<8;mask++){
+   boolean sens=(mask&1)!=0,ign=(mask&2)!=0,dice=(mask&4)!=0;
+   List<ListItem> items=build(false,sens,sens,!ign,dice);
+   check(items.get(0).type==ListItem.TYPE_HEADER,"missing header");
+   check(items.get(1).type==ListItem.TYPE_SHADOW_TOP,"first conditional item must follow TYPE_SHADOW_TOP");
+   check(items.get(2).type==ListItem.TYPE_RADIO_SETTING,"missing radio setting after SHADOW_TOP");
+   int expectedCount=3+(Integer.bitCount(mask)-1)*2+3;
+   check(items.size()==expectedCount,"wrong item count for mask "+mask+": "+items.size());
+   check(items.get(items.size()-3).type==ListItem.TYPE_SHADOW_BOTTOM,"missing bottom shadow before chatSwipes");
+   check(items.get(items.size()-2).type==ListItem.TYPE_SHADOW_TOP,"missing top shadow for chatSwipes");
+   check(items.get(items.size()-1).id==R.id.btn_chatSwipes,"missing chatSwipes");
+  }
+ }
+}'''
+

@@ -844,7 +844,7 @@ public class MediaViewController extends ViewController<MediaViewController.Args
 
       if (!inCaption) {
         UI.post(() -> {
-          if (!isDestroyed() && !MediaViewController.this.inCaption) {
+          if (!isDestroyed() && !MediaViewController.this.inCaption && revealAnimator.getFactor() > 0f && revealAnimator.getToFactor() > 0f) {
             setLowProfile(true);
           }
         }, 100);
@@ -943,12 +943,17 @@ public class MediaViewController extends ViewController<MediaViewController.Args
     }
   }
 
+  @SuppressWarnings("deprecation")
   private void setLowProfile (boolean isLowProfile) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
       if (isLowProfile) {
         if (mode == MODE_SECRET && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && Config.CUTOUT_ENABLED) {
-          context().setWindowDecorSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LOW_PROFILE, true);
-        } else {
+          int flags = View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            flags |= View.SYSTEM_UI_FLAG_LOW_PROFILE;
+          }
+          context().setWindowDecorSystemUiVisibility(flags, true);
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
           context().setWindowDecorSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE, true);
         }
       } else {
@@ -970,7 +975,10 @@ public class MediaViewController extends ViewController<MediaViewController.Args
           context().addFullScreenView(this, true);
         } else {
           context().removeFullScreenView(this, true);
+          context().removeHideNavigationView(this);
         }
+      } else if (!isFullscreen) {
+        context().removeHideNavigationView(this);
       }
     }
   }
@@ -1295,9 +1303,7 @@ public class MediaViewController extends ViewController<MediaViewController.Args
           showCurrentCell();
           popupView.onCustomHideAnimationComplete();
           setFullScreen(false);
-          if (mode == MODE_SECRET && revealAnimationType == ANIMATION_TYPE_SECRET_CLOSE) {
-            setLowProfile(false);
-          }
+          setLowProfile(false);
           onHide();
         } else if (finalFactor == 1f) {
           context().getRootView().forceHideKeyboard();

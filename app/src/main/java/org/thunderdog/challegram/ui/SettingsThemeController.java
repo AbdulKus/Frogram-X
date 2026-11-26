@@ -527,22 +527,27 @@ public class SettingsThemeController extends SettingsPageController<SettingsThem
       items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
 
       items.add(new ListItem(ListItem.TYPE_HEADER, 0, 0, R.string.Chats));
-      items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
+      boolean hasContentRestrictionItems = false;
 
       boolean sideLoaded = AppInstallationUtil.isAppSideLoaded(UI.getAppContext());
       if (tdlib.canIgnoreSensitiveContentRestriction() && (sideLoaded || tdlib.ignoreSensitiveContentRestrictions())) {
-        items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+        items.add(new ListItem(hasContentRestrictionItems ? ListItem.TYPE_SEPARATOR_FULL : ListItem.TYPE_SHADOW_TOP));
+        hasContentRestrictionItems = true;
         items.add(new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_restrictSensitiveContent, 0, R.string.DisplaySensitiveContent));
       }
       if (sideLoaded || !Settings.instance().needRestrictContent()) {
-        items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+        items.add(new ListItem(hasContentRestrictionItems ? ListItem.TYPE_SEPARATOR_FULL : ListItem.TYPE_SHADOW_TOP));
+        hasContentRestrictionItems = true;
         items.add(new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_ignoreContentRestrictions, 0, R.string.IgnoreRestrictions));
       }
       if (Settings.instance().getNewSetting(Settings.SETTING_FLAG_EXPLICIT_DICE)) {
-        items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
+        items.add(new ListItem(hasContentRestrictionItems ? ListItem.TYPE_SEPARATOR_FULL : ListItem.TYPE_SHADOW_TOP));
+        hasContentRestrictionItems = true;
         items.add(new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_toggleNewSetting, 0, R.string.UseExplicitDice).setLongId(Settings.SETTING_FLAG_EXPLICIT_DICE));
       }
-      items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
+      if (hasContentRestrictionItems) {
+        items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
+      }
       items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
       items.add(new ListItem(ListItem.TYPE_VALUED_SETTING_COMPACT, R.id.btn_chatSwipes, 0, R.string.ChatQuickActions));
       items.add(new ListItem(ListItem.TYPE_SEPARATOR_FULL));
