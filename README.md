@@ -48,7 +48,16 @@ Release-сборка требует постоянный ключ подписи
 
 После успешной сборки `main` Actions публикует релиз с APK, `SHA256SUMS.txt`, `update.json` и автоматически сформированным описанием изменений. Релиз становится видимым только после загрузки всех файлов. Манифест обновления строится из настоящих данных APK. Базовый номер Android-версии равен `version.app + GITHUB_RUN_NUMBER`, поэтому последовательные сборки отличаются даже без обновления версии Telegram X.
 
-Для push-уведомлений зарегистрируйте Android-приложение `org.frogram.messenger` в бесплатном проекте Firebase, скачайте `google-services.json` и добавьте его в secret `GOOGLE_SERVICES_JSON_BASE64` в виде одной base64-строки. Без этого секрета release собирается, но Firebase Cloud Messaging отключается.
+Для push-уведомлений нужны **настройка Android-клиента и настройка отправителя Telegram**:
+
+1. Зарегистрируйте Android-приложение `org.frogram.messenger` в Firebase, скачайте клиентский `google-services.json` и добавьте его в secret `GOOGLE_SERVICES_JSON_BASE64` в виде одной base64-строки.
+2. В том же Firebase-проекте проверьте, что включён Firebase Cloud Messaging API (HTTP v1). В **Project settings → Service accounts → Firebase Admin SDK → Generate new private key** получите серверный JSON сервисного аккаунта.
+3. На [my.telegram.org/apps](https://my.telegram.org/apps) откройте Android-приложение, чей API ID записан в `TELEGRAM_API_ID`. Загрузите серверный JSON в раздел настройки FCM/push. Клиентский `google-services.json` и его `api_key` не заменяют серверные реквизиты. Серверный JSON содержит закрытый ключ: не добавляйте его в APK, репозиторий, логи или `GOOGLE_SERVICES_JSON_BASE64`.
+4. Сверьте `project_id` в обоих JSON. После обновления серверных реквизитов откройте Frogram X и выполните **Push Services → Check & re-register push**.
+
+Без `GOOGLE_SERVICES_JSON_BASE64` workflow останавливает release-сборку; для pull request без доступа к секретам разрешена тестовая сборка без Firebase.
+
+Статус `7/7 registered` означает принятие регистрации устройств, но не проверку отправки через FCM. Если `Packages received: 0`, проверьте серверную настройку выше. Уведомления при открытом приложении могут приходить через активное соединение TDLib и не подтверждают работу Firebase. Подробная проверка описана в [диагностике push](docs/FIREBASE_PUSH.md).
 
 ## Локальная сборка
 
